@@ -1,0 +1,68 @@
+{
+  "version": 2,
+  "note": "路由语料：症状原文→分阶段期望。S1=仅 L0 命中正确 L1；S2=读 L1 后命中 playbook/包内深参考；S3=执行闭环（完成判据或声明回退）。行为正确性由真实 agent harness/人工验收（G5），本文件只存结构期望。core=true 的用例属发布基线 G1 核心任务集，禁止为过 gate 缩小。",
+  "cases": [
+    {
+      "id": "mouth-double-line",
+      "symptom": "闭嘴时嘴部出现两条线，像小胡子",
+      "stage": ["S1", "S2", "S3"],
+      "expect_l1": ["route-model-repair.md"],
+      "expect_pb": ["pb-render-compare.md", "pb-mouth-geometry-repair.md", "pb-mouth-layer-crossfade.md"],
+      "expect_ref": ["deep-live2d-psd2live-mouth-pipeline.md"],
+      "l0_keywords": ["像小胡子", "嘴部"],
+      "core": true
+    },
+    {
+      "id": "illustration-to-model",
+      "symptom": "只有一张立绘，要拆层做成 Live2D 模型并发布",
+      "stage": ["S1", "S2", "S3"],
+      "expect_l1": ["route-input-layering.md"],
+      "expect_pb": ["pb-export-and-audit-tags.md", "pb-render-compare.md", "pb-publish-and-handoff.md"],
+      "expect_ref": ["deep-live2d-layer-decomposition-tools.md"],
+      "l0_keywords": ["拆层"],
+      "core": true
+    },
+    {
+      "id": "viewer-blank-misattribution",
+      "symptom": "模型在别的软件正常，在这里整块空白",
+      "stage": ["S1", "S2", "S3"],
+      "expect_l1": ["route-runtime-integration.md"],
+      "expect_pb": ["pb-render-compare.md"],
+      "expect_ref": ["deep-live2d-runtime-render-check.md"],
+      "l0_keywords": ["整块空白"],
+      "core": true
+    },
+    {
+      "id": "semantic-tag-binding",
+      "symptom": "部件跟着头壳移动，不跟自己的参数",
+      "stage": ["S1", "S2", "S3"],
+      "expect_l1": ["route-model-repair.md"],
+      "expect_pb": ["pb-render-compare.md", "pb-export-and-audit-tags.md"],
+      "expect_ref": ["deep-live2d-psd2live-semantics.md"],
+      "l0_keywords": ["跟着头走"],
+      "core": true
+    },
+    {
+      "id": "hairline-trial-adjustment",
+      "symptom": "刘海偏低，往上拉一点试试",
+      "stage": ["S1", "S2", "S3"],
+      "expect_l1": ["route-art-repair.md"],
+      "expect_pb": ["pb-render-compare.md"],
+      "expect_ref": ["deep-live2d-reference-alignment.md", "deep-alignment-registration-and-metrics.md"],
+      "l0_keywords": ["刘海偏低"],
+      "core": false,
+      "note": "只生成探针与试改对比，不发布，等待用户终裁。"
+    },
+    {
+      "id": "layering-parts-stuck",
+      "symptom": "自动拆层后头发和脸被拆成一块",
+      "stage": ["S1", "S2", "S3"],
+      "expect_l1": ["route-input-layering.md"],
+      "expect_pb": ["pb-backup-rebuild-psd.md"],
+      "expect_ref": ["ref-skill-map.md"],
+      "l0_keywords": ["拆层粘连"],
+      "core": false,
+      "note": "仅在 See-through 后仍粘连时按需加载 source-part-segmentation。"
+    }
+  ]
+}

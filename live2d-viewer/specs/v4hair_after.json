@@ -1,0 +1,57 @@
+{
+  "model": "/public/models/pecorine-native/pecorine-practice.model3.json",
+  "canvaspx": [
+    512,
+    1024
+  ],
+  "shots": [
+    {
+      "name": "hairback_p10",
+      "params": {
+        "ParamHairBack": 10.0
+      },
+      "focus": [
+        100,
+        140,
+        420,
+        460
+      ],
+      "canvas": [
+        640,
+        640
+      ]
+    },
+    {
+      "name": "hairback_n10",
+      "params": {
+        "ParamHairBack": -10.0
+      },
+      "focus": [
+        100,
+        140,
+        420,
+        460
+      ],
+      "canvas": [
+        640,
+        640
+      ]
+    },
+    {
+      "name": "hairfront_p10",
+      "params": {
+        "ParamHairFront": 10.0
+      },
+      "focus": [
+        150,
+        30,
+        370,
+        300
+      ],
+      "canvas": [
+        660,
+        810
+      ]
+    }
+  ]
+}

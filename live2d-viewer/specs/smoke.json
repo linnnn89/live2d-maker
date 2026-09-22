@@ -1,0 +1,62 @@
+{
+  "model": "/public/models/pecorine-native/pecorine-practice.model3.json",
+  "canvaspx": [
+    512,
+    1024
+  ],
+  "shots": [
+    {
+      "name": "full_neutral",
+      "params": {},
+      "canvas": [
+        512,
+        1024
+      ]
+    },
+    {
+      "name": "eye_zone_x6",
+      "params": {},
+      "focus": [
+        190,
+        140,
+        320,
+        200
+      ],
+      "canvas": [
+        1040,
+        480
+      ]
+    },
+    {
+      "name": "eyes_open_close",
+      "params": {},
+      "focus": [
+        190,
+        140,
+        320,
+        200
+      ],
+      "canvas": [
+        1040,
+        480
+      ]
+    },
+    {
+      "name": "gaze_extremes",
+      "params": {
+        "ParamEyeBallX": 1.0,
+        "ParamEyeBallY": 0
+      },
+      "focus": [
+        190,
+        140,
+        320,
+        200
+      ],
+      "canvas": [
+        1040,
+        480
+      ]
+    }
+  ]
+}

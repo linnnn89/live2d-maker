@@ -1,0 +1,293 @@
+# PSD2Live
+
+[English](README_en.md) | [日本語](README_ja.md)
+
+PSD2Live 是一个自动化的 Live2D 模型生成流水线与桌面应用。输入分层 PSD 文件，系统自动完成图层语义识别、连通域双侧拆分、自适应三角网格剖分、九轴面部经纬网与解耦变形器层级构建、头发多摆物理与果冻眼动力学模拟及循环待机动作生成，一键导出可编辑的 `.cmo3` 编辑器工程与运行时 `.moc3` 文件族。
+
+> [!IMPORTANT]
+> **想直接使用桌面程序？** Windows 10/11 x64 用户请前往 [Releases](https://github.com/tsunehimatoi/psd2live/releases/latest) 下载可执行程序。便携版 ZIP 解压即用，也可选择 EXE 或 MSI 安装包；这些发布包已包含 Java 运行时，无需配置源码构建环境。
+
+<p align="center">
+  <img src="docs/imgs/use.gif" alt="PSD2Live 操作演示" />
+  <br>
+  <em>端到端全自动建模、实时视线追踪与动态预览</em>
+</p>
+
+---
+
+## 文档索引
+
+文档按 **用途分类 × 语言** 组织（`docs/<语言>/<分类>/`），完整目录与语言可用性见 [`docs/README.md`](docs/README.md)。
+
+| 分类 | 文档 | 说明 |
+| :--- | :--- | :--- |
+| 使用指南 | [用户操作指南](docs/zh/guide/USER_GUIDE.md) | 桌面 GUI、版本历史树、独立日志坞、Agent / MCP 连接、快捷键及 CLI 参数说明 |
+| 使用指南 | [Live2D SDK 配置指南](docs/zh/guide/CUBISM_SDK_SETUP.md) | 官方 Native SDK 许可政策、着色器提取与离屏硬件加速预览配置指南 |
+| 使用指南 | [纹理高清化配置](docs/zh/guide/TEXTURE_UPSCALE.md) | 可选 nunif 动漫超分、透明边缘处理、2×/4× 纹理与显存控制 |
+| 规范 | [PSD 图层规范与命名指南](docs/zh/spec/PSD_LAYER_SPEC.md) | 31 种语义标签中日英对照、侧别规则、连通域拆分与五官/头发分层规范 |
+| 规范 | [变形器与算法数学规范](docs/zh/spec/DEFORMER_AND_PARAMETER_SPEC.md) | 变形器拓扑树、九轴经纬网数学模型、C1 连续曲线、五官修形与动力学公式 |
+| 规范 | [工程文件格式](docs/zh/spec/PROJECT_FORMAT.md) | `.psd2live` 归档条目、保存/恢复语义与校验规则（完整规范为[英文版](docs/en/spec/PROJECT_FORMAT.md)） |
+| 规范 | [实现对比与设计决策](docs/zh/spec/IMPLEMENTATION_COMPARISON.md) | 逐流程技术选型、格式不变性与自动化几何自检说明 |
+| Agent | [MCP 接口契约](docs/zh/agent/MCP_AUTHORING.md) | 当前对外暴露的 10 个合并工具及其分支契约、素材导入、姿态拼图与失败条件 |
+| Agent | [Agent 设计](docs/zh/agent/AGENT_DESIGN.md) | 产品边界与硬约束、工具收敛、连续形变场、成本控制与分阶段验收 |
+
+> `en` / `ja` 目前只覆盖部分使用指南与规范文档，Agent 分类仅有中文。
+
+---
+
+## 核心特性
+
+- **自适应网格剖分**：基于可分离高斯平滑滤波与 95th 百分位自适应二值化消除边缘噪点；采用带物理窗口角点识别的周期三次 Bézier 曲线拟合与曲率加权加密采样（最高 12 倍）；执行受约束 Delaunay 剖分结合拓扑动态收敛 Lawson 翻边与超长内部边中点二分细分。
+
+  <p align="center">
+    <img src="docs/imgs/mesh22.png" width="32%" alt="22 px 高密度自适应网格" />
+    <img src="docs/imgs/mesh64.png" width="32%" alt="64 px 平衡型自适应网格" />
+    <img src="docs/imgs/mesh115.png" width="32%" alt="115 px 低密度自适应网格" />
+    <br>
+    <em>网格间距 22 / 64 / 115 px：从精细轮廓到轻量拓扑的密度对比</em>
+  </p>
+- **变形器 (Warp) 生成**：
+  - **眼/口 变形**：眼睛与眉毛共享透视平面约束，瞳孔自动反向补偿防止挤压，睫毛沿 Alpha 权重中线弯曲生成平滑闭眼 U 形曲线；嘴部以最大张口为基准向中线平滑向心压缩闭合，牙齿与舌头自动以嘴部为剪切蒙版。
+  - **九轴构建**：建立 `AngleX (±45°) × AngleY (±30°)` 8×8 面部经纬网，结合 C1 连续水平展开/压缩曲线（近侧展开、近眼宽平台保持、远侧透视压缩）、垂直 V/^ 仰俯曲率及四角 $C_{xy} = \text{yaw} \times \text{pitch}$ 交叉修正项。
+- **动画**：自动生成 6 秒无缝循环 `idle.motion3.json` 平滑待机动作，涵盖胸腔呼吸起伏、轻微头部/身体倾斜摇摆及自然眨眼；桌面 GUI 支持可选接入官方 Cubism 5-r.5 SDK 原生着色器离屏渲染引擎以获得 **100% 官方渲染与物理一致性验证（Ground Truth）**（本项目不包含且不分发官方 SDK 二进制，详见 [SDK 配置指南](docs/zh/guide/CUBISM_SDK_SETUP.md)；未配置时无缝自动回退为纯 CPU 高精度软件光栅化渲染），支持实时鼠标视线追踪（Mouse Look）与动作回放。
+- **物理**：前后发完全解耦独立跟随头壳，基于发根固定与 $v^3$ 立方发梢摆幅梯度的多摆物理系统；左右眼开合速度物理驱动二阶阻尼弹簧振子输出果冻眼挤压/回弹动力学（`ParamEyeBallForm`）。
+- **Agent / MCP 可编辑工作区**：应用启动后在本机提供带 Bearer Token 的 Streamable HTTP MCP。ChatGPT/Codex、Gemini/Antigravity 或其他 MCP 宿主可读取工程与参数、渲染带可逆画布映射的 PNG View、导入透明素材、增删参数，以及针对 ArtMesh、Warp、Rotation、Part、Glue 写入、复制或删除多参数 K 帧。每次修改都会进入追加式分支历史；版本树、长任务检查点和素材均可持久化恢复。
+- **工程文件/运行时文件导出**：一键同步导出可在 Live2D Cubism Modeler 5 中二次编辑的 `.cmo3` 完整工程与运行时 `.moc3` 文件族（包含 `.model3.json`、`.cdi3.json`、`physics3.json`、`idle.motion3.json` 及纹理贴图集）；内置中立姿态保真、极限姿态完整性与变形器镜像对称性三道几何自检闸门。
+
+<p align="center">
+  <img src="docs/imgs/agent.png" alt="PSD2Live AI Agent 素材生成、接入与多参数渲染流程" />
+  <br>
+  <em>Agent 添加发卡的案例：读取 MCP 工作流与工具、查看模型、生成并添加素材、检查其他参数姿态。该案例不代表下列更复杂任务已可用。</em>
+</p>
+
+### Agent 能力与实现状态
+
+待完成计划见 [`ROADMAP.md`](ROADMAP.md)，能力实测见 [`STATUS.md`](STATUS.md)（两页均为中文）。
+
+- **可用**：添加头饰或装饰物，再从多个参数姿态检查遮挡、位置与变形。
+- **待实现**：参数调整、表情与动作差分、简单图层切分、口腔部件拆分、头发拆分与遮挡补全、挥手动作、尾巴变形与物理、自生成图像与九轴调整。
+- **暂不可行**：对部件做逐点精确变形（需要 AI 逐点操作 Warp / Mesh 并正确控制各点形变）。
+
+> [!WARNING]
+> 待实现项端到端极不稳定，除非出于调试程序的目的，否则不建议尝试。已有 MCP 接口不代表 Agent 能完成任务；反复生图、定位与修正可能快速消耗大量 token 与图像生成额度，最终仍无可用结果。
+
+> [!IMPORTANT]
+> 这类工作流要求模型与 Agent harness 具备实际的图像生成能力。只能理解文本或图像、但无法生成并返回图片的模型，不能完成素材创建与回填步骤。
+
+最终效果受模型、图像生成器、Agent harness、提示词与原始 PSD 分层质量共同影响；底层工具的回归测试通过，不等于上述任务已具备可靠性。
+
+**特别征求 Prompt 工程与 Agent 工作流方向的贡献。** 尤其需要协助改进工具发现与选择、拆分对象的深度/遮挡理解、生成约束、定位与修正流程，以及 token 预算和停止条件。欢迎提交可复现案例、有效的提示词或 MCP 工作流改进、流程实现与评测用例；附上所用模型和宿主、实际消耗、成功与失败结果，可以帮助验证改进是否真的提高完成率、减少无效重试。单次成功演示不足以将这些能力标记为已完成。一般性的参与方式见[参与贡献](#参与贡献)。
+
+---
+
+## 快速上手
+
+### 环境要求
+- **Java Runtime**：从 Releases 下载的 Windows 发布包已包含运行时；仅从源码使用 Gradle 构建或启动时需要 JDK 21 或更高版本。
+- **操作系统**：Windows 10/11 x64（配置官方 Native SDK 时可实现与官方运行时 100% 像素级渲染与物理一致性对照），亦全面支持 Linux / macOS（内置 CPU 软件光栅化渲染）。
+- **Live2D 官方 SDK 说明**：本项目源码与发布包**不包含且不分发** Live2D 官方 SDK 专有二进制文件，开箱即可使用内置渲染与全部导出功能；如需开启官方渲染一致性验证，请参阅 [Live2D SDK 配置指南](docs/zh/guide/CUBISM_SDK_SETUP.md)。
+
+### 启动桌面应用 (GUI)
+
+- **Windows 一键启动**：运行根目录下的 `run-gui.bat`。
+- **Gradle 启动**：
+  ```powershell
+  # Windows
+  .\gradlew.bat run
+
+  # Linux / macOS
+  ./gradlew run
+  ```
+
+#### 常用快捷键
+
+| 操作 | 快捷键 / 鼠标指令 |
+| :--- | :--- |
+| **画布缩放** | 鼠标滚轮（以光标为中心，`0.05x ~ 64.0x`） |
+| **画布平移** | 鼠标中键拖拽 或 左键拖拽空白 |
+| **居中适配** | `F` / `Home` / `0` |
+| **选择画元** | 鼠标左键单击画元 |
+| **打开 PSD** | `Ctrl + O` |
+| **重新分析** | `Ctrl + R` |
+| **生成并导出** | `Ctrl + G` |
+| **导出到...** | `Ctrl + Shift + G` |
+
+#### 连接 AI Agent / MCP
+
+1. 保持 PSD2Live 桌面应用运行，打开顶部 **工具 → MCP → MCP 连接与安装…**。
+2. 在“连接配置”页复制宿主对应的配置：ChatGPT Desktop / Codex 使用 HTTP TOML，Gemini / Antigravity 使用 HTTP JSON。其他支持 Streamable HTTP 的宿主使用界面显示的端点和 `Authorization: Bearer <Token>` 请求头；不要改成旧 `/sse` 地址。
+3. 仅当宿主不支持 HTTP MCP 时，复制 Stdio JSON，通过 Python 3 运行仓库根目录的 `mcp_proxy.py`。代理优先读取 `PSD2LIVE_MCP_TOKEN`；Windows 上也可读取 PSD2Live 已保存的 Token。
+4. 连接后先列出工具，并调用 `inspect`（`scope: project`）读取工程与历史 HEAD 摘要。
+
+当前 MCP 支持工程/图层/参数读取、对象与 K 帧编辑、参数 CRUD、模型数据 PNG View、透明素材导入、软删除，以及追加式分支历史。每个会推进工程 `HEAD` 的编辑操作都要携带最新的 `state`；超时或断线后先用 `inspect`（`scope: project`）和 `revision`（`list`）确认是否已经提交，不能盲目重试。
+
+PSD2Live 提供模型 View、空间映射和 PNG 导入。素材可按画风与用户偏好选择原图像素、SVG、绘画或可用图像工具；省略 `solid_background` 时保留原生透明度。新增编辑接口与限制见 [MCP 接口契约](docs/zh/agent/MCP_AUTHORING.md)。
+
+---
+
+### 命令行批处理 (CLI)
+
+```powershell
+# 基础运行
+.\gradlew.bat run --args="--input ./sample.psd --output ./output"
+
+# 进阶参数配置
+.\gradlew.bat run --args="--input ./sample.psd --output ./output --atlas 8192 --mesh-spacing 48 --head-strength 1.2 --lang zh"
+```
+
+| 参数 | 类型 | 默认值 | 说明 |
+| :--- | :---: | :---: | :--- |
+| `--input <path>` | 路径 | *(必需)* | 输入分层 PSD 文件路径 |
+| `--output <path>` | 路径 | `PSD同级/psd2live-output` | 导出模型文件族的输出目录路径 |
+| `--lang <zh\|en\|ja>` | 字符串 | 系统语言 | 界面与日志语言（支持 `zh` / `en` / `ja`） |
+| `--atlas <size>` | 整数 | `4096` | 贴图集尺寸（`256 ~ 16384`） |
+| `--mesh-spacing <px>` | 整数 | `64` | 网格基础间距（像素） |
+| `--head-strength <val>`| 浮点数 | `1.0` | 头部转动九轴形变幅度（`0.0 ~ 4.0`） |
+| `--body-strength <val>`| 浮点数 | `1.0` | 身体与呼吸动作幅度（`0.0 ~ 4.0`） |
+| `--no-physics` | 开关 | `false` | 不生成物理配置 |
+| `--no-cmo3` | 开关 | `false` | 跳过 `.cmo3` 工程导出 |
+| `--no-moc3` | 开关 | `false` | 跳过 `.moc3` 运行时导出 |
+
+---
+
+## PSD 命名速查表
+
+> [!TIP]
+> **PSD 原画制作与构图核心建议**：
+> - **嘴巴张开且带描边更佳**：原画口部需绘制为最大张口状态（张嘴）；嘴唇外缘带有清晰描边/线稿效果更佳，向心压缩闭合时能自然贴合成清晰唇线。
+> - **睫毛仅限眼部上半部分**：`eyelash` 图层必须仅绘制上睫毛，严禁混入下睫毛或下眼眶线，以保证平滑闭眼 U 形曲线算法精准运行。
+> - **初始头部允许自然倾斜**：原画立绘中头部允许带有初始倾斜（歪头），系统会自动识别初始角度并以此作为中立原点展开确认转动范围。
+> - **身体须保持正立（过于倾斜不受支持）**：躯干动作与胸腔呼吸起伏严格基于垂直坐标系构建，过于倾斜、横卧的身体不受支持。
+> 
+> 更多分层规则与图层规范请参阅 [PSD 图层规范与命名指南](docs/zh/spec/PSD_LAYER_SPEC.md)。
+
+| 部件 | 推荐英文名 | 常用中文/日文别名 | 行为说明 |
+| :--- | :--- | :--- | :--- |
+| **头发** | `front hair`, `back hair` | 前发, 后发, 前髪, 後ろ髪 | 独立头壳跟随 + $v^3$ 发梢物理摆动 |
+| **脸部** | `face`, `facedetail` | 脸, 脸部, 脸颊, 顔, 肌, 腮红 | 面部轮廓与细节 |
+| **眼睛** | `eyewhite`, `eyelash`, `irides`, `eye_close` | 眼白, 睫毛, 瞳孔, 闭眼, 目, 瞳 | 支持自动左右拆分，瞳孔自动剪切，睫毛仅限上睫毛平滑闭眼 |
+| **眉毛** | `eyebrow` | 眉, 眉毛, まゆ | 支持自动左右拆分与透视联动 |
+| **鼻子** | `nose` | 鼻, 鼻子 | 最大立体空间深度位移 |
+| **嘴巴** | `mouth`, `mouth_open` | 嘴, 口, 嘴巴, 张嘴 | 最大张口原图（建议带清晰描边），自动向中线向心压缩闭口 |
+| **口腔内部件** | `tooth-t`, `tooth-b`, `tongue` | 上牙, 下牙, 舌头, 歯, 舌 | 可选部件，自动以 mouth 为剪切蒙版 |
+| **耳朵** | `ears` | 耳, 耳朵 | 随头部转动负深度位移与透视遮挡淡出 |
+| **身体** | `neck`, `topwear`, `bottomwear`, `legwear` | 脖子, 上衣, 裤子, 裙子, 身体 | 身体偏航、俯仰、倾斜与呼吸膨胀（身体须保持正立） |
+| **饰品** | `headwear`, `earwear`, `neckwear`, `tail`, `wings` | 头饰, 耳饰, 项链, 尾巴, 翅膀 | 挂载于对应父级变形器 |
+
+---
+
+## 变形器层级与参数体系
+
+```text
+Root (Canvas Space)
+ └─ DeformBodyXY (ParamBodyAngleX, ParamBodyAngleY)
+     └─ DeformBodyZBreath (ParamBodyAngleZ, ParamBreath)
+         └─ DeformHeadRotation (ParamAngleZ)
+             └─ DeformHeadContainer (ParamAngleX, ParamAngleY 头壳跟随)
+                 ├─ DeformFaceNinePose (ParamAngleX, ParamAngleY 九轴经纬网)
+                 │   ├─ Eye / Iris / Brow / Nose / Mouth / Ear
+                 │   └─ FaceDetails
+                 ├─ HairFrontFollow → HairFrontPhysics (ParamHairFront)
+                 ├─ HairBackFollow  → HairBackPhysics  (ParamHairBack)
+                 └─ HeadAccessories
+```
+
+| 参数 ID | 名称 | 范围 | 默认值 | 作用说明 |
+| :--- | :--- | :---: | :---: | :--- |
+| `ParamAngleX` / `Y` / `Z` | 头部角度 X / Y / Z | `[-45..45]` / `[-30..30]` / `[-30..30]` | `0` | 头部偏航、仰俯与平面旋转 |
+| `ParamEyeLOpen` / `ROpen` | 左/右眼 开闭 | `[0, 1]` | `1` | 睫毛平滑闭眼 U 形线，瞳孔由眼白遮罩隐藏 |
+| `ParamEyeBallX` / `Y` | 视线 X / Y | `[-1, +1]` | `0` | 瞳孔注视追踪 |
+| `ParamEyeBallForm` | 果冻眼 | `[-1, +1]` | `0` | 眨眼驱动瞳孔挤压回弹动力学 |
+| `ParamBrowLY` / `RY` | 左/右眉 上下 | `[-1, +1]` | `0` | 眉毛上下移动 |
+| `ParamMouthForm` | 嘴 变形 | `[-1, +1]` | `0` | 嘴角抬升/下压与宽度 |
+| `ParamMouthOpenY` | 嘴 开闭 | `[0, 1]` | `0` | 完整张口 $\to$ 中线闭口缝平滑插值 |
+| `ParamBodyAngleX` / `Y` / `Z`| 身体 X / Y / Z | `[-10, +10]` | `0` | 躯干偏航 Roll、S 形俯仰与倾斜 |
+| `ParamBreath` | 呼吸 | `[0, 1]` | `0` | 胸腔高斯呼吸起伏 |
+| `ParamHairFront` / `Back` | 前/后发 摇摆 | `[-1, +1]` | `0` | 前后发多摆物理模拟 |
+
+---
+
+## 导出产物
+
+```text
+output_dir/
+├── sample.cmo3                    # 可在 Live2D Modeler 5 中二次编辑的完整工程
+├── sample.moc3                    # 运行时模型文件 (MOC5 基线)
+├── sample.model3.json             # 运行时配置文件 (贴图、物理、动作接线)
+├── sample.cdi3.json               # 显示名称元数据
+├── sample.physics3.json           # 物理模拟配置 (头发多摆 + 果冻眼)
+├── sample.idle.motion3.json       # 6 秒无缝循环平滑待机动作
+├── sample.4096/texture_00.png     # 纹理贴图集
+└── sample.psd2live.json         # 诊断报告与映射元数据
+```
+
+---
+
+## 构建与测试
+
+```powershell
+# 编译并打包独立运行 ZIP
+.\gradlew.bat clean test distZip
+
+# 运行全套单元测试
+.\gradlew.bat test
+```
+
+---
+
+## 参与贡献
+
+本项目欢迎任何形式的参与——无论你是原画师、Live2D 建模师、开发者，还是刚开始使用这个工具的人。**Issue 和 Pull Request 同样有价值**，不必担心「这个改动太小」或「我还不熟悉代码」。
+
+### 提交 Issue
+
+遇到问题或有好想法，都欢迎开一个 Issue：
+
+- **Bug 报告**：崩溃、导出失败、网格或物理异常、结果与预期不符。
+- **PSD 兼容性问题**：某张分层 PSD 无法正确识别或生成。附上可复现的 PSD（或说明图层命名结构）会非常有帮助。
+- **功能建议**：希望支持的新部件、新参数、新的导出选项，或更省事的自动化。
+- **文档与教程改进**：看不懂的地方、缺失的步骤、与当前界面不一致的描述。
+- **使用案例分享**：用 PSD2Live 做出的模型、踩过的坑、有效的分层技巧。
+
+写 Issue 时，附上这些信息能大幅加快定位：PSD2Live 版本、操作系统、PSD 的图层结构与命名、复现步骤、期望与实际结果、日志坞中的相关输出或截图。信息不全也没关系，我们会一起把事情弄清楚。
+
+### 提交 Pull Request
+
+**欢迎各种规模的 PR**，从修正一个错别字到实现一整套新算法都可以：
+
+- **文档**：修正笔误、补充教程步骤、翻译——`en` / `ja` 译文仍有不少缺口，见[文档索引](docs/README.md)。
+- **测试与用例**：为现有行为补测试、补充能复现问题的 PSD 样例、完善评测用例。
+- **Bug 修复**：小到边界条件，大到几何与物理求解。
+- **新功能与算法**：网格剖分、变形器构建、物理参数、导出兼容性等方向。
+- **Agent / MCP 工作流**：提示词、工具设计与选择策略、拆分与定位流程、token 预算与停止条件。这一块目前最需要人手，详见 [Agent 设计](docs/zh/agent/AGENT_DESIGN.md)。
+- **性能与平台**：启动速度、内存占用、Linux / macOS 上的表现。
+
+动手前建议：
+
+1. 先开一个 Issue 说明你想改什么，避免和已有工作重复，也方便一起确定方向。
+2. 从 `master` 切出分支，保持改动聚焦，提交信息写清楚做了什么、为什么。
+3. 运行 `.\gradlew.bat test`（或 `./gradlew test`）确认测试通过；带测试的改动更容易合并。
+4. 在 PR 描述中关联相关 Issue，并说明验证方式（测试、截图、生成的模型文件等）。
+
+### 关于还没做稳的部分
+
+仓库里仍有一些「理论可行但尚未稳定」的能力，例如 Agent 自动拆分头发、生成表情差分。这类方向的 PR 尤其欢迎：即使只是让成功率提高一点，或者把失败原因记录得更清楚，都是实实在在的进展。相关背景与验收标准见 [Agent 设计](docs/zh/agent/AGENT_DESIGN.md) 与 [ROADMAP.md](ROADMAP.md)。
+
+不确定从哪里开始也没关系——开一个 Issue 说说你的想法、使用场景或想投入的方向，我们很乐意一起找个合适的切入点。
+
+感谢每一位提 Issue、分享案例或贡献代码的人，这个项目因为你们而更好。
+
+---
+
+## 许可证与致谢
+
+- **开源许可证**：本项目采用 [GNU General Public License v3.0 (GPL-3.0)](LICENSE)。
+- **第三方参考与致谢**：本项目直接集成了 [Umamo](THIRD_PARTY_NOTICES.md) 核心模块，并在语义规范、网格算法与物理设计上参考了 [Stretchy Studio](THIRD_PARTY_NOTICES.md)。详细说明请参阅 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)。
+
+---
+
+## 免责声明
+
+- PSD2Live 是独立开发的开源项目，与 Live2D Inc. 及其关联方不存在任何隶属、授权或赞助关系。
+- `Live2D`、`Cubism`、`.cmo3`、`.moc3` 等名称与文件扩展名仅用于格式兼容性说明，其商标与知识产权归各自权利人所有。本项目不包含且不分发 Live2D 官方 SDK。
+- 本项目按“现状”提供，请在正式生产前备份原始 PSD 文件，并在目标软件中检查生成效果。

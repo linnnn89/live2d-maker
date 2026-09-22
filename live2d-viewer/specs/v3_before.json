@@ -1,0 +1,110 @@
+{
+  "model": "/work/pecorine-native/_backup_pre_v3_export/pecorine-practice.model3.json",
+  "canvaspx": [
+    512,
+    1024
+  ],
+  "shots": [
+    {
+      "name": "full",
+      "params": {},
+      "canvas": [
+        512,
+        1024
+      ]
+    },
+    {
+      "name": "bust",
+      "params": {},
+      "focus": [
+        80,
+        140,
+        440,
+        620
+      ],
+      "canvas": [
+        540,
+        720
+      ]
+    },
+    {
+      "name": "eyes",
+      "params": {},
+      "focus": [
+        190,
+        140,
+        320,
+        196
+      ],
+      "canvas": [
+        780,
+        336
+      ]
+    },
+    {
+      "name": "eyes_gazeR",
+      "params": {
+        "ParamEyeBallX": 1.0
+      },
+      "focus": [
+        190,
+        140,
+        320,
+        196
+      ],
+      "canvas": [
+        780,
+        336
+      ]
+    },
+    {
+      "name": "eyes_closed",
+      "params": {
+        "ParamEyeLOpen": 0.0,
+        "ParamEyeROpen": 0.0
+      },
+      "focus": [
+        190,
+        140,
+        320,
+        196
+      ],
+      "canvas": [
+        780,
+        336
+      ]
+    },
+    {
+      "name": "head_turn",
+      "params": {
+        "ParamAngleX": 30
+      },
+      "focus": [
+        120,
+        140,
+        430,
+        520
+      ],
+      "canvas": [
+        620,
+        760
+      ]
+    },
+    {
+      "name": "body_turn",
+      "params": {
+        "ParamBodyAngleX": 25
+      },
+      "focus": [
+        120,
+        140,
+        430,
+        520
+      ],
+      "canvas": [
+        620,
+        760
+      ]
+    }
+  ]
+}

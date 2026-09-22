@@ -1,0 +1,162 @@
+{
+  "model": "/public/models/pecorine-native/pecorine-practice.model3.json",
+  "canvaspx": [
+    512,
+    1024
+  ],
+  "shots": [
+    {
+      "name": "eye_open",
+      "params": {},
+      "focus": [
+        186,
+        142,
+        325,
+        196
+      ],
+      "canvas": [
+        834,
+        324
+      ],
+      "scale": 1
+    },
+    {
+      "name": "eye_half",
+      "params": {
+        "ParamEyeLOpen": 0.5,
+        "ParamEyeROpen": 0.5
+      },
+      "focus": [
+        186,
+        142,
+        325,
+        196
+      ],
+      "canvas": [
+        834,
+        324
+      ],
+      "scale": 1
+    },
+    {
+      "name": "eye_closed",
+      "params": {
+        "ParamEyeLOpen": 0.0,
+        "ParamEyeROpen": 0.0
+      },
+      "focus": [
+        186,
+        142,
+        325,
+        196
+      ],
+      "canvas": [
+        834,
+        324
+      ],
+      "scale": 1
+    },
+    {
+      "name": "eye_jelly_p",
+      "params": {
+        "ParamEyeBallForm": 1
+      },
+      "focus": [
+        186,
+        142,
+        325,
+        196
+      ],
+      "canvas": [
+        834,
+        324
+      ],
+      "scale": 1
+    },
+    {
+      "name": "eye_jelly_n",
+      "params": {
+        "ParamEyeBallForm": -1
+      },
+      "focus": [
+        186,
+        142,
+        325,
+        196
+      ],
+      "canvas": [
+        834,
+        324
+      ],
+      "scale": 1
+    },
+    {
+      "name": "eye_gaze_up",
+      "params": {
+        "ParamEyeBallY": 1
+      },
+      "focus": [
+        186,
+        142,
+        325,
+        196
+      ],
+      "canvas": [
+        834,
+        324
+      ],
+      "scale": 1
+    },
+    {
+      "name": "eye_gaze_dn",
+      "params": {
+        "ParamEyeBallY": -1
+      },
+      "focus": [
+        186,
+        142,
+        325,
+        196
+      ],
+      "canvas": [
+        834,
+        324
+      ],
+      "scale": 1
+    },
+    {
+      "name": "eye_headL",
+      "params": {
+        "ParamAngleX": -30
+      },
+      "focus": [
+        186,
+        142,
+        325,
+        196
+      ],
+      "canvas": [
+        834,
+        324
+      ],
+      "scale": 1
+    },
+    {
+      "name": "eye_headR",
+      "params": {
+        "ParamAngleX": 30
+      },
+      "focus": [
+        186,
+        142,
+        325,
+        196
+      ],
+      "canvas": [
+        834,
+        324
+      ],
+      "scale": 1
+    }
+  ]
+}

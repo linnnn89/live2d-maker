@@ -1,0 +1,37 @@
+{
+  "model": "/public/models/pecorine-native/pecorine-practice.model3.json",
+  "canvaspx": [
+    512,
+    1024
+  ],
+  "shots": [
+    {
+      "name": "mdl_r",
+      "params": {},
+      "focus": [
+        205,
+        152,
+        246,
+        188
+      ],
+      "canvas": [
+        574,
+        504
+      ]
+    },
+    {
+      "name": "mdl_l",
+      "params": {},
+      "focus": [
+        264,
+        152,
+        305,
+        188
+      ],
+      "canvas": [
+        574,
+        504
+      ]
+    }
+  ]
+}

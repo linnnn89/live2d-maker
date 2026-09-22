@@ -1,0 +1,7 @@
+{
+  "model": "/public/models/pecorine-native/pecorine-practice.model3.json",
+  "canvaspx": [512, 1024],
+  "shots": [
+    {"name": "full_1x1", "params": {}, "canvas": [512, 1024], "exact": true}
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "schema": "live2d-studio.behavior-evaluation.v1",
+  "status": "not_run",
+  "passed": false,
+  "method": null,
+  "run_at": null,
+  "cases": [],
+  "note": "发布 gate G5 的真实 Agent harness 或人工验收记录。不得由结构校验结果代填。"
+}

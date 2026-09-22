@@ -1,0 +1,10 @@
+# PSD / Live2D 工作区辅助工具（Python 3.10）
+# See-through 使用它自己的 see-through/requirements.txt，不装在这里。
+jpype1==1.6.0
+numpy==2.2.6
+scipy==1.15.3
+pillow==12.3.0
+psd-tools==1.19.0
+playwright==1.62.0
+requests==2.34.2
+PyYAML==6.0.3

@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>Live2D 参数化渲染检查器</title>
+<style>
+  html, body { margin: 0; background: #2b2b2b; color: #ddd; font: 12px/1.5 system-ui, sans-serif; }
+  canvas { display: block; }
+  #bar { padding: 4px 8px; }
+  code { color: #9fd; }
+</style>
+</head>
+<body>
+<div id="bar">Live2D viewer — <span id="status">loading…</span></div>
+<canvas id="cv" width="512" height="1024"></canvas>
+<script>
+// Standalone parameterised renderer for local Cubism models.
+// Query params:
+//   model=/public/models/<pkg>/<file>.model3.json   (required)
+//   vendor=/public/vendor/cubism/                   (runtime files)
+//   w=1024 h=1024                                   (canvas pixels)
+// API (window.viewer):
+//   ready                     -> boolean
+//   params()                  -> [{id, value, min, max, default}]
+//   setParams({Id: value})    -> applies values (clamped)
+//   reset()                   -> back to the model's default pose
+//   drawables()               -> [{id, bbox}] in model canvas pixels, y down from the canvas top-left
+//   focus({x0,y0,x1,y1})      -> frame a canvas-pixel rect (model canvas coordinates)
+//   view({zoom, cx, cy})      -> explicit view; cx/cy are model canvas pixels
+//   render()                  -> draw one frame
+//   snapshot(crop, scale)     -> data URL PNG; crop = [x0,y0,x1,y1] in device px
+//   errors                    -> load/runtime error strings
+const q = new URLSearchParams(location.search);
+const VENDOR = q.get('vendor') || '/public/vendor/cubism/';
+const MODEL = q.get('model') || '/public/models/pecorine-native/pecorine-practice.model3.json';
+const cv = document.getElementById('cv');
+cv.width = Number(q.get('w') || 512);
+cv.height = Number(q.get('h') || 1024);
+// Model canvas in authored pixels (the PSD canvas). The Cubism runtime speaks
+// normalised units (canvas height == 1), so every pixel rect this tool accepts
+// is converted with this factor.
+const PX = {
+  w: Number((q.get('canvaspx') || '512,1024').split(',')[0]),
+  h: Number((q.get('canvaspx') || '512,1024').split(',')[1]),
+};
+const status = document.getElementById('status');
+const viewer = { ready: false, errors: [], coreVersion: '', mocVersion: 0 };
+window.viewer = viewer;
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src; s.async = false;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error('script failed: ' + src));
+    document.head.append(s);
+  });
+}
+
+function parseJson(buffer) { return JSON.parse(new TextDecoder().decode(buffer)); }
+
+async function getBuffer(url) {
+  const res = await fetch(url, { cache: 'no-store' });
+  if (!res.ok) throw new Error('fetch ' + res.status + ' ' + url);
+  return res.arrayBuffer();
+}
+
+function loadTexture(gl, buffer) {
+  const url = URL.createObjectURL(new Blob([buffer]));
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => {
+      URL.revokeObjectURL(url);
+      const tex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, 1);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 0);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.bindTexture(gl.TEXTURE_2D, null);
+      resolve(tex);
+    };
+    image.onerror = () => { URL.revokeObjectURL(url); reject(new Error('texture decode failed')); };
+    image.src = url;
+  });
+}
+
+(async () => {
+  try {
+    await loadScript(VENDOR + 'live2dcubismcore.min.js');
+    await loadScript(VENDOR + 'framework.js');
+    const core = window.Live2DCubismCore;
+    const sdk = window.Live2DChatCubismFramework;
+    if (!core || !sdk) throw new Error('runtime missing');
+    const v = core.Version.csmGetVersion();
+    viewer.coreVersion = `${(v >>> 24) & 0xff}.${(v >>> 16) & 0xff}.${v & 0xffff}`;
+    sdk.CubismFramework.startUp({ loggingLevel: 3, logFunction: (m) => console.error('[Cubism] ' + m) });
+    sdk.CubismFramework.initialize();
+
+    const gl = cv.getContext('webgl2', { alpha: true, premultipliedAlpha: true, antialias: true, preserveDrawingBuffer: true });
+    if (!gl) throw new Error('no webgl2');
+
+    const doc = parseJson(await getBuffer(MODEL));
+    const base = new URL(MODEL, location.href);
+    const fetchRef = (p) => getBuffer(new URL(p, base).href);
+    const mocBytes = await fetchRef(doc.FileReferences.Moc);
+    viewer.mocVersion = core.Version.csmGetMocVersion(mocBytes);
+    const moc = sdk.CubismMoc.create(mocBytes, true);
+    const model = moc.createModel();
+    const parameterList = [];
+    const byId = new Map();
+    for (let i = 0; i < model.getParameterCount(); i += 1) {
+      const id = model.getParameterId(i).getString();
+      const entry = {
+        id, index: i,
+        default: model.getParameterDefaultValue(i),
+        min: model.getParameterMinimumValue(i),
+        max: model.getParameterMaximumValue(i),
+        value: model.getParameterValueByIndex(i),
+      };
+      parameterList.push(entry);
+      byId.set(id, entry);
+    }
+    const drawableList = [];
+    for (let i = 0; i < model.getDrawableCount(); i += 1) {
+      drawableList.push({ index: i, id: model.getDrawableId(i).getString() });
+    }
+    const renderer = new sdk.CubismRenderer_WebGL();
+    renderer.initialize(model);
+    renderer.startUp(gl);
+    renderer.setIsPremultipliedAlpha(true);
+    for (let i = 0; i < doc.FileReferences.Textures.length; i += 1) {
+      renderer.bindTexture(i, await loadTexture(gl, await fetchRef(doc.FileReferences.Textures[i])));
+    }
+    renderer.loadShaders(VENDOR + 'shaders/');
+    const shader = sdk.CubismShaderManager_WebGL.getInstance().getShader(gl);
+    const t0 = performance.now();
+    while (!shader._isShaderLoaded) {
+      if (performance.now() - t0 > 15000) throw new Error('shader load timeout');
+      await new Promise((r) => setTimeout(r, 20));
+    }
+
+    const matrix = new sdk.CubismMatrix44();
+    const canvasW = model.getCanvasWidth();
+    const canvasH = model.getCanvasHeight();
+    // Authored pixels -> runtime units (canvas height is 1 unit).
+    const unit = canvasH / PX.h;
+    // View defaults: the whole model canvas, addressed in authored pixels.
+    const view = { zoom: 1, cx: PX.w / 2, cy: PX.h / 2 };
+
+    // Effective render pixels per authored canvas pixel for the current view.
+    // s = fit * zoom is a NDC-ish scale, so one canvas pixel spans
+    // (fit*zoom)*cv.height/2 render pixels vertically (and the same
+    // horizontally, because fit already carries the aspect ratio).
+    function viewFit() {
+      const aspect = cv.width / Math.max(1, cv.height);
+      return Math.min(1.86 / canvasH, (1.86 * aspect) / canvasW);
+    }
+    function pxPerCanvas(zoom = view.zoom) {
+      return (viewFit() * zoom * cv.height) / 2;
+    }
+
+    function applyMatrix() {
+      const aspect = cv.width / Math.max(1, cv.height);
+      const fit = Math.min(1.86 / canvasH, 1.86 * aspect / canvasW);
+      const s = fit * view.zoom;
+      // Model coords are Y-up with the origin at the canvas centre: convert the
+      // canonical (Y-down, top-left) pixel the caller asked for into model space.
+      const mx = (view.cx - PX.w / 2) * unit;
+      const my = (PX.h / 2 - view.cy) * unit;
+      matrix.setMatrix(new Float32Array([
+        s / aspect, 0, 0, 0,
+        0, s, 0, 0,
+        0, 0, 1, 0,
+        -(s / aspect) * mx, -s * my, 0, 1,
+      ]));
+      return matrix;
+    }
+
+    function render() {
+      model.update();
+      applyMatrix();
+      gl.viewport(0, 0, cv.width, cv.height);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      renderer.setRenderState(null, [0, 0, cv.width, cv.height]);
+      renderer.setMvpMatrix(matrix);
+      renderer.drawModel(VENDOR + 'shaders/');
+    }
+
+    // Drawable bounds come straight from the runtime mesh, converted to the
+    // canonical Y-down canvas pixels the rest of this tool speaks.
+    function drawables() {
+      model.update();
+      return drawableList.map(({ index, id }) => {
+        const count = model.getDrawableVertexCount(index);
+        const pos = model.getDrawableVertexPositions(index);
+        const opacity = model.getDrawableOpacity(index);
+        if (!count) return { id, bbox: null, opacity };
+        let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+        for (let i = 0; i < count; i += 1) {
+          const x = pos[i * 2] / unit + PX.w / 2, y = PX.h / 2 - pos[i * 2 + 1] / unit;
+          if (x < x0) x0 = x; if (x > x1) x1 = x;
+          if (y < y0) y0 = y; if (y > y1) y1 = y;
+        }
+        return { id, bbox: [x0, y0, x1, y1], opacity };
+      });
+    }
+
+    Object.assign(viewer, {
+      canvas: { width: canvasW, height: canvasH },
+      parameters: parameterList,
+      setParams(values) {
+        const applied = {};
+        for (const [id, raw] of Object.entries(values)) {
+          const p = byId.get(id);
+          if (!p) continue;
+          p.value = Math.max(p.min, Math.min(p.max, Number(raw)));
+          model.setParameterValueByIndex(p.index, p.value);
+          applied[id] = p.value;
+        }
+        return applied;
+      },
+      reset() { for (const p of parameterList) { p.value = p.default; model.setParameterValueByIndex(p.index, p.value); } },
+      params: () => parameterList.map((p) => ({ ...p })),
+      drawables,
+      focus(rect) {
+        const [x0, y0, x1, y1] = rect;
+        view.cx = (x0 + x1) / 2;
+        view.cy = (y0 + y1) / 2;
+        const aspect = cv.width / Math.max(1, cv.height);
+        const needsX = (x1 - x0) * unit / aspect;
+        const needsY = (y1 - y0) * unit;
+        // Clip space spans 2 units, so a rect of `needs` units fills the viewport at 2/needs.
+        view.zoom = 2 / (viewFit() * Math.max(needsX, needsY)) * 0.94;
+        return { ...view };
+      },
+      // Strict 1:1 mapping between authored canvas pixels and render pixels.
+      // Requires the render surface (cv) to match the model canvas in size.
+      // Without this, "zoom 1" renders at ~0.93 px per canvas pixel, which
+      // silently mis-scales any measurement taken off a snapshot.
+      exact() {
+        view.cx = PX.w / 2;
+        view.cy = PX.h / 2;
+        view.zoom = 2 / (viewFit() * cv.height);
+        return { ...view };
+      },
+      pxPerCanvas: (zoom) => pxPerCanvas(zoom),
+      view: (next) => { Object.assign(view, next); return { ...view }; },
+      currentView: () => ({ ...view, pxPerCanvas: pxPerCanvas() }),
+      render,
+      snapshot(crop, scale = 1) {
+        render();
+        if (!crop) return cv.toDataURL('image/png');
+        const [x0, y0, x1, y1] = crop;
+        const w = Math.max(1, Math.round((x1 - x0) * scale));
+        const h = Math.max(1, Math.round((y1 - y0) * scale));
+        const out = document.createElement('canvas');
+        out.width = w; out.height = h;
+        const ctx = out.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(cv, x0, y0, x1 - x0, y1 - y0, 0, 0, w, h);
+        return out.toDataURL('image/png');
+      },
+      ready: true,
+    });
+    renderer.drawModel(VENDOR + 'shaders/');
+    render();
+    status.textContent = `ready · core ${viewer.coreVersion} · moc ${viewer.mocVersion} · canvas ${canvasW}×${canvasH} · ${parameterList.length} params · ${drawableList.length} drawables`;
+  } catch (error) {
+    viewer.errors.push(String(error && error.message || error));
+    status.textContent = 'ERROR: ' + viewer.errors.join(' | ');
+    console.error(error);
+  }
+})();
+</script>
+</body>
+</html>

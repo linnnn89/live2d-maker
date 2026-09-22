@@ -1,0 +1,79 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.token
+*.pem
+*.key
+
+# Python environments and caches
+python/
+.venv/
+venv/
+**/.venv/
+**/__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Downloaded applications and runtimes
+portable/
+
+# Hugging Face / model weights / datasets
+**/.hf_home/
+**/workspace/
+**/wandb/
+*.safetensors
+*.ckpt
+*.pt
+*.pth
+*.bin
+*.onnx
+*.gguf
+
+# Build outputs and package caches
+**/.gradle/
+**/build/
+**/dist/
+**/out/
+vite-cache/
+node_modules/
+
+# Generated Live2D artifacts and local working data
+*.moc3
+*.cmo3
+*.model3.json
+*.physics3.json
+*.motion3.json
+*.psd2live.json
+_backup_pre_*/
+debug_analysis/
+
+# Keep the small upstream PSD2Live examples that are intentionally versioned
+!psd2live/examples/**/*.moc3
+!psd2live/examples/**/*.cmo3
+!psd2live/examples/**/*.model3.json
+
+# Local logs and probes
+*.log
+err.txt
+out.txt
+cli-help.txt
+mcp-request.json
+mcp-tools.json
+
+# Viewer output
+live2d-viewer/out/
+
+# IDE and OS
+.vscode/
+.idea/
+*.code-workspace
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Nested repository metadata is never part of the published tree
+see-through/.git/

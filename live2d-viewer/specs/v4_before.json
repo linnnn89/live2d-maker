@@ -1,0 +1,116 @@
+{
+  "model": "/work/pecorine-native/_backup_pre_v3_export/pecorine-practice.model3.json",
+  "canvaspx": [
+    512,
+    1024
+  ],
+  "shots": [
+    {
+      "name": "eye_zoom",
+      "params": {},
+      "focus": [
+        196,
+        146,
+        314,
+        192
+      ],
+      "canvas": [
+        980,
+        382
+      ]
+    },
+    {
+      "name": "eye_closed",
+      "params": {
+        "ParamEyeLOpen": 0.0,
+        "ParamEyeROpen": 0.0
+      },
+      "focus": [
+        196,
+        146,
+        314,
+        192
+      ],
+      "canvas": [
+        980,
+        382
+      ]
+    },
+    {
+      "name": "eye_gazeR",
+      "params": {
+        "ParamEyeBallX": 1.0
+      },
+      "focus": [
+        196,
+        146,
+        314,
+        192
+      ],
+      "canvas": [
+        980,
+        382
+      ]
+    },
+    {
+      "name": "cheek",
+      "params": {},
+      "focus": [
+        190,
+        160,
+        320,
+        200
+      ],
+      "canvas": [
+        780,
+        240
+      ]
+    },
+    {
+      "name": "neck_shoulder",
+      "params": {},
+      "focus": [
+        150,
+        180,
+        360,
+        330
+      ],
+      "canvas": [
+        840,
+        600
+      ]
+    },
+    {
+      "name": "head_turn30",
+      "params": {
+        "ParamAngleX": 30
+      },
+      "focus": [
+        150,
+        180,
+        360,
+        330
+      ],
+      "canvas": [
+        840,
+        600
+      ]
+    },
+    {
+      "name": "body_turn25",
+      "params": {
+        "ParamBodyAngleX": 25
+      },
+      "focus": [
+        150,
+        180,
+        360,
+        330
+      ],
+      "canvas": [
+        840,
+        600
+      ]
+    }
+  ]
+}

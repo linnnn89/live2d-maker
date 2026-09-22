@@ -1,0 +1,154 @@
+{
+  "model": "/public/models/pecorine-native/pecorine-practice.model3.json",
+  "canvaspx": [
+    512,
+    1024
+  ],
+  "shots": [
+    {
+      "name": "f_neutral",
+      "params": {},
+      "focus": [
+        130,
+        15,
+        390,
+        350
+      ],
+      "canvas": [
+        600,
+        770
+      ]
+    },
+    {
+      "name": "f_angleX_m30",
+      "params": {
+        "ParamAngleX": -30
+      },
+      "focus": [
+        130,
+        15,
+        390,
+        350
+      ],
+      "canvas": [
+        600,
+        770
+      ]
+    },
+    {
+      "name": "f_angleX_p30",
+      "params": {
+        "ParamAngleX": 30
+      },
+      "focus": [
+        130,
+        15,
+        390,
+        350
+      ],
+      "canvas": [
+        600,
+        770
+      ]
+    },
+    {
+      "name": "f_angleY_m30",
+      "params": {
+        "ParamAngleY": -30
+      },
+      "focus": [
+        130,
+        15,
+        390,
+        350
+      ],
+      "canvas": [
+        600,
+        770
+      ]
+    },
+    {
+      "name": "f_angleZ_p20",
+      "params": {
+        "ParamAngleZ": 20
+      },
+      "focus": [
+        130,
+        15,
+        390,
+        350
+      ],
+      "canvas": [
+        600,
+        770
+      ]
+    },
+    {
+      "name": "f_bodyX_p20",
+      "params": {
+        "ParamBodyAngleX": 20
+      },
+      "focus": [
+        130,
+        15,
+        390,
+        350
+      ],
+      "canvas": [
+        600,
+        770
+      ]
+    },
+    {
+      "name": "f_blink_mouth",
+      "params": {
+        "ParamEyeLOpen": 0.0,
+        "ParamEyeROpen": 0.0,
+        "ParamMouthOpenY": 1.0
+      },
+      "focus": [
+        130,
+        15,
+        390,
+        350
+      ],
+      "canvas": [
+        600,
+        770
+      ]
+    },
+    {
+      "name": "f_hairfront",
+      "params": {
+        "ParamHairFront": 10.0
+      },
+      "focus": [
+        130,
+        15,
+        390,
+        350
+      ],
+      "canvas": [
+        600,
+        770
+      ]
+    },
+    {
+      "name": "f_shy",
+      "params": {
+        "ParamPecorineShy": 1.0,
+        "ParamMouthForm": 0.3
+      },
+      "focus": [
+        130,
+        15,
+        390,
+        350
+      ],
+      "canvas": [
+        600,
+        770
+      ]
+    }
+  ]
+}

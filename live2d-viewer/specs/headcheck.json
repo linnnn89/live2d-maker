@@ -1,0 +1,23 @@
+{
+  "model": "/public/models/pecorine-native/pecorine-practice.model3.json",
+  "canvaspx": [
+    512,
+    1024
+  ],
+  "shots": [
+    {
+      "name": "head",
+      "params": {},
+      "focus": [
+        150,
+        20,
+        410,
+        340
+      ],
+      "canvas": [
+        780,
+        960
+      ]
+    }
+  ]
+}
