@@ -128,4 +128,4 @@ if (-not $DryRun) {
     Write-Host "[dry-run] See-through upstream baseline: $SeeThroughCommit" -ForegroundColor DarkGray
 }
 
-Write-Host "`nSetup complete. See environment.md or the Chinese guide environment-cn.md." -ForegroundColor Green
+Write-Host "`nSetup complete. See environment.md; it links to the Chinese guide." -ForegroundColor Green
