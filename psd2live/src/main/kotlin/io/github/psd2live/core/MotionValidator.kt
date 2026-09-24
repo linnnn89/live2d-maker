@@ -184,7 +184,7 @@ object MotionValidator {
             if (kotlin.math.abs(firstTime) > EPS) error("json.start_time", "First point must start at t=0", id)
 
             val sampledValues = mutableListOf(firstValue)
-            var previousTime = firstTime
+            var previousTime: Float = firstTime
             var index = 2
             while (index < segments.size) {
                 val type = integer(segments[index])
