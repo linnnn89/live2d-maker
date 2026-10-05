@@ -1,10 +1,11 @@
-# ref-toolchain — 工具链指针摘要（权威正文在仓库 `docs/toolchain.md`）
+# ref-toolchain — 工具链指针摘要（正文在仓库 `docs/toolchain.md`）
 
-> 本文件只放**指针 + 重定位规则摘要**，不复制权威正文（禁止平行文档）。
+本文件说明如何找到工具，清单与安装步骤保留在仓库文档中。
 
-- 权威正文：仓库 `docs/toolchain.md`（`read_file` + 仓内相对路径）——工具清单、环境要点、常见坑。
-- **重定位程序（R-f，红线唯一入口）**：不按记忆拼路径。先反查既有脚本里写死的绝对路径定位工具链：
-  `search_files(pattern="tools/portable|tools/python|PSD2Live", target="content", file_glob="*.py")`，
-  照抄脚本实际使用的解释器与导出器路径。同一台机常有多份 checkout，工具可能只在其中一份。
-- 关键提醒（详见权威正文）：项目 python 与宿主 python3/python **不是同一个**；PSD 读写/连通域
-  脚本一律用项目 python 经 `terminal` 跑；临时文件写 `$TMPDIR`。
+- 工具入口、应用选择和常见限制：仓库 `docs/toolchain.md`。
+- 安装、版本与自检命令：仓库 `docs/environment.md`。
+- 重定位：先确认当前 Git 根，再检查安装脚本、`tools/authoring_rig/native.py`
+  和 `studio/vite.config.ts` 如何解析路径；核对目标文件实际存在。
+- 多份 checkout 同时存在时，不照抄其他工程写死的绝对路径。
+- PSD 操作显式使用当前仓库的 `python/Scripts/python.exe`，不假定宿主解释器有相同依赖。
+- 临时资源使用系统临时目录或仓库被忽略的 `out/` 子目录。

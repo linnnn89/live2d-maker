@@ -1,46 +1,56 @@
 # 第三方来源与许可
 
-本集成仓库原创代码与文档采用根目录 GPL-3.0。第三方代码、运行时、SDK、示例和权重始终保留各自许可；根目录许可证不覆盖下面的专有内容。
+本项目原创代码和文档采用根目录 [GPL-3.0](../LICENSE)。第三方代码、运行时、SDK、示例和模型保留各自许可。安装包版本和 SHA-256以 [dependencies/manifest.json](../dependencies/manifest.json) 为准。
 
 ## PSD2Live / Umamo
 
-- 上游：https://github.com/tsunehimatoi/psd2live ，本仓 `psd2live/` 保留 GPL-3.0 与 `THIRD_PARTY_NOTICES.md`。
-- `dependencies/archives/psd2live-runtime.zip.*` 重新压缩上游 v0.7.1 portable，保留 JVM legal 信息、依赖 JAR 内的声明，并追加 GPL 与上游第三方说明；对应应用源代码在 `psd2live/`。
-- `dependencies/native/psd2live-0.7.1.jar` 是本仓当前源码构建，用于 CLI/Studio；不嵌入官方 Native SDK。
-- portable 的 OpenJDK 21.0.9 自带 GPL-2.0/ClassPath 相关许可；对应版本源代码：https://github.com/openjdk/jdk21u/tree/jdk-21.0.9%2B10 。各依赖仍受其随包声明约束。
+上游：[tsunehimatoi/psd2live](https://github.com/tsunehimatoi/psd2live)。本仓源码在 `psd2live/`，保留 [GPL-3.0](../psd2live/LICENSE)、[第三方说明](../psd2live/THIRD_PARTY_NOTICES.md) 与组件许可证。
+
+`psd2live-runtime.zip.*` 重新压缩上游 v0.7.1 portable，保留 JVM legal 信息和依赖 JAR 声明，并补入上游许可文件。随仓应用 JAR 由本仓源码构建；它不嵌入 Native SDK，原生资源由独立 JAR 提供。后续 Gradle 构建会嵌入该资源 JAR 中的内容。
+
+portable 的 OpenJDK 21.0.9 使用 GPL-2.0/Classpath 相关许可，对应源代码：[jdk21u jdk-21.0.9+10](https://github.com/openjdk/jdk21u/tree/jdk-21.0.9%2B10)。其他库以各自随包声明为准。
 
 ## Eclipse Temurin JDK
 
-- 版本：21.0.12.1+1，Windows x64 HotSpot。
-- 官方二进制：https://github.com/adoptium/temurin21-binaries/releases/tag/jdk-21.0.12.1%2B1 。
-- 对应源代码：https://github.com/adoptium/jdk21u/tree/jdk-21.0.12.1%2B1 ，构建源：https://github.com/adoptium/temurin-build 。
-- GPL-2.0 WITH Classpath-exception-2.0；完整 `legal/`、`NOTICE`、`src.zip` 均在压缩包中，NOTICE 另置于 `dependencies/licenses/`。重新压缩但未改程序代码。
-- 官方许可说明：https://adoptium.net/docs/faq 。
+版本为 21.0.12.1+1，Windows x64 HotSpot，采用 GPL-2.0 WITH Classpath-exception-2.0。
+
+- [官方二进制](https://github.com/adoptium/temurin21-binaries/releases/tag/jdk-21.0.12.1%2B1)
+- [对应源码](https://github.com/adoptium/jdk21u/tree/jdk-21.0.12.1%2B1) 与 [构建源码](https://github.com/adoptium/temurin-build)
+- [官方许可说明](https://adoptium.net/docs/faq)
+
+重新压缩时保留完整 legal、NOTICE 和 src.zip。NOTICE 另存于 `dependencies/licenses/`，程序代码未改。
 
 ## Gradle
 
-- 版本：9.6.1，完整 bin 分发：https://services.gradle.org/distributions/gradle-9.6.1-bin.zip 。
-- 对应源代码：https://github.com/gradle/gradle/tree/v9.6.1 。
-- Gradle Build Tool 采用 Apache-2.0；包内库各受自己的许可证约束，完整 LICENSE/NOTICE 保留并额外放在 `dependencies/licenses/`。
-- 官方许可说明：https://docs.gradle.org/current/userguide/licenses.html 。
+版本为 9.6.1，保留完整 bin 分发。Gradle Build Tool 采用 Apache-2.0，包内其他库保留自己的许可证。
 
-## Live2D Cubism SDK / Web runtime
+- [官方分发](https://services.gradle.org/distributions/gradle-9.6.1-bin.zip)
+- [对应源码](https://github.com/gradle/gradle/tree/v9.6.1)
+- [官方许可说明](https://docs.gradle.org/current/userguide/licenses.html)
 
-- 应项目所有者要求，本集成仓库单独随附官方完整 Native 5-r.5 ZIP：`dependencies/archives/CubismSdkForNative-5-r.5.zip`，不改内容，保留 Core、Framework、Samples 与所有内置许可。
-- 官方来源：https://cubism.live2d.com/sdk-native/bin/CubismSdkForNative-5-r.5.zip 。
-- 官方下载页：https://www.live2d.com/en/sdk/download/native/ 。
-- Core 为专有软件；Framework 使用 Live2D Open Software License。完整 SDK 不采用 GPL，也不能根据本仓 GPL 任意再许可。
-- 官方条款：https://www.live2d.com/eula/live2d-proprietary-software-license-agreement_en.html 和 https://www.live2d.com/eula/live2d-open-software-license-agreement_en.html 。Core 随派生应用分发的条款与整个 SDK 的镜像分发不同；保留许可文件本身并不授予额外分发权利。完整 SDK 的上传由项目所有者明确要求。
-- 原生桥接 DLL 在 `dependencies/native/cubism/windows-x86_64/live2d_renderer.dll`，取回自 PSD2Live 历史提交 `0b13a8184791733ff30584bd1243222c8ad1bd43` 的原始 Git blob `8aad05ebcaa7c8afb42faefc404d495be2279ca9`，未改二进制；上游未在该提交提供桥接 C++ 源码，不能声称可复现编译该 DLL。它包含官方 Core/Framework，随附对应许可，不按根 GPL 再许可。22 个着色器来自随仓官方 Native 5-r.5 ZIP；`cubism-runtime.jar` 仅打包这些资源与许可，无 Java 程序代码。
-- 已有 Web runtime 在 `live2d-viewer/public/vendor/cubism/`，精确 Core/Framework 版本、来源和生成方式见该目录 README。
-- PSD2Live 上游文档中的“不随附官方 SDK”描述其自身组件政策；本集成仓库的独立 SDK 压缩包不属于 PSD2Live 应用 JAR。
-- 本项目与 Live2D Inc. 无隶属、背书或赞助关系。
+LICENSE/NOTICE 随包保留，并另存于 `dependencies/licenses/`。
 
-## See-through 与模型权重
+## Live2D Cubism
 
-- 上游：https://github.com/shitagaki-lab/see-through ，固定基线 `7f139bb25c46a0c8ac720d95ddab185fcda5451c`，Apache-2.0，见 `see-through/LICENSE`。
-- 模型权重不在本仓上传物中；仅显式 `setup-windows.bat -WithModels` 下载，受各模型页面条款约束。来源与环境见 [环境说明](environment.md)。
+仓库随附官方完整 Native 5-r.5 ZIP，未改内容，保留 Core、Framework、Samples 及内置许可：
 
-## Studio 与技能包
+- [原始 SDK ZIP](https://cubism.live2d.com/sdk-native/bin/CubismSdkForNative-5-r.5.zip)
+- [官方 Native 下载页](https://www.live2d.com/en/sdk/download/native/)
+- [Proprietary Software License](https://www.live2d.com/eula/live2d-proprietary-software-license-agreement_en.html)
+- [Open Software License](https://www.live2d.com/eula/live2d-open-software-license-agreement_en.html)
 
-Studio 的 npm 依赖按精确 `studio/package-lock.json` 安装，保留包内许可证。`skills/live2d-studio/` 是项目自有路由、手册与验证脚本；未替换本机已安装技能。
+Core 使用专有许可，Framework 和着色器使用 Live2D Open Software License，不按本仓 GPL再许可。Core 随派生应用分发与完整 SDK镜像的条件不同，保留许可文件本身不授予额外分发权利。
+
+`live2d_renderer.dll` 取自 [PSD2Live 历史提交 0b13a818](https://github.com/tsunehimatoi/psd2live/blob/0b13a8184791733ff30584bd1243222c8ad1bd43/src/main/resources/cubism/windows-x86_64/live2d_renderer.dll)，原始 blob为 `8aad05ebcaa7c8afb42faefc404d495be2279ca9`，二进制未改。该提交没有桥接 C++ 源码，不能保证可复现编译；DLL 包含官方 Core/Framework，随附对应许可。22 个着色器来自官方 Native 5-r.5 ZIP。`cubism-runtime.jar` 只打包这些资源与许可，没有Java 程序代码。
+
+Web Core/Framework 来源、精确版本和打包方式见 [Web runtime 说明](../live2d-viewer/public/vendor/cubism/README.md)。PSD2Live 上游的“不随附 SDK”政策描述其独立仓库；本集成仓库另外提供 SDK 和桥接资源。本项目与 Live2D Inc. 无隶属或背书关系。
+
+## See-through
+
+上游：[shitagaki-lab/see-through](https://github.com/shitagaki-lab/see-through)，固定基线 `7f139bb25c46a0c8ac720d95ddab185fcda5451c`，采用 [Apache-2.0](../see-through/LICENSE)。
+
+模型权重不随仓分发，显式使用 `setup-windows.bat -WithModels` 才下载，受各模型页面条款约束。来源与推理环境见 [environment.md](environment.md)。
+
+## Studio 与技能
+
+Studio 依赖由 `studio/package-lock.json` 固定，各包保留自己的许可证。`skills/live2d-studio/` 的迁入资料来源与许可单独记在 [vendor-manifest.md](../skills/live2d-studio/references/vendor-manifest.md)。外部技能注册表仅包含指针，不随仓复制外部技能正文。
