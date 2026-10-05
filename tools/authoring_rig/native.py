@@ -36,6 +36,9 @@ def start_native(native_jar=None):
                 raise ValueError("native-jar must be a built PSD2Live application JAR")
         # Replace only the application; dependency JARs and JVM remain pinned and untouched.
         jars = [source_jar] + [p for p in jars if not p.name.startswith("psd2live-")]
+    resources = ROOT / "dependencies/native/cubism-runtime.jar"
+    if resources.is_file():
+        jars.append(resources)
     if jpype.isJVMStarted():
         raise RuntimeError("Native CLI requires a fresh process to pin the bundled JVM/classpath")
     jpype.startJVM(str(jvm), "-Djava.awt.headless=true", classpath=[str(p) for p in jars], convertStrings=True)

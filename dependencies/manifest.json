@@ -114,5 +114,142 @@
     "sha256": "7ff3a4bbc19c0a8728965aa522ab77eb11b252916453e68a8a78d3b71188bb12",
     "bytes": 27566034,
     "folder": "CubismSdkForNative-5-r.5"
+  },
+  "cubismRuntime": {
+    "source": "https://github.com/tsunehimatoi/psd2live/blob/0b13a8184791733ff30584bd1243222c8ad1bd43/src/main/resources/cubism/windows-x86_64/live2d_renderer.dll",
+    "sdk": "Cubism Native 5-r.5",
+    "note": "Unmodified upstream Windows x64 DLL; official SDK shaders and licenses; resource-only JAR generated from these files.",
+    "files": [
+      {
+        "file": "native/cubism/windows-x86_64/Core-LICENSE.md",
+        "bytes": 520,
+        "sha256": "b81e37048010ef1d336106151201a0323c3309cae44aecdedf57831fe88fa991"
+      },
+      {
+        "file": "native/cubism/windows-x86_64/Framework-LICENSE.md",
+        "bytes": 2254,
+        "sha256": "b367cb8009a392894796baac33dc43e4918462f457574b4a81ceb7bbf7c86803"
+      },
+      {
+        "file": "native/cubism/windows-x86_64/FrameworkShaders/FragShaderSrc.frag",
+        "bytes": 740,
+        "sha256": "a05759315a2471adad530e58e0a7ced243b87bb25250fb522a188cfd9f6f4c65"
+      },
+      {
+        "file": "native/cubism/windows-x86_64/FrameworkShaders/FragShaderSrcAlphaBlend.frag",
+        "bytes": 2320,
+        "sha256": "2b778f70fd42e1e6cac4660dcdbe377ae8f23d49e9c08672ab6b0371477211fb"
+      },
+      {
+        "file": "native/cubism/windows-x86_64/FrameworkShaders/FragShaderSrcBlend.frag",
+        "bytes": 1146,
+        "sha256": "e555ddadc1cfa80d2de0f909f3577eef86b345ba821ee25be535288ff0c7d304"
+      },
+      {
+        "file": "native/cubism/windows-x86_64/FrameworkShaders/FragShaderSrcColorBlend.frag",
+        "bytes": 7737,
+        "sha256": "d6f40b618f72e6a19d1e43776de8d24bd4c800055c80779611126972ddc688d1"
+      },
+      {
+        "file": "native/cubism/windows-x86_64/FrameworkShaders/FragShaderSrcCopy.frag",
+        "bytes": 416,
+        "sha256": "7490f94676b1498468917b79f04a64ccbbeeaea369f09a3201aa346f1a6d2aa5"
+      },
+      {
+        "file": "native/cubism/windows-x86_64/FrameworkShaders/FragShaderSrcMask.frag",
+        "bytes": 1030,
+        "sha256": "eded9e550c7c59c3afbb7e35b3f0b2323f01531cac5f0c3b4a28375827cc91d8"
+      },
+      {
+        "file": "native/cubism/windows-x86_64/FrameworkShaders/FragShaderSrcMaskBlend.frag",
+        "bytes": 1426,
+        "sha256": "70f8d0c8e0a9fc1c181058bd1d9806c099ddab617db2fdfa92b3cd79d1c2c761"
+      },
+      {
+        "file": "native/cubism/windows-x86_64/FrameworkShaders/FragShaderSrcMaskInverted.frag",
+        "bytes": 1038,
+        "sha256": "50e07d507b4147b1b96619e1fdf4a7415ace37c6cd8e47c55b5f6fe5ae1c99ed"
+      },
+      {
+        "file": "native/cubism/windows-x86_64/FrameworkShaders/FragShaderSrcMaskInvertedBlend.frag",
+        "bytes": 1434,
+        "sha256": "e102020be68acca0fc0fe1366ce2d6d915c51e7fbba30e940a74005417a60ad1"
+      },
+      {
+        "file": "native/cubism/windows-x86_64/FrameworkShaders/FragShaderSrcMaskInvertedPremultipliedAlpha.frag",
+        "bytes": 997,
+        "sha256": "8a83ad7025a6399c9a05f4e9b167de0587a1df9d5cb9773d0e9cafd24b51b809"
+      },
+      {
+        "file": "native/cubism/windows-x86_64/FrameworkShaders/FragShaderSrcMaskInvertedPremultipliedAlphaBlend.frag",
+        "bytes": 1481,
+        "sha256": "162843847b89ba572d2ab3918f2eed1a6b2353201d31b0dbce317280e5f9100f"
+      },
+      {
+        "file": "native/cubism/windows-x86_64/FrameworkShaders/FragShaderSrcMaskPremultipliedAlpha.frag",
+        "bytes": 989,
+        "sha256": "b23218f67e607850f047b21f2a85da57e0dd44def02bc2262a9f757097db6453"
+      },
+      {
+        "file": "native/cubism/windows-x86_64/FrameworkShaders/FragShaderSrcMaskPremultipliedAlphaBlend.frag",
+        "bytes": 1473,
+        "sha256": "0e31cd1bafd40361f904c1aa3d7492b5fa2b8aa0461cb104964626376fe05c20"
+      },
+      {
+        "file": "native/cubism/windows-x86_64/FrameworkShaders/FragShaderSrcPremultipliedAlpha.frag",
+        "bytes": 702,
+        "sha256": "b10b5533752f1f53fff9de51d833c672956fb26a582a178323836e36c71e0206"
+      },
+      {
+        "file": "native/cubism/windows-x86_64/FrameworkShaders/FragShaderSrcPremultipliedAlphaBlend.frag",
+        "bytes": 1192,
+        "sha256": "1b0277e5edc44bae7340c3f2fe13a7212de9553061ce6c0aed180fd7c5148672"
+      },
+      {
+        "file": "native/cubism/windows-x86_64/FrameworkShaders/FragShaderSrcSetupMask.frag",
+        "bytes": 706,
+        "sha256": "e93547427c052a54f36c3e668cebf443313d996686a00077dbef08d733617574"
+      },
+      {
+        "file": "native/cubism/windows-x86_64/FrameworkShaders/VertShaderSrc.vert",
+        "bytes": 517,
+        "sha256": "31224999977586c5e4054a2276df5e30c7062ce276c22981c0da8b0a5d50ecde"
+      },
+      {
+        "file": "native/cubism/windows-x86_64/FrameworkShaders/VertShaderSrcBlend.vert",
+        "bytes": 633,
+        "sha256": "31f913762b7cf6b1a3120a94c7cb860e4ac82378174faca1335a584f77b22db8"
+      },
+      {
+        "file": "native/cubism/windows-x86_64/FrameworkShaders/VertShaderSrcCopy.vert",
+        "bytes": 405,
+        "sha256": "c9fa34f75f725640bfe0d0e60d05bac54608a8be6bb35d2e3dbb3dd1f0a7154e"
+      },
+      {
+        "file": "native/cubism/windows-x86_64/FrameworkShaders/VertShaderSrcMasked.vert",
+        "bytes": 572,
+        "sha256": "e68ff07c63a6fde693da8acf5eea27094cce29cf2afa448b251602fd3a6324b2"
+      },
+      {
+        "file": "native/cubism/windows-x86_64/FrameworkShaders/VertShaderSrcMaskedBlend.vert",
+        "bytes": 688,
+        "sha256": "b025c0256252dcc1deace19f125e241112f0df5ac97269ce15c3ec7a17b3883d"
+      },
+      {
+        "file": "native/cubism/windows-x86_64/FrameworkShaders/VertShaderSrcSetupMask.vert",
+        "bytes": 549,
+        "sha256": "24f566347bd2f1e17ef9e5a96ba3870ff4bfd4fb8d3caf5586a1dab2ae372e0a"
+      },
+      {
+        "file": "native/cubism/windows-x86_64/live2d_renderer.dll",
+        "bytes": 930304,
+        "sha256": "8c855be34ea39139149d56c0da8cd5950d763d9bb5e240b3398ab484d9e656bf"
+      },
+      {
+        "file": "native/cubism-runtime.jar",
+        "bytes": 404006,
+        "sha256": "d2e987115aad9603b280dec83d4a5954f643cfed1bb612e13d51fa3ae9f2ab77"
+      }
+    ]
   }
 }

@@ -31,6 +31,7 @@
 - 官方下载页：https://www.live2d.com/en/sdk/download/native/ 。
 - Core 为专有软件；Framework 使用 Live2D Open Software License。完整 SDK 不采用 GPL，也不能根据本仓 GPL 任意再许可。
 - 官方条款：https://www.live2d.com/eula/live2d-proprietary-software-license-agreement_en.html 和 https://www.live2d.com/eula/live2d-open-software-license-agreement_en.html 。Core 随派生应用分发的条款与整个 SDK 的镜像分发不同；保留许可文件本身并不授予额外分发权利。完整 SDK 的上传由项目所有者明确要求。
+- 原生桥接 DLL 在 `dependencies/native/cubism/windows-x86_64/live2d_renderer.dll`，取回自 PSD2Live 历史提交 `0b13a8184791733ff30584bd1243222c8ad1bd43` 的原始 Git blob `8aad05ebcaa7c8afb42faefc404d495be2279ca9`，未改二进制；上游未在该提交提供桥接 C++ 源码，不能声称可复现编译该 DLL。它包含官方 Core/Framework，随附对应许可，不按根 GPL 再许可。22 个着色器来自随仓官方 Native 5-r.5 ZIP；`cubism-runtime.jar` 仅打包这些资源与许可，无 Java 程序代码。
 - 已有 Web runtime 在 `live2d-viewer/public/vendor/cubism/`，精确 Core/Framework 版本、来源和生成方式见该目录 README。
 - PSD2Live 上游文档中的“不随附官方 SDK”描述其自身组件政策；本集成仓库的独立 SDK 压缩包不属于 PSD2Live 应用 JAR。
 - 本项目与 Live2D Inc. 无隶属、背书或赞助关系。

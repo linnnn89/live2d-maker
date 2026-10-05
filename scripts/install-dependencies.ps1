@@ -23,6 +23,9 @@ function Check-Hash([string]$Path, [string]$Expected) {
 }
 
 Check-Hash (Join-Path $Source $Manifest.nativeJar.file) $Manifest.nativeJar.sha256
+foreach ($RuntimeFile in $Manifest.cubismRuntime.files) {
+    Check-Hash (Join-Path $Source $RuntimeFile.file) $RuntimeFile.sha256
+}
 foreach ($Package in $Manifest.packages) {
     if ($SkipPortable -and $Package.name -eq 'psd2live-runtime') { continue }
     foreach ($Part in $Package.parts) {
@@ -80,4 +83,28 @@ foreach ($Package in $Manifest.packages) {
         Remove-Item -LiteralPath $ResolvedTemp -Recurse -Force
     }
 }
-Write-Host 'Dependency archives and native application JAR: SHA-256 verified.'
+# Add a resource-only JAR to the original desktop launcher without replacing its app/runtime.
+if (-not $SkipPortable) {
+    $AppDirectory = Join-Path $DestinationRoot 'portable/PSD2Live/app'
+    $ConfigPath = Join-Path $AppDirectory 'PSD2Live.cfg'
+    $RuntimeJar = Join-Path $AppDirectory 'psd2live-cubism-runtime.jar'
+    $ExpectedRuntimeHash = ($Manifest.cubismRuntime.files | Where-Object { $_.file -eq 'native/cubism-runtime.jar' }).sha256
+    if (Test-Path -LiteralPath $RuntimeJar) { Check-Hash $RuntimeJar $ExpectedRuntimeHash }
+    $ClassPathEntry = 'app.classpath=$APPDIR\psd2live-cubism-runtime.jar'
+    if ($DryRun) {
+        Write-Host '[dry-run] install Cubism resource JAR and register desktop launcher classpath'
+    } else {
+        if (-not (Test-Path -LiteralPath $ConfigPath -PathType Leaf)) { throw "Desktop launcher config missing: $ConfigPath" }
+        Copy-Item -LiteralPath (Join-Path $Source 'native/cubism-runtime.jar') -Destination $RuntimeJar -Force
+        $Config = [IO.File]::ReadAllText($ConfigPath)
+        if (-not ($Config.Split("`n").Trim() -contains $ClassPathEntry)) {
+            if (-not $Config.Contains('[Application]')) { throw "Invalid desktop launcher config: $ConfigPath" }
+            $Backup = "$ConfigPath.before-cubism"
+            if (-not (Test-Path -LiteralPath $Backup)) { Copy-Item -LiteralPath $ConfigPath -Destination $Backup }
+            $Config = $Config.Replace('[Application]', "[Application]`r`n$ClassPathEntry")
+            [IO.File]::WriteAllText($ConfigPath, $Config, (New-Object Text.UTF8Encoding($false)))
+        }
+        Write-Host 'Cubism native renderer: desktop classpath configured (original application retained).'
+    }
+}
+Write-Host 'Dependency archives, native application JAR and Cubism runtime: SHA-256 verified.'

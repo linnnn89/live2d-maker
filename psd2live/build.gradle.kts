@@ -17,6 +17,12 @@ kotlin {
 	jvmToolchain(21)
 }
 
+// The integration repository supplies the matching DLL/shaders as a resource-only JAR.
+tasks.processResources {
+	val cubismResources = rootProject.file("../dependencies/native/cubism-runtime.jar")
+	if (cubismResources.isFile) from(zipTree(cubismResources))
+}
+
 dependencies {
 	implementation(platform("io.ktor:ktor-bom:3.5.1"))
 	// Core engine dependencies (ported from Umamo: format, runtime, interop, render, edit)

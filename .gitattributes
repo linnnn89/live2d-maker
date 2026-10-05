@@ -1,3 +1,8 @@
 # Binary dependency archives and the built application must retain their exact hashes.
 dependencies/archives/** -text
 dependencies/native/*.jar -text
+dependencies/native/cubism/windows-x86_64/live2d_renderer.dll -text
+dependencies/native/cubism/windows-x86_64/FrameworkShaders/** -text
+dependencies/native/cubism/windows-x86_64/*-LICENSE.md -text
+# Preserve the official shader byte-for-byte, including its original final blank line.
+dependencies/native/cubism/windows-x86_64/FrameworkShaders/FragShaderSrcBlend.frag whitespace=-blank-at-eof

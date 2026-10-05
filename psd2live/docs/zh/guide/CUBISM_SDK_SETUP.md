@@ -1,5 +1,7 @@
 # Live2D Cubism SDK 配置与使用指南
 
+> 本集成仓库已直接随附 Windows x64 `live2d_renderer.dll`、22 个着色器和许可。先在仓库根目录运行 `dependencies\install.bat`，安装器会自动注册 portable 桌面 classpath；CLI/Studio 和源码 Gradle 构建也使用同一资源 JAR。来源与哈希见 [随仓依赖](../../../../dependencies/README.md)。下文手工配置及不分发政策描述 PSD2Live 上游独立仓库。
+
 [English](../../en/guide/CUBISM_SDK_SETUP.md) | [日本語](../../ja/guide/CUBISM_SDK_SETUP.md)
 
 本指南旨在指引用户在需要时为 PSD2Live 配置官方 Live2D® Cubism® Native SDK 运行时环境，以启用与官方 Cubism 运行时**100% 忠实一致的渲染与动力学行为验证（Consistency & Ground Truth）**。
