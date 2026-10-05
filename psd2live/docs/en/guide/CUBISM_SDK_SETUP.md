@@ -1,5 +1,7 @@
 # Live2D Cubism SDK Configuration Guide
 
+> This integration repository bundles the Windows x64 renderer DLL, 22 shaders and licenses. Run `dependencies\install.bat` at the repository root to configure the portable desktop classpath automatically. CLI/Studio and Gradle source builds use the same resource JAR. See [bundled dependencies](../../../../dependencies/README.md) for provenance and hashes. The manual setup and non-distribution policy below describe the standalone upstream PSD2Live repository.
+
 [中文](../../zh/guide/CUBISM_SDK_SETUP.md) | [日本語](../../ja/guide/CUBISM_SDK_SETUP.md)
 
 This guide provides instructions on how to configure the official Live2D® Cubism® Native SDK runtime for PSD2Live to achieve **100% faithful rendering and physical dynamics parity with the official Cubism runtime (Consistency & Ground Truth)**.

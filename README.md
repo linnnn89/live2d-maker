@@ -2,7 +2,7 @@
 
 把 PSD 处理、单图拆层、Live2D 自动建模、渲染验证工具与 Agent 技能经验整合为一个可复现工作区：**一个路由入口、四层分流文档**，人和 agent 各取所需，逐层下钻，不一次性灌满。
 
-> Windows 用户克隆后运行 [`setup-windows.bat`](setup-windows.bat)，校验并解压随仓库提供的 PSD2Live、JDK 21、Gradle 和完整 Cubism Native SDK，创建 Python 环境并安装 Studio。依赖包、校验清单和单独安装入口在 [`dependencies/`](dependencies/README.md)；唯一环境说明入口为 [`docs/environment.md`](docs/environment.md)。模型权重、虚拟环境、构建缓存和生成结果不进 Git。
+> Windows 用户克隆后运行 [`setup-windows.bat`](setup-windows.bat)，校验并解压随仓库提供的 PSD2Live、JDK 21、Gradle、完整 Cubism Native SDK 和原生预览桥接 DLL，创建 Python 环境并安装 Studio。依赖包、校验清单和单独安装入口在 [`dependencies/`](dependencies/README.md)；唯一环境说明入口为 [`docs/environment.md`](docs/environment.md)。模型权重、虚拟环境、构建缓存和生成结果不进 Git。
 
 > **当前状态：开发态可用，尚未通过开源发布 gate。** 技能包的路由与安全降级自包含，具体工具契约依赖其绑定的 `live2d-edit-tool` 工作区。
 >
@@ -14,7 +14,7 @@
 | :--- | :--- | :--- |
 | **PSD2Live** | [`psd2live/`](psd2live/README.md) | 核心流水线：分层 PSD → 自动建模 → `.cmo3` / `.moc3` 导出（Kotlin/Gradle + MCP 接口） |
 | **PSD2Live 便携版** | `portable/PSD2Live/` | jpype 起 JVM 的免构建导出器，脚本驱动 |
-| **随仓依赖** | [`dependencies/`](dependencies/README.md) | PSD2Live 运行时、当前源码 JAR、JDK、Gradle、完整 Cubism Native 5-r.5 SDK；SHA-256 校验与一键解压 |
+| **随仓依赖** | [`dependencies/`](dependencies/README.md) | PSD2Live 运行时、当前源码 JAR、JDK、Gradle、完整 Cubism Native 5-r.5 SDK 与原生预览 DLL/着色器；SHA-256 校验与一键解压 |
 | **See-through** | [`see-through/`](see-through/README.md) | 单张立绘 → 多层全补绘 PSD 拆层（SIGGRAPH 2026 研究项目） |
 | **live2d-viewer** | `live2d-viewer/` | 参数化渲染 harness：按参数/镜位出图，before/after 对比验证 |
 | **Live2D Studio** | [`studio/`](studio/README.md) | 本地三栏 IR 编辑器：拖点、保存、PSD/moc3 重建、Cubism 预览与 Pose QA |

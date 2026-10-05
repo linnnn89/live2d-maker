@@ -1,5 +1,7 @@
 # Live2D Cubism SDK 設定・利用ガイド
 
+> この統合リポジトリは Windows x64 DLL、22 個のシェーダーとライセンスを同梱します。ルートで `dependencies\install.bat` を実行すると portable の classpath を自動設定します。CLI/Studio と Gradle ビルドも同じリソース JAR を使用します。[同梱依存関係](../../../../dependencies/README.md)に出所とハッシュを記載しています。以下の手動設定と非配布方針は上流の独立 PSD2Live リポジトリを説明します。
+
 [English](../../en/guide/CUBISM_SDK_SETUP.md) | [中文](../../zh/guide/CUBISM_SDK_SETUP.md)
 
 本ガイドは、PSD2Live で公式 Live2D® Cubism® Native SDK ランタイム環境を設定し、公式 Cubism ランタイムと**100% 忠実な描画および物理挙動の一致性検証（Consistency & Ground Truth）**を有効化する手順を説明します。

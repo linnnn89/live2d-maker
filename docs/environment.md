@@ -73,7 +73,7 @@ python\Scripts\python.exe live2d-viewer\check_runtime.py
 python\Scripts\python.exe skills\live2d-studio\scripts\check_routing.py
 ```
 
-完整 Native SDK 已解压不代表桌面官方预览已经配置：上游专用 `live2d_renderer.dll` 桥接库不在官方 SDK ZIP 中，需要按 [SDK 配置说明](../psd2live/docs/zh/guide/CUBISM_SDK_SETUP.md) 另行构建/配置；Studio 使用 Web Core，不依赖该 DLL。
+`live2d_renderer.dll`、22 个着色器与许可已经随仓分发，`setup-windows.bat` / `dependencies\install.bat` 自动将资源 JAR 接入 portable 桌面启动配置，CLI/Studio 与源码构建也加载同一份运行时。无需另行编译桥接库或设置全局 `CUBISM_SDK_PATH`。Windows 官方原生预览需要可用的 OpenGL 图形环境；Studio 的 Web Core 验证仍独立可用。来源、哈希和验证命令见 [随仓依赖](../dependencies/README.md)。
 
 ## 可选 See-through
 
