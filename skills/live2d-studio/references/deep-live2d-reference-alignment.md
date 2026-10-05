@@ -17,7 +17,7 @@
 用 `scripts/register_art.py`（本技能自带，逻辑与实测一致）：
 
 ```bash
-work/tools/python/Scripts/python.exe scripts/register_art.py \
+python/Scripts/python.exe scripts/register_art.py \
   work/<char>-native/全身像参考图.png --lo 0.35 --hi 0.75 --step 0.01 --sub 4 --model-dir work/<char>-native --tag fullbody
 ```
 
@@ -47,7 +47,7 @@ work/tools/python/Scripts/python.exe scripts/register_art.py \
 生成三格图 `参考 | 模型 | 50% 叠加`，**叠一张每 10px 一条、每 50px 带坐标标签的画布网格**，放大 3~5 倍，再按部位切：头顶/眼/嘴下巴。数值与目视一致才向用户汇报。
 
 ```bash
-work/tools/python/Scripts/python.exe zoom_cmp.py --align debug_analysis/align_fullbody.json --image 全身像参考图.png --tag full
+python/Scripts/python.exe zoom_cmp.py --align debug_analysis/align_fullbody.json --image 全身像参考图.png --tag full
 ```
 
 叠加图里成对出现的"重影"就是差量：重影间距 ÷ 放大倍数 = 画布像素差。

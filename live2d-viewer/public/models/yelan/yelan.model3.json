@@ -1,0 +1,24 @@
+{
+	"Version": 3,
+	"FileReferences": {
+		"Moc": "yelan.moc3",
+		"Textures": [
+			"yelan.4096/texture_00.png",
+			"yelan.4096/texture_01.png"
+		],
+		"Physics": "yelan.physics3.json",
+		"DisplayInfo": "yelan.cdi3.json"
+	},
+	"Groups": [
+		{
+			"Target": "Parameter",
+			"Name": "LipSync",
+			"Ids": []
+		},
+		{
+			"Target": "Parameter",
+			"Name": "EyeBlink",
+			"Ids": []
+		}
+	]
+}

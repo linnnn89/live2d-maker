@@ -1,4 +1,4 @@
-# 参数化渲染验证 harness（work/tools/live2d-viewer/）
+# 参数化渲染验证 harness（live2d-viewer/）
 
 ## 为什么需要它
 
@@ -8,18 +8,36 @@
 
 | 文件 | 作用 |
 | --- | --- |
-| `index.html` | 复用 `public/vendor/cubism` 运行时加载任意本地 model3.json，暴露 `viewer.load/reset/setParams/focus/render/snapshot`；`snapshot` 返回 dataURL |
-| `shot.py` | 起 headless 浏览器（playwright，`channel='msedge'` + `--use-angle=swiftshader`），按 spec 逐 shot 设参数、`focus` 取景、截图存 PNG |
+| `index.html` | 用 `public/vendor/cubism/` 运行时加载**一个**本地 model3.json（由 URL query 指定，一页一模型，没有 `load()`），挂 `window.viewer` |
+| `shot.py` | 起 headless 浏览器（playwright，`channel='msedge'` + `--use-angle=swiftshader`），每个 shot 重新打开页面，`reset` → `setParams` → `focus` → `snapshot` 存 PNG |
 | `sheet.py` | 把多张快照拼成带标签的对比图（before/after 并排） |
-| `specs/*.json` | 参数组合与取景：`{"model":url,"canvaspx":[512,1024],"shots":[{"name","params","focus":[x0,y0,x1,y1],"canvas":[w,h]}]}` |
+| `specs/*.json` | 参数组合与取景：`{"model":url,"vendor":url,"canvaspx":[w,h],"canvas":[w,h],"shots":[{"name","params","focus":[x0,y0,x1,y1],"canvas":[w,h],"exact":bool}]}`；冒烟样例 `specs/smoke-fixture.json` |
+| `public/vendor/cubism/` | Cubism Core 5.3（native 6.0.1）+ Framework 5-r.5 打包（全局名 `Live2DChatCubismFramework`）+ shaders，来源见其 README |
+| `public/models/yelan/` | 冒烟测试模型 |
 
-调用（静态服务与 `model3.json` 同源，避免 file:// 的 fetch 限制）：
+`index.html` 的 URL query：`model=`（必填）、`vendor=`（默认 `/public/vendor/cubism/`）、`w=`/`h=`（渲染面像素，默认 512×1024）、`canvaspx=w,h`（模型画布像素，默认 `512,1024`，用于像素↔模型单位换算）。
+
+`window.viewer` 实际 API（以 `index.html` 为准）：
+
+| 成员 | 说明 |
+| --- | --- |
+| `ready` / `errors` | 加载完成标志 / 错误字符串数组 |
+| `coreVersion` / `mocVersion` | Core 与 moc 版本 |
+| `params()` | `[{id, value, min, max, default}]` |
+| `setParams({Id: value})` | 设参数（clamp），返回已应用的 id |
+| `reset()` | 恢复默认姿态 |
+| `drawables()` | `[{id, bbox, opacity…}]`，模型画布像素，y 向下 |
+| `focus([x0,y0,x1,y1])` | 取景到画布像素矩形 |
+| `exact()` | 1:1 取景（渲染面尺寸需等于 `canvaspx`） |
+| `view({zoom,cx,cy})` / `currentView()` / `pxPerCanvas(zoom)` | 显式视图 / 当前视图 / 每画布像素对应渲染像素 |
+| `render()` / `snapshot(crop, scale)` | 画一帧 / 返回 PNG dataURL |
+
+调用（静态服务从**仓库根**起，所以 spec 里的 URL 要带 `/live2d-viewer/` 前缀）：
 
 ```bash
-# 后台起服务（目录取仓库根，路径按 URL /public/models/... 访问）
-python -m http.server 8899 --bind 127.0.0.1 --directory <repo>
-work/tools/python/Scripts/python.exe work/tools/live2d-viewer/shot.py --spec <spec.json> --outdir <out>
-work/tools/python/Scripts/python.exe work/tools/live2d-viewer/sheet.py <out.png> labelA=<a.png> labelB=<b.png>
+python/Scripts/python.exe -m http.server 8899 --bind 127.0.0.1   # 在仓库根后台运行
+python/Scripts/python.exe live2d-viewer/shot.py --spec live2d-viewer/specs/smoke-fixture.json --outdir live2d-viewer/out/smoke
+python/Scripts/python.exe live2d-viewer/sheet.py <out.png> labelA=<a.png> labelB=<b.png>
 ```
 
 ## 坐标换算（关键，错了会全部取错景）

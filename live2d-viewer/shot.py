@@ -1,6 +1,6 @@
 """Parameterised Live2D snapshot tool.
 
-Renders a local Cubism model through work/tools/live2d-viewer/index.html and
+Renders a local Cubism model through live2d-viewer/index.html and
 writes one PNG per requested pose, so a rig change can be inspected (and
 diffed) without launching the Electron app.
 

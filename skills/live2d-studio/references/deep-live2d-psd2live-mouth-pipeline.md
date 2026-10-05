@@ -6,7 +6,7 @@
   - `buildChannels()`：决定每个 drawable 的不透明度网格。PRESET 类型下只有 `MOUTH_CLOSE -> scalarGrid(MOUTH_OPEN, [0,1]) { 1 - it }`、`TOOTH_T/B`/`TONGUE -> [0, 0.15, 1]` 的快速淡入；**`MOUTH` / `MOUTH_OPEN` 落到 `else -> null`，即永远不透明，没有渐显**。
   - `mouthWholePoint()`：张嘴形变。`seamY = aperture.top + aperture.height * 0.48`；闭嘴时 `verticalScale = (1.25px / aperture.height)`，水平只收缩到 `0.92`。`aperture` 来自 `mouthApertureFor(layer)`＝`mouth`/`mouth_open` 层的 alpha 包围盒。
   - `mouthAxes()`：嘴部密集关键形轴（MouthForm 9 档 × MouthOpen 33 档）。
-- 规范：`work/tools/psd2live/docs/zh/spec/PSD_LAYER_SPEC.md` §2（嘴与口腔系统）。
+- 规范：`psd2live/docs/zh/spec/PSD_LAYER_SPEC.md` §2（嘴与口腔系统）。
 - 语义别名：`mouth` / `mouth_open` / `open mouth` / `张嘴`… → MOUTH_OPEN；`mouth_close` / `闭嘴` / `口閉じ` → MOUTH_CLOSE。
 
 ### 由机制直接推出的两条结论

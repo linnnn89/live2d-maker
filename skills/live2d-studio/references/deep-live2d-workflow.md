@@ -5,11 +5,11 @@
 
 ## 工具链（先确认，不要猜路径）
 
-- 项目 python：`work/tools/python/Scripts/python.exe`（3.10，含 psd-tools / jpype1 / numpy / scipy / Pillow / playwright）。**Hermes 沙箱解释器没有 psd_tools / scipy**：凡涉及 PSD 读写、连通域/填洞/内插的脚本，一律用 `terminal` 调这个 python 跑，不要用 `execute_code` 直接 import。
-- 便携 PSD2Live：`work/tools/portable/PSD2Live`（jpype 起 JVM，classpath 取 `app/*`），由该角色的 `export_*.py` 驱动。
-- **先在磁盘上确认工具链落在哪个 checkout**：同一台机常有多份工程副本，`work/tools/python`、`work/tools/portable/PSD2Live`、`work/tools/psd2live` 可能只存在于其中一份（另一个项目目录里只有产物、没有工具）。既有脚本里写死的绝对路径就是最可靠线索：先 `grep -rn "tools/portable\|tools/python" <项目>/ --include=*.py` 读出它们实际用的解释器与 PSD2Live 路径再照抄，不要按本技能里的占位路径硬拼。项目布局也不保证是 `work/<char>-native/`：可能是一套角色一套 `work/<cluster>/<id>/{source,export,raw}` + 发布到 `extracted/<...>/<id>/`，`raw/` 里放 PSD 素材、`source/` 里放 psd。
-- 规范先读：`work/tools/psd2live/docs/zh/spec/PSD_LAYER_SPEC.md`（层语义与眼/嘴/发规则）、`DEFORMER_AND_PARAMETER_SPEC.md`；实现源码 `work/tools/psd2live/src/main/kotlin/io/github/psd2live/core/{LayerClassifier,ComponentSplitter,RigBuilder}.kt`。
-- 渲染 harness：`work/tools/live2d-viewer/`（见 deep-live2d-render-check-harness.md）。仓库原有的整机截图脚本只能给界面截图，不能按参数出图，别拿它当验证手段。
+- 项目 python：`python/Scripts/python.exe`（3.10，含 psd-tools / jpype1 / numpy / scipy / Pillow / playwright）。**Hermes 沙箱解释器没有 psd_tools / scipy**：凡涉及 PSD 读写、连通域/填洞/内插的脚本，一律用 `terminal` 调这个 python 跑，不要用 `execute_code` 直接 import。
+- 便携 PSD2Live：`portable/PSD2Live`（jpype 起 JVM，classpath 取 `app/*`），由该角色的 `export_*.py` 驱动。
+- **先在磁盘上确认工具链落在哪个 checkout**：同一台机常有多份工程副本，`python`、`portable/PSD2Live`、`psd2live` 可能只存在于其中一份（另一个项目目录里只有产物、没有工具）。既有脚本里写死的绝对路径就是最可靠线索：先 `grep -rn "portable/PSD2Live\|python/Scripts" <项目>/ --include=*.py` 读出它们实际用的解释器与 PSD2Live 路径再照抄，不要按本技能里的占位路径硬拼。项目布局也不保证是 `work/<char>-native/`：可能是一套角色一套 `work/<cluster>/<id>/{source,export,raw}` + 发布到 `extracted/<...>/<id>/`，`raw/` 里放 PSD 素材、`source/` 里放 psd。
+- 规范先读：`psd2live/docs/zh/spec/PSD_LAYER_SPEC.md`（层语义与眼/嘴/发规则）、`DEFORMER_AND_PARAMETER_SPEC.md`；实现源码 `psd2live/src/main/kotlin/io/github/psd2live/core/{LayerClassifier,ComponentSplitter,RigBuilder}.kt`。
+- 渲染 harness：`live2d-viewer/`（见 deep-live2d-render-check-harness.md）。仓库原有的整机截图脚本只能给界面截图，不能按参数出图，别拿它当验证手段。
 
 ## 标准流程
 

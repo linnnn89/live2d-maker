@@ -56,6 +56,9 @@ debug_analysis/
 !psd2live/examples/**/*.cmo3
 !psd2live/examples/**/*.model3.json
 
+# Keep the viewer smoke-test fixture model (live2d-viewer/public/models/)
+!live2d-viewer/public/models/**
+
 # Local logs and probes
 *.log
 err.txt
