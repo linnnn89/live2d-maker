@@ -13,8 +13,9 @@ import kotlin.test.*
 class AgentAuthoringTest {
     @Test fun historyPersistsStructureJournal() {
         val edit=Json.parseToJsonElement("""{"action":"rename","kind":"mesh","id":"hair","name":"Bang"}""").jsonObject
+        val journal=commandJournal()
         val document=AgentWorkspaceDocument(WorkspaceSourceArt(10,10,emptyList(),emptyList()),emptyMap(),emptySet(),emptyMap(),emptyMap(),
-            RigEditOverlay(structureEdits=listOf(edit)))
+            RigEditOverlay(structureEdits=listOf(edit), authoringJournal=journal))
         val root=Files.createTempDirectory("psd2live-history-test")
         try {
             val store=AgentWorkspaceStore(root)
@@ -23,8 +24,14 @@ class AgentAuthoringTest {
             val restored=assertNotNull(store.loadHistory("project"))
             assertEquals(history.head().node.id,restored.head().node.id)
             assertEquals(listOf(edit),restored.head().snapshot.rigEdits.structureEdits)
+            assertEquals(journal,restored.head().snapshot.rigEdits.authoringJournal)
         } finally { root.toFile().deleteRecursively() }
     }
+
+    private fun commandJournal() = listOf(
+        Json.parseToJsonElement("""{"op":"set","target":"mesh:hair","key":{"ParamAngleX":30},"channels":{"opacity":0.5}}""").jsonObject,
+        Json.parseToJsonElement("""{"op":"copy","target":"mesh:hair","from":{"ParamAngleX":30},"key":{"ParamAngleX":-30},"channels":["opacity"]}""").jsonObject,
+        Json.parseToJsonElement("""{"op":"delete","target":"mesh:hair","parameter":"ParamAngleX","value":30,"channel":"opacity"}""").jsonObject)
 
     @Test fun nativeAlphaReferenceImportDoesNotStripWhitePaint() {
         val image=BufferedImage(2,2,BufferedImage.TYPE_INT_ARGB)

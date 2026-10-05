@@ -1,0 +1,3 @@
+# Binary dependency archives and the built application must retain their exact hashes.
+dependencies/archives/** -text
+dependencies/native/*.jar -text

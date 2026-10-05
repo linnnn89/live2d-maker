@@ -25,14 +25,12 @@ the viewer; `scale` upscales the snapshot with nearest neighbour. Without
 
 `exact: true` requests a strict 1:1 mapping between model canvas pixels and
 render pixels (the PNG *is* the canvas; measure it directly, no transform
-maths). It is calibrated empirically against the model's own drawable bounds
-and re-checked after the render, because the viewer's "zoom 1" is actually
-~0.93 px per canvas pixel — measuring pixels off an uncalibrated snapshot
-silently scales every number you read.
+maths). The viewer computes the mapping from the authored canvas size and Cubism
+canvas units. Mesh bounds include masks and hidden geometry, so they cannot
+be used as the reference for rendered alpha bounds.
 
 Every shot prints its effective px-per-canvas-pixel; only `exact` shots are
-asserted to be 1:1. Use the `None`-scale mode (no PIL import) for pure
-screenshots.
+asserted to be 1:1. Pillow and numpy verify that snapshots are non-empty.
 """
 import argparse
 import base64
@@ -40,12 +38,50 @@ import io
 import json
 import sys
 from pathlib import Path
+from urllib.parse import urlencode
 
 from playwright.sync_api import sync_playwright
 
 HERE = Path(__file__).resolve().parent
 EXACT_TOLERANCE = 0.002          # px-per-canvas accepted as 1:1
-EXACT_ALIGN_TOLERANCE = 2.0      # px, final bbox agreement
+
+
+def viewer_url(spec, shot, port):
+    w, h = shot.get("canvas", spec.get("canvas", [1024, 1536]))
+    query = {"w": w, "h": h, "model": spec["model"]}
+    if spec.get("vendor"):
+        query["vendor"] = spec["vendor"]
+    if spec.get("canvaspx"):
+        query["canvaspx"] = ",".join(map(str, spec["canvaspx"]))
+    return f"http://127.0.0.1:{port}/live2d-viewer/index.html?{urlencode(query)}"
+
+
+def snapshot_pose(page, spec, shot):
+    """Apply a pose and view explicitly; reject incomplete evidence."""
+    page.evaluate("window.viewer.reset()")
+    px = spec.get("canvaspx", [512, 1024])
+    page.evaluate("v => window.viewer.view(v)", {"zoom": 1, "cx": px[0] / 2, "cy": px[1] / 2})
+    requested = shot.get("params", {})
+    applied = page.evaluate("v => window.viewer.setParams(v)", requested)
+    missing = set(requested) - set(applied)
+    if missing:
+        raise ValueError(f"{shot['name']}: unknown parameters: {sorted(missing)}")
+    if any(applied[k] != v for k, v in requested.items()):
+        raise ValueError(f"{shot['name']}: out-of-range parameters: requested={requested}, applied={applied}")
+    if shot.get("exact"):
+        if shot.get("focus"):
+            raise ValueError("exact and focus cannot be combined")
+        page.evaluate("window.viewer.exact()")
+    elif shot.get("focus"):
+        page.evaluate("r => window.viewer.focus(r)", shot["focus"])
+    data = page.evaluate("window.viewer.snapshot(null, 1)")
+    payload = base64.b64decode(data.split(",", 1)[1])
+    if content_bbox(payload) is None:
+        raise ValueError(f"{shot['name']}: render is empty")
+    view = page.evaluate("window.viewer.currentView()")
+    if shot.get("exact") and abs(view["pxPerCanvas"] - 1) > EXACT_TOLERANCE:
+        raise ValueError(f"{shot['name']}: exact 1:1 mapping failed: {view}")
+    return payload, applied, view
 
 
 def content_bbox(payload):
@@ -53,8 +89,8 @@ def content_bbox(payload):
     try:
         from PIL import Image
         import numpy as np
-    except ImportError:
-        return None
+    except ImportError as error:
+        raise RuntimeError("Pillow and numpy are required for non-empty render checks") from error
     a = np.array(Image.open(io.BytesIO(payload)).convert("RGBA"))
     ys, xs = np.nonzero(a[..., 3] > 16)
     if len(ys) == 0:
@@ -71,41 +107,6 @@ def visible_bbox(draws):
             max(b[2] for b in boxes), max(b[3] for b in boxes)]
 
 
-def calibrate(page, shot, outdir, name, w, h, canvaspx):
-    """Render, measure, adjust the zoom until the PNG is the canvas at 1:1."""
-    page.evaluate("() => window.viewer.view({zoom: 1, cx: %s, cy: %s})" % (w / 2, h / 2))
-    want = visible_bbox(page.evaluate("() => window.viewer.drawables()"))
-    if want is None:
-        return None, None
-    payload = got = None
-    ok = False
-    attempt = -1
-    for attempt in range(6):
-        data = page.evaluate("(c) => window.viewer.snapshot(c || null, 1)", None)
-        payload = base64.b64decode(data.split(",", 1)[1])
-        got = content_bbox(payload)
-        if not got:
-            print(f"  ! {name}: render is empty, cannot calibrate")
-            return payload, None
-        kx = (got[2] - got[0]) / max(1.0, want[2] - want[0])
-        ky = (got[3] - got[1]) / max(1.0, want[3] - want[1])
-        k = (kx + ky) / 2
-        if abs(k - 1) <= EXACT_TOLERANCE:
-            ok = True
-            break
-        cur = page.evaluate("() => window.viewer.currentView()")["zoom"]
-        page.evaluate("(v) => window.viewer.view(v)",
-                      {"zoom": cur / k, "cx": w / 2, "cy": h / 2})
-    align = max(abs(got[i] - want[i]) for i in range(4)) if got else None
-    if ok and align is not None and align <= EXACT_ALIGN_TOLERANCE:
-        print(f"  {name:<28} exact 1:1 verified (px/canvas=1.000, "
-              f"bbox png={[round(v) for v in got]} vs drawables={[round(v, 1) for v in want]}, Δ≤{align:.1f}px)")
-    else:
-        print(f"  !! {name}: exact 1:1 NOT achieved (iterate={attempt}, "
-              f"png={[round(v) for v in got] if got else None}, drawables={[round(v, 1) for v in want]})")
-    return payload, got
-
-
 def run(spec, outdir, port, keep_open=False):
     outdir.mkdir(parents=True, exist_ok=True)
     base = f"http://127.0.0.1:{port}/live2d-viewer/index.html"
@@ -117,39 +118,15 @@ def run(spec, outdir, port, keep_open=False):
         page.on("pageerror", lambda e: print(f"  [pageerror] {e}"))
         for shot in spec["shots"]:
             w, h = shot.get("canvas", spec.get("canvas", [1024, 1536]))
-            url = f"{base}?w={w}&h={h}&model={spec['model']}"
-            if spec.get("vendor"):
-                url += f"&vendor={spec['vendor']}"
-            if spec.get("canvaspx"):
-                url += f"&canvaspx={spec['canvaspx'][0]},{spec['canvaspx'][1]}"
+            url = viewer_url(spec, shot, port)
             page.goto(url)
             page.wait_for_function("window.viewer && (window.viewer.ready || window.viewer.errors.length)", timeout=60_000)
             errors = page.evaluate("window.viewer.errors")
             if errors:
                 raise RuntimeError(f"viewer errors: {errors}")
-            params = page.evaluate("window.viewer.reset()")
-            if shot.get("params"):
-                applied = page.evaluate("(v) => window.viewer.setParams(v)", shot["params"])
-                missing = set(shot["params"]) - set(applied)
-                if missing:
-                    print(f"  ! unknown parameters ignored: {sorted(missing)}")
-            if shot.get("focus"):
-                page.evaluate("(r) => window.viewer.focus(r)", shot["focus"])
+            payload, applied, view = snapshot_pose(page, spec, shot)
             target = outdir / f"{shot['name']}.png"
-            if shot.get("exact"):
-                canvaspx = spec.get("canvaspx")
-                if canvaspx and [w, h] != list(canvaspx):
-                    print(f"  ! exact=true needs canvas == canvaspx; {w}x{h} != {canvaspx} — refusing to calibrate")
-                payload, _ = calibrate(page, shot, outdir, shot["name"], w, h, canvaspx)
-                if payload is None:
-                    continue
-            else:
-                data = page.evaluate("(c) => window.viewer.snapshot(c || null, 1)", None)
-                payload = base64.b64decode(data.split(",", 1)[1])
-                view = page.evaluate("window.viewer.currentView()")
-                ppc = view.pop("pxPerCanvas", None)
-                print(f"  {shot['name']:<28} {w}x{h} view={view} "
-                      f"(px/canvas≈{ppc:.3f} — NOT 1:1, do not measure pixels off this PNG)")
+            print(f"  {shot['name']:<28} {w}x{h} view={view}")
             target.write_bytes(payload)
             written.append(str(target))
             if shot.get("exact"):

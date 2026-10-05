@@ -8,6 +8,7 @@ out/
 src/main/resources/cubism/
 cubism/
 *CubismSdk*
+!src/main/kotlin/io/github/psd2live/core/CubismSdkPreviewSession.kt
 CubismSdk*/
 *.dll
 *.so

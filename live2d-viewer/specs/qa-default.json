@@ -1,0 +1,27 @@
+{
+  "model": "/live2d-viewer/public/models/yelan/yelan.model3.json",
+  "vendor": "/live2d-viewer/public/vendor/cubism/",
+  "canvas": [1024, 1536],
+  "canvaspx": [4000, 6000],
+  "crops": {
+    "eye-crops": [395, 270, 635, 355],
+    "mouth-crops": [430, 340, 595, 390],
+    "hair-crops": [340, 175, 675, 450]
+  },
+  "shots": [
+    {"name": "neutral", "params": {}},
+    {"name": "angleX_plus30", "params": {"ParamAngleX": 30}},
+    {"name": "angleX_minus30", "params": {"ParamAngleX": -30}},
+    {"name": "angleY_plus30", "params": {"ParamAngleY": 30}},
+    {"name": "angleY_minus30", "params": {"ParamAngleY": -30}},
+    {"name": "angleZ_plus30", "params": {"ParamAngleZ": 30}},
+    {"name": "angleZ_minus30", "params": {"ParamAngleZ": -30}},
+    {"name": "bodyAngleX_plus10", "params": {"ParamBodyAngleX": 10}},
+    {"name": "bodyAngleX_minus10", "params": {"ParamBodyAngleX": -10}},
+    {"name": "eye_close", "params": {"ParamEyeLOpen": 0, "ParamEyeROpen": 0}},
+    {"name": "mouth_open", "params": {"ParamMouthOpenY": 1}},
+    {"name": "eye_close_mouth_open", "params": {"ParamEyeLOpen": 0, "ParamEyeROpen": 0, "ParamMouthOpenY": 1}},
+    {"name": "hair_extrema_min", "params": {"ParamHairFront": -1, "ParamHairSide": -1, "ParamHairBack": -1, "Param9": -10, "Param10": -10}},
+    {"name": "hair_extrema_max", "params": {"ParamHairFront": 1, "ParamHairSide": 1, "ParamHairBack": 1, "Param9": 10, "Param10": 10}}
+  ]
+}
