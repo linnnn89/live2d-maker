@@ -1,75 +1,96 @@
-# live2d-maker — PSD / Cubism / Live2D 集成工作区
+# live2d-maker
 
-把 PSD 处理、单图拆层、Live2D 自动建模、渲染验证工具与 Agent 技能经验整合为一个可复现工作区：**一个路由入口、四层分流文档**，人和 agent 各取所需，逐层下钻，不一次性灌满。
+用于处理分层 PSD、生成 Live2D 模型和检查导出效果的本地工具。核心建模与导出由 [PSD2Live](psd2live/README.md) 完成，浏览器编辑器 Studio 用来调整图层裁切、导入素材、重建模型和检查不同姿态。
 
-> Windows 用户克隆后运行 [`setup-windows.bat`](setup-windows.bat)，校验并解压随仓库提供的 PSD2Live、JDK 21、Gradle、完整 Cubism Native SDK 和原生预览桥接 DLL，创建 Python 环境并安装 Studio。依赖包、校验清单和单独安装入口在 [`dependencies/`](dependencies/README.md)；唯一环境说明入口为 [`docs/environment.md`](docs/environment.md)。模型权重、虚拟环境、构建缓存和生成结果不进 Git。
+项目仍在开发中。Studio 已支持编辑、保存、重建和预览，但还没有独立安装包，需要在本地启动服务。
 
-> **当前状态：开发态可用，尚未通过开源发布 gate。** 技能包的路由与安全降级自包含，具体工具契约依赖其绑定的 `live2d-edit-tool` 工作区。
->
-> 一句话：PSD 进来，分层 → 建模 → 验证 → 发布，每一步都有对应的操作手册和深度参考。
+## 功能
 
-## 组件地图
+- 从分层 PSD 生成模型，导出 `.cmo3` 编辑器工程和 `.moc3` 运行时文件。
+- 在 Studio 中查看图层、调整裁切轮廓、添加标记点，以及新增或替换透明 PNG 素材。
+- 重建后通过 Cubism 查看模型，用参数滑块检查动作，并批量渲染姿态检查图。
+- 通过可选的 See-through 将单张立绘拆成分层 PSD。这部分需要单独安装推理环境和模型。
 
-| 组件 | 位置 | 职责 |
-| :--- | :--- | :--- |
-| **PSD2Live** | [`psd2live/`](psd2live/README.md) | 核心流水线：分层 PSD → 自动建模 → `.cmo3` / `.moc3` 导出（Kotlin/Gradle + MCP 接口） |
-| **PSD2Live 便携版** | `portable/PSD2Live/` | jpype 起 JVM 的免构建导出器，脚本驱动 |
-| **随仓依赖** | [`dependencies/`](dependencies/README.md) | PSD2Live 运行时、当前源码 JAR、JDK、Gradle、完整 Cubism Native 5-r.5 SDK 与原生预览 DLL/着色器；SHA-256 校验与一键解压 |
-| **See-through** | [`see-through/`](see-through/README.md) | 单张立绘 → 多层全补绘 PSD 拆层（SIGGRAPH 2026 研究项目） |
-| **live2d-viewer** | `live2d-viewer/` | 参数化渲染 harness：按参数/镜位出图，before/after 对比验证 |
-| **Live2D Studio** | [`studio/`](studio/README.md) | 本地三栏 IR 编辑器：拖点、保存、PSD/moc3 重建、Cubism 预览与 Pose QA |
-| **Python 环境** | `python/` | 项目专用解释器（psd-tools / numpy / scipy / Pillow / playwright 等） |
-| **技能包 + 文档** | [`skills/live2d-studio/`](skills/live2d-studio/SKILL.md) `docs/` | 多层路由技能包、工具链清单、外部技能注册表 |
+Studio 的裁切轮廓用于控制图层显示范围；标记点目前只保存位置，还不参与自动绑定。具体操作和限制见 [Studio 使用说明](studio/README.md)。
 
-## 快速开始
+## 安装
 
-**Agent 入口只有一个**：[`skills/live2d-studio/SKILL.md`](skills/live2d-studio/SKILL.md)（L0 路由表，按症状分流；Hermes 宿主经技能加载，纯文件宿主直接读）。
-进入后按 L0 → `references/route-*.md` → `references/pb-*.md` → `references/index.md` 逐层下钻，**每次只读一层**。
+目前提供 Windows x64 的安装脚本。先准备：
 
-**人类**：按上表找组件；PSD2Live 深入阅读 [`psd2live/docs/README.md`](psd2live/docs/README.md)（自带文档地图）。
+- Git for Windows
+- Python 3.10 x64，能够运行 `py -3.10`
+- Node.js 20.19+（20.x）或 22.12+，包含 npm
+- Microsoft Edge，用于浏览器渲染检查
+
+在命令提示符中执行：
 
 ```bat
+git clone https://github.com/linnnn89/live2d-maker.git
+cd live2d-maker
 setup-windows.bat
+```
+
+脚本会解压随仓提供的 PSD2Live、JDK 21、Gradle、完整 Cubism Native SDK 和原生预览运行时，再创建 Python 环境、安装并构建 Studio。Python 和 npm 依赖的安装需要网络；不用另外安装 Java 或 Gradle。
+
+只解压随仓依赖，可以运行：
+
+```bat
+dependencies\install.bat
+```
+
+原生预览所需的 `live2d_renderer.dll` 和着色器已经包含在仓库中，安装脚本会配置桌面启动器。See-through 模型权重不包含在基础安装中，安装方法见 [环境说明](docs/environment.md)。
+
+## 使用
+
+### 浏览器编辑器
+
+安装完成后，在仓库根目录执行：
+
+```bat
+cd studio
+npm run dev
+```
+
+打开 <http://127.0.0.1:5173/>。首次启动会导入示例 PSD；点击 **Rebuild** 生成模型预览。修改后先保存，再重建，最后可用 **Run Pose QA** 检查一组姿态。
+
+使用自己的 PSD、导入素材和切换工作区，见 [Studio 使用说明](studio/README.md)。编辑与导出结果保存在工作区中，源 PSD 不会被就地覆盖。
+
+### 桌面程序
+
+安装后运行：
+
+```bat
+portable\PSD2Live\PSD2Live.exe
+```
+
+便携版桌面程序使用上游 PSD2Live 应用。本仓新增的 Studio 工作流通过浏览器界面和 CLI 使用。桌面操作见 [PSD2Live 用户指南](psd2live/docs/zh/guide/USER_GUIDE.md)。
+
+### 源码构建与命令行
+
+以下命令在仓库根目录执行：
+
+```bat
 build-psd2live.bat
+python\Scripts\python.exe -m tools.authoring_rig --help
 ```
 
-基础安装需要 Python 3.10、Node.js 20.19+ 或 22.12+ 和系统 Edge。第一条安装环境与 Studio；第二条使用本地 JDK/Gradle 构建源码，首次构建仍需从 Maven 下载锁定版本的库。只解压依赖可执行 `dependencies\install.bat`，无需 Python、Node 或联网。Studio 启动方式见 [`studio/README.md`](studio/README.md)。
+构建脚本使用随仓 JDK 和 Gradle，默认生成应用 JAR；首次构建需要下载 Maven 依赖。CLI 无需先构建源码，可以使用随仓提供的应用 JAR。
 
-## 文档与技能索引
+## 目录与文档
 
-| 要找什么 | 去哪 |
-| :--- | :--- |
-| 按症状/任务分流（唯一入口） | [`skills/live2d-studio/SKILL.md`](skills/live2d-studio/SKILL.md) |
-| 分域路线（输入拆层/生成/修复/美术/运行时/MCP） | `skills/live2d-studio/references/route-*.md` |
-| 操作手册（备份重建/导出审计/渲染对比/嘴部修复/发布交接） | `skills/live2d-studio/references/pb-*.md` |
-| 深度参考指针索引（含取用方式） | [`skills/live2d-studio/references/index.md`](skills/live2d-studio/references/index.md) |
-| 工具链与路径重定位（权威正文） | [`docs/toolchain.md`](docs/toolchain.md) |
-| 外部技能注册表（权威正文） | [`docs/skill-map.md`](docs/skill-map.md) |
-| 交接记录（编号小节追加） | [`docs/HANDOFF.md`](docs/HANDOFF.md) |
-| 环境安装与复现 | [`docs/environment.md`](docs/environment.md) |
-| 第三方来源与许可 | [`docs/THIRD_PARTY.md`](docs/THIRD_PARTY.md) |
-| 项目定位 | [`docs/IDEA.md`](docs/IDEA.md) |
-| PSD2Live 完整文档 | [`psd2live/docs/README.md`](psd2live/docs/README.md) |
+| 目录 | 内容 |
+|---|---|
+| [`studio/`](studio/README.md) | 浏览器编辑器 |
+| [`psd2live/`](psd2live/README.md) | 建模、导出和桌面程序源码 |
+| [`tools/authoring_rig/`](tools/authoring_rig/) | 图层编辑、素材导入、重建和检查的 Python CLI |
+| [`live2d-viewer/`](live2d-viewer/) | Cubism 浏览器预览与姿态渲染工具 |
+| [`see-through/`](see-through/README.md) | 可选的单图拆层工具 |
+| [`dependencies/`](dependencies/README.md) | 随仓依赖、安装入口和文件校验清单 |
 
-## 路由架构
+环境配置见 [docs/environment.md](docs/environment.md)，开发计划见 [docs/PLAN.md](docs/PLAN.md)。使用 Agent 协助处理 PSD 或模型时，可从 [live2d-studio 技能说明](skills/live2d-studio/SKILL.md) 开始。
 
-```
-L0 skills/live2d-studio/SKILL.md        路由表 + 红线（≤120 行，唯一常驻入口）
- ├─ L1 references/route-<domain>.md     分域判定树 + 精简编排（6 篇，≤200 行）
- │   ├─ L2 references/pb-<op>.md        单一操作 SOP（6 篇，≤220 行）
- │   └─ L3 references/index.md          深参考指针（按需取一篇；含 host-adapter/stubs）
- ├─ docs/toolchain.md                   工具与环境权威正文
- └─ docs/skill-map.md                   外部技能注册表权威正文
-```
+## 许可
 
-设计原则：L0/L1 只做决策与编排，配方下沉 L2/L3；禁止内联复制他文件内容。结构、预算、链接、
-路由语料由 `skills/live2d-studio/scripts/check_routing.py` 机器校验（`--release` 附加发布 gate）。
-定位声明：本技能包是**项目自行分发**的领域技能包（多文件路由形态），非 Hermes 官方仓库的
-单技能投稿形态。
+本项目原创代码和文档采用 [GPL-3.0](LICENSE)。PSD2Live、See-through 和其他第三方组件保留各自的许可证。
 
-## 许可与第三方组件
-
-- 本项目原创代码和文档使用根目录 `LICENSE`（GPL-3.0）；第三方组件保留自己的许可。
-- `psd2live/` 自带 `LICENSE` 与 `THIRD_PARTY_NOTICES.md`；其中 SDK 非分发说明描述上游组件政策，本集成仓库额外提供独立的官方完整 SDK 包。
-- `see-through/` 自带 `LICENSE`（上游研究项目，保留署名）。
-- 完整 SDK 和 Web Core/Framework 受 Live2D 自己的条款约束，未改为 GPL。许可与来源见 [`docs/THIRD_PARTY.md`](docs/THIRD_PARTY.md)；根目录 `LICENSE` 不覆盖第三方 SDK。
+Live2D Cubism SDK、Core 和 Framework 受 Live2D 的许可条款约束，不适用本仓的 GPL。第三方来源与许可见 [docs/THIRD_PARTY.md](docs/THIRD_PARTY.md)。
