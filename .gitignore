@@ -18,9 +18,6 @@ venv/
 .mypy_cache/
 .ruff_cache/
 
-# Downloaded applications and runtimes
-portable/
-
 # Hugging Face / model weights / datasets
 **/.hf_home/
 **/workspace/
@@ -69,6 +66,7 @@ mcp-tools.json
 
 # Viewer output
 live2d-viewer/out/
+live2d-viewer/review/
 
 # IDE and OS
 .vscode/
@@ -80,3 +78,8 @@ Desktop.ini
 
 # Nested repository metadata is never part of the published tree
 see-through/.git/
+
+# Installed distributions and local build caches are restored from dependencies/
+portable/
+dependencies/downloads/
+dependencies/sdk/

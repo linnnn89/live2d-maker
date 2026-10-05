@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <title>Live2D 参数化渲染检查器</title>
+<link rel="icon" href="data:,">
 <style>
   html, body { margin: 0; background: #2b2b2b; color: #ddd; font: 12px/1.5 system-ui, sans-serif; }
   canvas { display: block; }
@@ -16,8 +17,8 @@
 <script>
 // Standalone parameterised renderer for local Cubism models.
 // Query params:
-//   model=/public/models/<pkg>/<file>.model3.json   (required)
-//   vendor=/public/vendor/cubism/                   (runtime files)
+//   model=/live2d-viewer/public/models/<pkg>/<file>.model3.json (defaults to bundled yelan)
+//   vendor=/live2d-viewer/public/vendor/cubism/      (defaults to files beside this page)
 //   w=1024 h=1024                                   (canvas pixels)
 // API (window.viewer):
 //   ready                     -> boolean
@@ -25,19 +26,19 @@
 //   setParams({Id: value})    -> applies values (clamped)
 //   reset()                   -> back to the model's default pose
 //   drawables()               -> [{id, bbox}] in model canvas pixels, y down from the canvas top-left
-//   focus({x0,y0,x1,y1})      -> frame a canvas-pixel rect (model canvas coordinates)
+//   focus([x0,y0,x1,y1])      -> frame a canvas-pixel rect (model canvas coordinates)
 //   view({zoom, cx, cy})      -> explicit view; cx/cy are model canvas pixels
 //   render()                  -> draw one frame
 //   snapshot(crop, scale)     -> data URL PNG; crop = [x0,y0,x1,y1] in device px
 //   errors                    -> load/runtime error strings
 const q = new URLSearchParams(location.search);
-const VENDOR = q.get('vendor') || '/public/vendor/cubism/';
-const MODEL = q.get('model') || '/public/models/pecorine-native/pecorine-practice.model3.json';
+const VENDOR = q.get('vendor') || new URL('./public/vendor/cubism/', location.href).href;
+const MODEL = q.get('model') || new URL('./public/models/yelan/yelan.model3.json', location.href).href;
 const cv = document.getElementById('cv');
 cv.width = Number(q.get('w') || 512);
 cv.height = Number(q.get('h') || 1024);
 // Model canvas in authored pixels (the PSD canvas). The Cubism runtime speaks
-// normalised units (canvas height == 1), so every pixel rect this tool accepts
+// normalised units determined by pixels-per-unit, so every pixel rect this tool accepts
 // is converted with this factor.
 const PX = {
   w: Number((q.get('canvaspx') || '512,1024').split(',')[0]),
@@ -146,21 +147,21 @@ function loadTexture(gl, buffer) {
     const matrix = new sdk.CubismMatrix44();
     const canvasW = model.getCanvasWidth();
     const canvasH = model.getCanvasHeight();
-    // Authored pixels -> runtime units (canvas height is 1 unit).
+    // Authored pixels -> runtime units; model canvas height is not necessarily 1.
     const unit = canvasH / PX.h;
     // View defaults: the whole model canvas, addressed in authored pixels.
     const view = { zoom: 1, cx: PX.w / 2, cy: PX.h / 2 };
 
     // Effective render pixels per authored canvas pixel for the current view.
     // s = fit * zoom is a NDC-ish scale, so one canvas pixel spans
-    // (fit*zoom)*cv.height/2 render pixels vertically (and the same
+    // (fit*zoom*unit)*cv.height/2 render pixels vertically (and the same
     // horizontally, because fit already carries the aspect ratio).
     function viewFit() {
       const aspect = cv.width / Math.max(1, cv.height);
       return Math.min(1.86 / canvasH, (1.86 * aspect) / canvasW);
     }
     function pxPerCanvas(zoom = view.zoom) {
-      return (viewFit() * zoom * cv.height) / 2;
+      return (viewFit() * zoom * unit * cv.height) / 2;
     }
 
     function applyMatrix() {
@@ -246,7 +247,10 @@ function loadTexture(gl, buffer) {
       exact() {
         view.cx = PX.w / 2;
         view.cy = PX.h / 2;
-        view.zoom = 2 / (viewFit() * cv.height);
+        if (cv.width !== PX.w || cv.height !== PX.h) {
+          throw new Error('exact() requires render canvas == canvaspx');
+        }
+        view.zoom = 2 / (viewFit() * unit * cv.height);
         return { ...view };
       },
       pxPerCanvas: (zoom) => pxPerCanvas(zoom),

@@ -2,6 +2,7 @@
   "model": "/live2d-viewer/public/models/yelan/yelan.model3.json",
   "vendor": "/live2d-viewer/public/vendor/cubism/",
   "canvas": [1024, 1536],
+  "canvaspx": [4000, 6000],
   "shots": [
     {"name": "smoke_neutral", "params": {}},
     {"name": "smoke_angleX_plus30", "params": {"ParamAngleX": 30}}

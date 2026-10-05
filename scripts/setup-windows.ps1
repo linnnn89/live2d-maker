@@ -3,6 +3,7 @@ param(
     [switch]$WithSeeThrough,
     [switch]$WithModels,
     [switch]$SkipPortable,
+    [switch]$SkipStudio,
     [switch]$DryRun
 )
 
@@ -11,7 +12,6 @@ $Root = Split-Path -Parent $PSScriptRoot
 $SeeThrough = Join-Path $Root 'see-through'
 $ToolsPython = Join-Path $Root 'python'
 $Portable = Join-Path $Root 'portable\PSD2Live'
-$Psd2LiveZip = 'https://github.com/tsunehimatoi/psd2live/releases/download/v0.7.1/PSD2Live-0.7.1-portable.zip'
 $SeeThroughCommit = '7f139bb25c46a0c8ac720d95ddab185fcda5451c'
 
 function Step([string]$Message) {
@@ -54,33 +54,30 @@ if (-not $DryRun) {
     if ($LASTEXITCODE -ne 0) { throw 'Python 3.10 is required.' }
 }
 if (-not (Get-Command java -ErrorAction SilentlyContinue)) {
-    Write-Warning 'Java was not found. Portable PSD2Live does not need system Java; source builds require JDK 21.'
+    Write-Host 'System Java is not required; a local JDK 21 is included in dependencies/.'
 }
+
+Step 'Verifying and restoring bundled dependencies (PSD2Live, JDK, Gradle, full Cubism SDK)'
+& (Join-Path $PSScriptRoot 'install-dependencies.ps1') -SkipPortable:$SkipPortable -DryRun:$DryRun
 
 Step 'Creating the Python 3.10 tools environment'
 Run { & py -3.10 -m venv $ToolsPython } "py -3.10 -m venv $ToolsPython"
 Run { & (Join-Path $ToolsPython 'Scripts\python.exe') -m pip install --upgrade pip } 'Upgrade pip in the tools environment'
 Run { & (Join-Path $ToolsPython 'Scripts\python.exe') -m pip install -r (Join-Path $Root 'requirements-tools.txt') } 'Install requirements-tools.txt'
 
-if (-not $SkipPortable) {
-    Step 'Installing PSD2Live v0.7.1 portable'
-    if (Test-Path (Join-Path $Portable 'PSD2Live.exe')) {
-        Write-Host 'portable/PSD2Live already exists; skipping.' -ForegroundColor Green
-    } else {
-        $Cache = Join-Path $env:TEMP 'PSD2Live-0.7.1-portable.zip'
-        Run { Invoke-WebRequest -Uri $Psd2LiveZip -OutFile $Cache } "Download $Psd2LiveZip"
-        Run {
-            $Parent = Split-Path -Parent $Portable
-            New-Item -ItemType Directory -Force -Path $Parent | Out-Null
-            $Extract = Join-Path $env:TEMP 'PSD2Live-0.7.1-extract'
-            Remove-Item $Extract -Recurse -Force -ErrorAction SilentlyContinue
-            Expand-Archive -Path $Cache -DestinationPath $Extract -Force
-            $Exe = Get-ChildItem $Extract -Filter 'PSD2Live.exe' -Recurse | Select-Object -First 1
-            if (-not $Exe) { throw 'PSD2Live.exe was not found in the release archive.' }
-            if (Test-Path $Portable) { Remove-Item $Portable -Recurse -Force }
-            Copy-Item $Exe.Directory.FullName $Portable -Recurse
-        } 'Extract portable/PSD2Live'
+if (-not $SkipStudio) {
+    Step 'Installing and building Studio from its exact npm lockfile'
+    Require-Command 'node' 'Install Node.js 22.12+ (or 20.19+) locally before running setup.'
+    Require-Command 'npm.cmd' 'Install Node.js with npm.'
+    if (-not $DryRun) {
+        & node -e "const [major,minor]=process.versions.node.split('.').map(Number); if(!((major===20&&minor>=19)||(major===22&&minor>=12)||major>22)) process.exit(1)"
+        if ($LASTEXITCODE -ne 0) { throw 'Studio requires Node 20.19+ or 22.12+.' }
     }
+    Push-Location (Join-Path $Root 'studio')
+    try {
+        Run { & npm.cmd ci --no-audit --no-fund } 'npm ci --no-audit --no-fund (studio)'
+        Run { & npm.cmd run build } 'npm run build (studio)'
+    } finally { Pop-Location }
 }
 
 if ($WithSeeThrough -or $WithModels) {
@@ -128,4 +125,4 @@ if (-not $DryRun) {
     Write-Host "[dry-run] See-through upstream baseline: $SeeThroughCommit" -ForegroundColor DarkGray
 }
 
-Write-Host "`nSetup complete. See environment.md; it links to the Chinese guide." -ForegroundColor Green
+Write-Host "`nSetup complete. See docs/environment.md. Use build-psd2live.bat for a local source build." -ForegroundColor Green

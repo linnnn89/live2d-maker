@@ -10,12 +10,13 @@
 | --- | --- |
 | `index.html` | 用 `public/vendor/cubism/` 运行时加载**一个**本地 model3.json（由 URL query 指定，一页一模型，没有 `load()`），挂 `window.viewer` |
 | `shot.py` | 起 headless 浏览器（playwright，`channel='msedge'` + `--use-angle=swiftshader`），每个 shot 重新打开页面，`reset` → `setParams` → `focus` → `snapshot` 存 PNG |
+| `qa.py` | Pose QA runner：单命令执行 QA 姿态扫描，输出 `review/{full,eye-crops,mouth-crops,hair-crops}/`、`contact-sheet.png`、`review.json`，stdout 输出 JSON |
 | `sheet.py` | 把多张快照拼成带标签的对比图（before/after 并排） |
-| `specs/*.json` | 参数组合与取景：`{"model":url,"vendor":url,"canvaspx":[w,h],"canvas":[w,h],"shots":[{"name","params","focus":[x0,y0,x1,y1],"canvas":[w,h],"exact":bool}]}`；冒烟样例 `specs/smoke-fixture.json` |
+| `specs/*.json` | 参数组合与取景：`{"model":url,"vendor":url,"canvaspx":[w,h],"canvas":[w,h],"shots":[{"name","params","focus":[x0,y0,x1,y1],"canvas":[w,h],"exact":bool}]}`；冒烟样例 `specs/smoke-fixture.json`；QA 姿态全量清单 `specs/qa-default.json` |
 | `public/vendor/cubism/` | Cubism Core 5.3（native 6.0.1）+ Framework 5-r.5 打包（全局名 `Live2DChatCubismFramework`）+ shaders，来源见其 README |
 | `public/models/yelan/` | 冒烟测试模型 |
 
-`index.html` 的 URL query：`model=`（必填）、`vendor=`（默认 `/public/vendor/cubism/`）、`w=`/`h=`（渲染面像素，默认 512×1024）、`canvaspx=w,h`（模型画布像素，默认 `512,1024`，用于像素↔模型单位换算）。
+`index.html` 的 URL query：`model=`（默认页面旁的 `public/models/yelan/yelan.model3.json`）、`vendor=`（默认页面旁的 `public/vendor/cubism/`）、`w=`/`h=`（渲染面像素，默认 512×1024）、`canvaspx=w,h`（模型画布像素，默认 `512,1024`，用于像素↔模型单位换算）。fixture 的原生画布是 4000×6000，两份 spec 均显式固定该值。
 
 `window.viewer` 实际 API（以 `index.html` 为准）：
 
@@ -37,15 +38,21 @@
 ```bash
 python/Scripts/python.exe -m http.server 8899 --bind 127.0.0.1   # 在仓库根后台运行
 python/Scripts/python.exe live2d-viewer/shot.py --spec live2d-viewer/specs/smoke-fixture.json --outdir live2d-viewer/out/smoke
+python/Scripts/python.exe live2d-viewer/qa.py --spec live2d-viewer/specs/qa-default.json --outdir live2d-viewer/review
 python/Scripts/python.exe live2d-viewer/sheet.py <out.png> labelA=<a.png> labelB=<b.png>
 ```
 
+`qa.py` 可以单独运行：没有服务时临时启动仅监听 127.0.0.1 的仓库静态服务，完成后关闭；已有服务时复用。`shot.py` 仍需先启动服务。运行前可用 `live2d-viewer/check_runtime.py` 核验固定 Core 哈希和 16 个必要文件。
+
+QA 与 shot 共用姿态应用逻辑，支持每个 shot 的 `canvas`、`focus`、`exact`（focus 与 exact 互斥）。未知参数、越界参数、空渲染均失败；QA 的 stdout 为 JSON，失败退出码 1，失败报告覆盖旧 `review.json`。`crops` 使用**渲染面像素**矩形，必须落在每个 shot 的画布内；默认裁剪仅适用于 yelan fixture，其他模型必须实测调整。报告存档完整 spec、spec SHA-256、实际参数值、镜位与像素比例。`status: ok` 仅表示出图成功，美术验收仍需查看 contact sheet。
+
 ## 坐标换算（关键，错了会全部取错景）
 
-- Cubism 把模型归一化到**画布高度 = 1 个 clip 单位**，所以画布像素 → 模型单位：`unit = canvasH_units / PX_h`（本仓库画布 512×1024、模型高 1.86）。
-- fit 因子按窗口宽高比分档（横屏用 `1.86/1`，窄屏用宽高比公式）。
+- Cubism 模型单位由原生 canvas 与 pixels-per-unit 决定，不能假设高度为 1。画布像素 → 模型单位：`unit = canvasH_units / PX_h`；yelan 的模型尺寸为 1×1.5，原生画布 4000×6000。
+- `fit = min(1.86 / canvasH_units, 1.86 * aspect / canvasW_units)`；有效比例为 `fit * zoom * unit * renderH / 2`，其中 `unit` 不可省略。
 - 取景缩放：clip 空间是 `[-1,1]`（宽 2 单位），要让一个矩形正好填满视口：`zoom = 2 / (fit * max(W_units/aspect, H_units))`，再乘 0.94 留边。**只写 `1/max(...)` 会得到一半的放大倍率**——早期版本就是这样，出图看起来"没放大"。
 - canvas 上下文必须带 `preserveDrawingBuffer: true`，否则 `toDataURL` 取到空图。
+- `exact()` 要求渲染面等于 `canvaspx`，使用 `zoom = 2 / (fit * unit * renderH)`。不能用所有 drawable 的网格 bbox 与可见 alpha bbox 比值校准：遮罩与隐藏几何使两者不等价。回归中通过实际 alpha 边界的缩放比例另行验证 1:1 换算。
 
 ## before/after 对照的套路
 

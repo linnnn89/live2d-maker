@@ -1,0 +1,118 @@
+{
+  "format": 1,
+  "archiveNote": "Repacked without code changes from the installed verified Windows x64 distributions. Build caches excluded.",
+  "packages": [
+    {
+      "name": "psd2live-runtime",
+      "target": "portable",
+      "probe": "PSD2Live/PSD2Live.exe",
+      "sha256": "8939b0a5d8139e5feaf7f9c05b267925f5ff914c0a287eb17d6f79d26d13c23e",
+      "bytes": 76067380,
+      "source": "https://github.com/tsunehimatoi/psd2live/releases/tag/v0.7.1",
+      "license": "GPL-3.0 and component licenses",
+      "parts": [
+        {
+          "file": "archives/psd2live-runtime.zip.001",
+          "bytes": 50331648,
+          "sha256": "77855f50c03d8893b23766b804c0ba46c67100739b2fc49e16f1f6ace2073da3"
+        },
+        {
+          "file": "archives/psd2live-runtime.zip.002",
+          "bytes": 25735732,
+          "sha256": "1ff180590ee5cf465b0b2ed1e8a13e9ea5d550e57c005470f974bdacfbe85565"
+        }
+      ]
+    },
+    {
+      "name": "temurin-jdk21",
+      "target": "portable/build-tools",
+      "probe": "jdk-21.0.12.1+1/bin/java.exe",
+      "sha256": "90061bda75b58acf635005e494b0da2fa38ca6c7b7c2911e55533f6369416c38",
+      "bytes": 201958698,
+      "source": "https://github.com/adoptium/temurin21-binaries/releases/tag/jdk-21.0.12.1%2B1",
+      "license": "GPL-2.0 WITH Classpath-exception-2.0",
+      "parts": [
+        {
+          "file": "archives/temurin-jdk21.zip.001",
+          "bytes": 50331648,
+          "sha256": "c2374b9bf45c6615a5c41bb57f4d3ce7a9e3bd581790ba1f4c7f688b3263d357"
+        },
+        {
+          "file": "archives/temurin-jdk21.zip.002",
+          "bytes": 50331648,
+          "sha256": "91994d6e47ce809de0d7186094afc091c1fb95d5399bf80cf8985addedf67769"
+        },
+        {
+          "file": "archives/temurin-jdk21.zip.003",
+          "bytes": 50331648,
+          "sha256": "af316beeab7348d0d54b9dda908c00ca63c538945581db99981238a3ea5e53e8"
+        },
+        {
+          "file": "archives/temurin-jdk21.zip.004",
+          "bytes": 50331648,
+          "sha256": "c12daf73e24d741ce5ed49589dbc3b39e3ab03dbd2db58028b7d561272d5c8bd"
+        },
+        {
+          "file": "archives/temurin-jdk21.zip.005",
+          "bytes": 632106,
+          "sha256": "16eb16fd1482ce544dc4ae63add2632e4bf1cb53998f507290face02ba07b2d5"
+        }
+      ]
+    },
+    {
+      "name": "gradle-9.6.1",
+      "target": "portable/build-tools",
+      "probe": "gradle-9.6.1/bin/gradle.bat",
+      "sha256": "fde08febf600967780f3bdcb9b568a3d238746051a00c60a3784b0bb37b39d22",
+      "bytes": 140681964,
+      "source": "https://services.gradle.org/distributions/gradle-9.6.1-bin.zip",
+      "license": "Apache-2.0 and component licenses",
+      "parts": [
+        {
+          "file": "archives/gradle-9.6.1.zip.001",
+          "bytes": 50331648,
+          "sha256": "a8c702f5c26b15d4ed4ba2e88cdd6da3b0ad7ab3dcde0e7aa4531334bde652b3"
+        },
+        {
+          "file": "archives/gradle-9.6.1.zip.002",
+          "bytes": 50331648,
+          "sha256": "beb6aa71bdb39b704f2974cea1a0cce6c892daad363eb5098d0fa282187e3fda"
+        },
+        {
+          "file": "archives/gradle-9.6.1.zip.003",
+          "bytes": 40018668,
+          "sha256": "cfa1089f9985e1d2e8ad0d3ab60530dae17747036247b7a6a46630e5dde20b23"
+        }
+      ]
+    },
+    {
+      "name": "cubism-native-5-r.5",
+      "target": "dependencies/sdk",
+      "probe": "CubismSdkForNative-5-r.5/Core/LICENSE.md",
+      "sha256": "7ff3a4bbc19c0a8728965aa522ab77eb11b252916453e68a8a78d3b71188bb12",
+      "bytes": 27566034,
+      "source": "https://cubism.live2d.com/sdk-native/bin/CubismSdkForNative-5-r.5.zip",
+      "license": "Live2D Proprietary Software License and Live2D Open Software License; NOT GPL",
+      "parts": [
+        {
+          "file": "archives/CubismSdkForNative-5-r.5.zip",
+          "bytes": 27566034,
+          "sha256": "7ff3a4bbc19c0a8728965aa522ab77eb11b252916453e68a8a78d3b71188bb12"
+        }
+      ]
+    }
+  ],
+  "nativeJar": {
+    "file": "native/psd2live-0.7.1.jar",
+    "bytes": 5839104,
+    "sha256": "34c4b9ee31a3955c020dc4bce7357f8287d7f68d5b6174918acbb6926592ce9d",
+    "source": "psd2live/ source in this repository",
+    "license": "GPL-3.0"
+  },
+  "sdk": {
+    "url": "https://cubism.live2d.com/sdk-native/bin/CubismSdkForNative-5-r.5.zip",
+    "sha256": "7ff3a4bbc19c0a8728965aa522ab77eb11b252916453e68a8a78d3b71188bb12",
+    "bytes": 27566034,
+    "folder": "CubismSdkForNative-5-r.5"
+  }
+}
