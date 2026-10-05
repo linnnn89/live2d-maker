@@ -1,10 +1,10 @@
-# 环境安装与工作区复现
+# 环境安装
 
-本文件是唯一环境说明入口。目录布局和命令均以仓库根为基准；SDK、JDK、Gradle、PSD2Live 运行时已随仓放在 `dependencies/`，Python/Node 基础环境由使用者安装。
+本页说明 Windows x64 的安装、构建和可选推理环境。日常操作见 [根 README](../README.md) 和 [Studio 使用说明](../studio/README.md)；代码入口见 [toolchain.md](toolchain.md)。
 
-## 基础安装（Windows x64）
+## 基础安装
 
-先安装 Git for Windows、Python 3.10 x64（`py -3.10` 可用）、Node.js 20.19+ 或 22.12+（含 npm）。viewer/Pose QA 使用系统 Microsoft Edge，无需另下载 Playwright Chromium。
+先安装 Git for Windows、Python 3.10 x64（`py -3.10` 可用）、Node.js 20.19+（20.x）或 22.12+，包含 npm。viewer/Pose QA 使用系统 Microsoft Edge。
 
 ```bat
 git clone https://github.com/linnnn89/live2d-maker.git
@@ -12,85 +12,69 @@ cd live2d-maker
 setup-windows.bat
 ```
 
-安装脚本校验随仓依赖、解压到约定路径、创建 `python/` venv、安装固定 Python 版本 requirements，随后在 `studio/` 执行 `npm ci` 与 `npm run build`。无需系统 Java/Gradle。Python/npm 安装仍需网络；已有便携包和 JDK 等目录保留，脚本不删除或覆盖它们。
+脚本解压随仓依赖、创建 `python/` venv、安装 [requirements-tools.txt](../requirements-tools.txt)，再在 Studio 执行 `npm ci` 和 `npm run build`。Python/npm 安装需要网络；Java、Gradle、SDK 和原生预览资源已经随仓提供。现有依赖目录保留，版本标记不匹配或关键文件缺失时会报错，由使用者移开旧目录后重装。
 
-```bat
-setup-windows.bat -DryRun
-setup-windows.bat -SkipStudio
-dependencies\install.bat
-```
-
-`-DryRun` 校验归档并打印计划，不创建环境；`-SkipStudio` 用于只运行 CLI/viewer。仅解压依赖的第三条不需要 Python/Node 或网络。
-
-## 安装后的目录
-
-```text
-live2d-maker/
-├─ dependencies/archives/    # 随 Git 的分卷包与完整官方 SDK ZIP
-├─ dependencies/native/      # 当前源码构建的 PSD2Live JAR
-├─ dependencies/sdk/         # 完整 Cubism Native 5-r.5（解压生成）
-├─ portable/PSD2Live/         # 原始 portable JVM、启动器与依赖
-├─ portable/build-tools/     # JDK 21、Gradle 9.6.1 和本地缓存
-├─ python/                   # Python 3.10 venv（生成）
-├─ studio/                   # 编辑器源码、package-lock；node_modules 生成
-├─ psd2live/                 # Kotlin/Gradle 源码
-├─ see-through/              # 上游源码；模型和推理环境另行安装
-├─ live2d-viewer/             # 官方 Web Core/Framework 与渲染 harness
-├─ schemas/authoring-rig/     # IR schema
-├─ tools/authoring_rig/       # CLI 与工作区处理
-└─ docs/                     # 环境、计划、交接和来源说明
-```
-
-## 版本与构建
-
-| 项目 | 固定版本 |
+| 命令/选项 | 用途 |
 |---|---|
-| PSD2Live | 0.7.1 系列；随仓当前源码 JAR 加原始 portable |
-| Temurin JDK | 21.0.12.1+1，Windows x64 |
-| Gradle | 9.6.1 |
-| Cubism Native SDK | 5-r.5，官方完整 ZIP |
-| Cubism Web Framework/Core | Framework 5-r.5，Core native version 6.0.1 |
-| Studio | React 19.2.4、TypeScript 5.9.3、Vite 8.3.2，精确 lockfile |
-| 辅助 Python | 3.10，精确依赖见 `requirements-tools.txt` |
-| 当前验证机 Node/npm | 24.19.0 / 11.17.0 |
-| See-through | commit `7f139bb25c46a0c8ac720d95ddab185fcda5451c` |
-| See-through Python/PyTorch | 3.12 / 2.8.0 + CUDA 12.8 |
+| `setup-windows.bat -DryRun` | 校验依赖文件并显示计划，不创建环境 |
+| `setup-windows.bat -SkipStudio` | 不安装/构建 Studio；仍安装 Python 工具 |
+| `setup-windows.bat -SkipPortable` | 跳过 PSD2Live portable 解压和桌面配置；其余依赖照常处理，CLI/Studio 仍需已有 portable |
+| `dependencies\install.bat` | 只安装随仓依赖，无需 Python/Node 或联网 |
+| `dependencies\install.bat -DestinationRoot "D:\work\live2d-maker"` | 将依赖安装到另一目录；不复制源码或应用 JAR |
+
+归档清单、校验方法和目录保留规则集中在 [dependencies/README.md](../dependencies/README.md)。
+
+## 安装位置与版本
+
+| 内容 | 位置 | 版本来源 |
+|---|---|---|
+| Python 工具环境 | `python/` | Python 3.10；requirements 固定包版本 |
+| 原 portable 应用/JVM | `portable/PSD2Live/` | PSD2Live 0.7.1；上游运行时 |
+| 本仓应用与原生预览资源 | `dependencies/native/` | 应用 JAR、资源 JAR、DLL/着色器 |
+| JDK | `portable/build-tools/jdk-21.0.12.1+1/` | Temurin 21.0.12.1+1 |
+| Gradle | `portable/build-tools/gradle-9.6.1/` | 9.6.1 |
+| 完整 Native SDK | `dependencies/sdk/CubismSdkForNative-5-r.5/` | 官方 5-r.5 ZIP |
+| Cubism Web | `live2d-viewer/public/vendor/cubism/` | Framework 5-r.5，Core native version 6.0.1 |
+| Studio | `studio/` | [package-lock.json](../studio/package-lock.json) |
+
+安装器将 `cubism-runtime.jar` 加入桌面启动配置，首次修改前保存 `.before-cubism` 备份；不用手工编译 DLL 或设置全局环境变量。Windows 原生预览需要可用的 OpenGL 图形环境，Studio 使用独立的 Web runtime。
+
+Python venv、node_modules、解压后的依赖、Gradle 缓存与工作区输出保持本地，不提交 Git。
+
+## 构建与检查
+
+以下命令在仓库根目录执行：
 
 ```bat
 build-psd2live.bat
 build-psd2live.bat test
-```
-
-脚本使用本地 JDK/Gradle，默认构建 `jar`；首次源码构建仍从 Maven/插件仓库解析配置中固定版本的库。不需要调用会再下载 Gradle 的 wrapper。Studio 优先使用 `psd2live/build/libs/psd2live-0.7.1.jar`，无开发构建时 CLI 自动使用 `dependencies/native/psd2live-0.7.1.jar`。原始 portable 桌面启动器继续使用上游应用；本轮工具扩展由 Studio/CLI 与本仓源码提供。
-
-## Studio 与自检
-
-Studio 的 PSD/IR 工作区初始化、启动与交互见 [Studio 使用说明](../studio/README.md)。构建出的前端 `dist/` 不能替代 Python/Vite CLI 桥接服务。
-
-```bat
 python\Scripts\python.exe -m tools.authoring_rig --help
 python\Scripts\python.exe live2d-viewer\check_runtime.py
 python\Scripts\python.exe skills\live2d-studio\scripts\check_routing.py
 ```
 
-`live2d_renderer.dll`、22 个着色器与许可已经随仓分发，`setup-windows.bat` / `dependencies\install.bat` 自动将资源 JAR 接入 portable 桌面启动配置，CLI/Studio 与源码构建也加载同一份运行时。无需另行编译桥接库或设置全局 `CUBISM_SDK_PATH`。Windows 官方原生预览需要可用的 OpenGL 图形环境；Studio 的 Web Core 验证仍独立可用。来源、哈希和验证命令见 [随仓依赖](../dependencies/README.md)。
+构建脚本使用本地 JDK/Gradle，默认任务是 `jar`，首次解析 Maven/插件依赖需要网络。不要把 portable 的 Java 运行时当作源码构建 JDK。
+
+Studio 优先加载 `psd2live/build/libs/psd2live-0.7.1.jar`；没有开发构建时，原生 CLI 使用随仓应用 JAR。切换运行时后 Overlay baseline 要重新建立。原 portable 桌面程序继续使用上游应用，本仓扩展通过 Studio/CLI 或源码构建使用。
+
+原生加载/渲染集成检查需要 Windows OpenGL：
+
+```bat
+build-psd2live.bat test --tests io.github.psd2live.core.CubismNativeRuntimeTest "-Dpsd2live.cubism.smoke=true"
+```
 
 ## 可选 See-through
 
-需要使用拆层推理时，先装 Miniconda/Miniforge 和适用的 NVIDIA 驱动，再运行：
+这部分不属于基础安装。先安装 Miniconda/Miniforge 和适用的 NVIDIA 驱动，再运行：
 
 ```bat
 setup-windows.bat -WithSeeThrough
 ```
 
-明确需要权重时才运行以下命令；会下载数十 GB 数据：
+脚本创建 `see_through_dev` Conda 环境（Python 3.12），安装 PyTorch 2.8.0/CUDA 12.8 和 See-through requirements。需要下载模型时显式运行：
 
 ```bat
 setup-windows.bat -WithSeeThrough -WithModels
 ```
 
-权重来源：`layerdifforg/seethroughv0.0.2_layerdiff3d`、`24yearsold/seethroughv0.0.1_marigold`、`24yearsold/l2d_sam_iter2`。缓存统一为 `see-through/.hf_home/`；具体推理与 AMD/ROCm、Linux、Apple Silicon 配置见 See-through 自带 README。可选环境未包含在基础安装验证中。
-
-## 提交边界
-
-完整 SDK ZIP、JDK/Gradle/PSD2Live 分卷和当前应用 JAR 上传 Git；每个文件小于 100 MiB。归档清单与许可证见 [依赖目录](../dependencies/README.md) 和 [第三方来源](THIRD_PARTY.md)。环境目录、模型权重、Gradle 缓存、node_modules、构建输出、个人工作区与渲染结果保持本地，不重复上传。
+`-WithModels` 会连同推理环境一起处理并下载数十 GB 模型，缓存位于 `see-through/.hf_home/`。固定来源为 `layerdifforg/seethroughv0.0.2_layerdiff3d`、`24yearsold/seethroughv0.0.1_marigold`、`24yearsold/l2d_sam_iter2`。本项目未验证这套可选推理环境；其他平台与推理方法见 [See-through README](../see-through/README.md)。

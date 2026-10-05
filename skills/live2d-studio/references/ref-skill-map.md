@@ -4,8 +4,9 @@
 
 - 权威正文：仓库 `docs/skill-map.md`（`read_file` + 仓内相对路径）。
 - **加载纪律**：一次只加载命中触发条件的 1～2 个；禁止批量预读。
-- See-through 后仍粘连/遮挡歧义/部件数不符时，可只读本机 `.agents` 的
-  `source-part-segmentation`；它产出具名 masks 和歧义报告，不直接产出 Live2D PSD。
+- See-through 后仍粘连/遮挡歧义/部件数不符时，先读当前宿主提供的 Blender 技能入口，
+  再按其路由找到 `source-part-segmentation` 手册；它不一定是独立技能。
+  它产出具名 masks 和歧义报告，不直接产出 Live2D PSD。
 - Blender/3D 技能不得直接套用到 Cubism ArtMesh；具体适用边界见权威注册表。
 - 外部协作技能缺失时，退回本包和仓库工具能完成的流程；缺少的跨界增强如实说明，不编造。
 - 项目级 `<repo>/.agents/skills/` 与用户家目录 `~/.agents/skills/` 是不同来源，不得混用。
