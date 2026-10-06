@@ -53,7 +53,8 @@ def build_psd(ir_path: str | Path, out_psd_path: str | Path) -> dict:
         layer.visible = appearance.get("visible", True)
         layer.opacity = appearance.get("opacity", 255)
         identities.append((layer, part))
-        built_layers.append({"name": part["name"], "z": part["z"], "offset": [left, top]})
+        built_layers.append({"name": part["name"], "z": part["z"], "offset": [left, top],
+                             "partId": part["id"], "sourceLayerId": f"lyid:{len(identities)}"})
 
     write_identities(new_psd, identities)
     new_psd.save(out_psd_path)

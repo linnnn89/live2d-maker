@@ -33,7 +33,11 @@ export function recoveryPlan(value: unknown, ir: ArtworkIR, workspaceId: string)
     seen.add(key);
     const part = parts.get(change.partId);
     let command: EditCommand, current: unknown;
-    if (change.field === 'appearance.visible') {
+    if (change.field === 'semantic.override') {
+      command = change.after === null ? { type: 'reset_semantic', partId: change.partId }
+        : { type: 'set_semantic', partId: change.partId, ...(change.after as NonNullable<import('../protocol').Part['semantic']['override']>) };
+      current = part?.semantic.override ?? null;
+    } else if (change.field === 'appearance.visible') {
       command = { type: 'set_visibility', partId: change.partId, visible: change.after as boolean };
       current = part?.appearance?.visible ?? true;
     } else if (change.field === 'appearance.opacity') {

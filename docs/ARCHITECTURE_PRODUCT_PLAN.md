@@ -244,3 +244,5 @@ R1c 的 Linux 构建与 37 项回归通过；像素样本使用现有 Python ras
 同日完成 E6b：版本 2 模型输入/注记签名与构建/QA 记录对应关系，保存注记不使 PSD、模型和 QA 过期；旧记录保守核对，不放宽 Overlay/runtime 或完整 IR 并发约束。22 项 Python 全套及实际旧/新构建、16 姿态 QA、Overlay 失败保留通过。剩余 E6 WorkspaceService 与 R2–R8 继续，详见工程审阅和交接第 30 节。
 
 同日完成 E6c：UI 无关 WorkspaceService 处理工程归档/资源恢复，桌面适配保留状态转换和互斥，既有 Agent 保存入口共用。三个真实临时工程集成测试及 Kotlin 全套 208 项通过，随仓 JAR/manifest 同步、安装校验和实际桌面启动通过；未将整个编辑事务迁出 ViewModel，也未声称通过 UIA 验收桌面保存/打开。完整服务化和建模模块整理随 R7 推进，接续 R2/R3 ID/分类映射与构建设置，详见工程审阅和交接第 31 节。
+
+同日完成 R2/R3a：IR 可选人工 semantic.override、类别/左右侧 UI 与共享撤销/恢复命令，通过实际 PSD 标准 ID 映射到原生 split component/drawable，报告返回自动/覆盖/采用值并修复重名误对应。前端 55、Python 23、Kotlin 209 回归及真实 ds 重建/16 姿态 QA/复原/PNG 对照通过，随仓 JAR 同步；接续 R3b 项目构建设置及 R4–R8，见交接第 32 节。

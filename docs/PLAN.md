@@ -130,3 +130,5 @@ CLI 和界面不调用生成 API，不自动绘制 mask，也不处理全尺寸�
 同日继续完成 E6a：显式 Kotlin AuthoringPipelineFacade 和版本化 JSON 构建 DTO 替代 Python 配置字段顺序反射；随仓 JAR/哈希同步更新。源码构建、205 项 Kotlin 回归及额外实际 DLL GPU 渲染、旧/新模型签名与完整产物对照、实际 Edge Overlay/Studio 重建通过。E6 的签名分层/WorkspaceService 和 R2–R8 剩余内容继续推进，详情见工程审阅 E6a 与交接第 29 节。
 
 同日完成 E6b：版本 2 模型输入/注记签名与构建/QA 记录对应关系，保存注记不使 PSD、模型和 QA 过期；旧记录保守核对，不放宽 Overlay/runtime 或完整 IR 并发约束。22 项 Python 全套及实际旧/新构建、16 姿态 QA、Overlay 失败保留通过。剩余 E6 WorkspaceService 与 R2–R8 继续，详见工程审阅和交接第 30 节。
+
+2026-10-07 R3a 已支持部件设置的类别/左右侧修正及恢复自动识别，无需改 PSD 名称。实际构建通过标准 layer ID 映射传入原生，返回自动识别/人工覆盖/采用组件与 drawable；命令、撤销/重做和草稿恢复共用。前端 55、Python 23、Kotlin 209 回归及 Edge 重建/16 姿态 QA/PNG 对照通过。项目构建设置继续 R3b，项目/导出、素材、模型编辑与动态仍按架构规划推进。

@@ -734,3 +734,10 @@ footer>div{
 .recovery-record { margin: 10px 0; padding: 12px; background: white; border: 1px solid #d5e1f2; border-radius: 8px; }
 .recovery-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .recovery-record pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 120px; overflow-y: auto; }
+.artwork-panel { overflow-y: auto; }
+.semantic-editor { padding: 10px 12px; border-top: 1px solid #d8ddd4; font-size: 13px; flex-shrink: 0; }
+.semantic-editor p { margin: 8px 0; color: #596454; overflow-wrap: anywhere; }
+.semantic-fields { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+.semantic-fields label { display:flex; align-items:center; gap:6px; }
+.semantic-fields select { padding:6px; max-width:150px; }
+.semantic-editor ul { padding-left:18px; overflow-wrap:anywhere; max-height:160px; overflow:auto; }

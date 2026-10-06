@@ -18,6 +18,7 @@ from .generated import composite_ir, import_generated
 from .stale import evaluate_dag_stale, check_overlay_compatibility, model_input_signature
 from .validator import validate_authoring_rig
 from .studio_protocol import StudioError, validate_protocol
+from .binding import build_configuration, classification_audit
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -208,15 +209,16 @@ def save_workspace(root, payload):
             raise StudioError("BASE_CONFLICT", "IR changed in another editor; reload before saving", "save")
         candidate = payload["ir"]
         validate_authoring_rig(candidate, root)
-        # This editing surface owns geometry and appearance; paths, IDs and source are immutable.
+        # Geometry, appearance and explicit classification overrides are editable; source stays fixed.
         old = copy.deepcopy(current)
         new = copy.deepcopy(candidate)
         for data in (old, new):
             for part in data["parts"]:
                 part.pop("geometry", None)
                 part.pop("appearance", None)
+                part["semantic"].pop("override", None)
         if old != new:
-            raise StudioError("EDIT_SCOPE", "Studio may edit only geometry and appearance", "save")
+            raise StudioError("EDIT_SCOPE", "Studio may edit only geometry, appearance and semantic overrides", "save")
         for part, previous in zip(candidate["parts"], current["parts"]):
             if part["geometry"]["bbox"] != previous["geometry"]["bbox"]:
                 raise StudioError("EDIT_SCOPE", "Raster bbox is fixed; edit polygon or landmarks", "save", part_id=part["id"], field="geometry.bbox")
@@ -319,7 +321,9 @@ def rebuild_workspace(root):
         build = root / "builds" / uuid.uuid4().hex
         build.mkdir(parents=True)
         write(build / "build-ir.json", data)
-        build_psd(root / "authoring-rig.json", build / "artwork.psd")
+        built = build_psd(root / "authoring-rig.json", build / "artwork.psd")
+        configuration = build_configuration(data, built["layers"])
+        write(build / "native-configuration.json", configuration)
         native_dir = build / "native"
         jar = ROOT / "psd2live/build/libs/psd2live-0.7.1.jar"
         native_jar = jar if jar.exists() else None
@@ -330,9 +334,9 @@ def rebuild_workspace(root):
 
         try:
             if state["overlay"]:
-                result = native_replay(build / "artwork.psd", root / "overlay.json", root / "overlay-baseline.json", native_dir, native_jar)
+                result = native_replay(build / "artwork.psd", root / "overlay.json", root / "overlay-baseline.json", native_dir, native_jar, configuration)
             else:
-                result = native_base(build / "artwork.psd", native_dir, native_jar)
+                result = native_base(build / "artwork.psd", native_dir, native_jar, configuration)
         except Exception as error:
             failed({"status": "error", "applied": False, "reasons": [str(error)]})
             raise
@@ -345,7 +349,11 @@ def rebuild_workspace(root):
         model = next(native_dir.glob("*.model3.json"))
         labels_path = next(native_dir.glob("*.psd2live.json"))
         labels = read(labels_path)
-        layers = labels["layers"]
+        try:
+            layers = classification_audit(data, built["layers"], labels["layers"])
+        except ValueError as error:
+            failed({"status": "error", "applied": False, "reasons": [str(error)]})
+            raise
         unknown = [layer for layer in layers if layer.get("tag", "").lower() == "unknown"]
         audit = {"layers": layers, "unknown": unknown, "count": len(layers),
                  "fresh": labels_path.stat().st_mtime >= (build / "artwork.psd").stat().st_mtime}
@@ -354,6 +362,7 @@ def rebuild_workspace(root):
             raise ValueError("Label audit failed; previous build retained")
         report = {"status": "ok", **context, "modelFile": model.relative_to(build).as_posix(),
                   "warnings": result.get("warnings", []), "labelCount": len(layers), "unknownCount": 0,
+                  "classifications": layers,
                   "modelBounds": composite_ir(data, root).getchannel("A").getbbox(),
                   "modelSha256": hashlib.sha256(model.with_suffix("").with_suffix(".moc3").read_bytes()).hexdigest()}
         write(build / "build-report.json", report)

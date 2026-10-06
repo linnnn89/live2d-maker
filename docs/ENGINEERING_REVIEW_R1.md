@@ -208,3 +208,15 @@ Kotlin/JAR/素材及 IR 持久化格式未改，本轮未重跑未变的前端/K
 新增三个真实临时资源集成测试：删除原 PSD/恢复缓存后，归档仍能恢复原 PSD、栅格、历史节点/HEAD、设置、任务、空间引用及辅助 PNG/日志图片；写入失败保留旧工程且清理暂存；清单正确但图片引用越界的工程被拒绝，解压目录不泄漏。Kotlin 全套 208 项，0 失败/错误，1 跳过。构建 JAR、随仓 JAR 与 manifest 同步，安装器 DryRun 哈希校验通过。
 
 使用现有缓存 JDK 21、当前源码 JAR 和便携包依赖启动真实桌面，WinCode 只读 PrintWindow 截图确认主界面正常，日志无启动错误。首次手工启动漏掉便携配置已有 skiko.library.path，补齐启动参数后成功；未修改源码。Compose UIA 仅提供容器节点，未声称通过 UIA 验收桌面保存/打开交互。证据日志及测试统计在 out/e6-workspace-evidence/。未重跑未变化的前端/Python全套。接续 R2/R3 图层 ID 映射、实际分类覆盖与项目构建设置。
+
+### R2/R3a：身份映射与语义修正（2026-10-07）
+
+部件设置支持类别、左右侧和恢复自动识别；set_semantic/reset_semantic 共用原子命令、撤销/重做、差异、离线提案与草稿恢复。IR 保留导入的 tag/side/confidence，只增加可选 semantic.override；未知枚举拒绝，保存层不放宽名称/素材/ID/导入识别值权限。当前 schema 读取旧 IR，旧严格读者对含新字段的 IR 会拒绝，需使用当前版本。
+
+重建 PSD 已有标准 layer ID/XMP 身份映射；builder 回传 partId/sourceLayerId，binding 用该映射生成明确 layerOverrides。原生 Analyzer 保留实际 source→split component 来源，口唇派生层继承来源；报告按 rig.layerIdByDrawableId 查 drawable，修复重名误对应。构建记录 automaticTag/automaticSide、requestedOverride、实际 semanticTag/side、componentId/drawable 和 native-configuration.json。未知或缺失映射拒绝并保留旧成功模型，旧报告需重建才显示映射；不猜名称或组件 ID。拆分规则保留既有子组件侧别，UI 明示。
+
+三项新回归：前端语义历史/原子拒绝/恢复，Python 实际重名/眼白拆分/原生覆盖/复原，Kotlin 配置枚举及 schema 同步。前端 55 项、Python 23 项、Kotlin 209 项全套通过（Kotlin 0 失败/错误、1 跳过）；随仓 JAR/manifest 同步、安装器 DryRun 通过。新 Python 测试前两次失败来自错误类型和错误属性的断言预期，按现有 StudioError.detail 契约修正后通过，未为测试改错误处理。
+
+实际 Edge 154、ds 24 图层：nose 的 psd_14→lyid:13→ArtMeshFaceDetailL 映射，类别 FACE_DETAIL/LEFT 可撤销/重做/保存刷新，PSD 不过期而模型/QA 过期，重建实际采用并加载 Cubism，16 姿态 QA 成功。恢复自动识别后模型哈希回到初始值。前后完整美术 PNG 不变且逐像素对照 Python，源 PSD 不变。截图复核发现窄屏面板底部裁掉结果，改为纵向滚动并实际验证结果可达；区分未保存覆盖、已保存待重建及已采用。结束无页面/控制台错误，证据 out/r3-semantic-evidence/。首次脚本等待了错误的就绪文案，按实际 Cubism 已就绪续验未完成流程；未改生产预览。
+
+本轮尚未开放项目构建设置，继续 R3b；R4–R8 仍按规划推进。

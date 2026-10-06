@@ -67,3 +67,25 @@ test('legacy workspace migration keeps one persisted identity and leaves source,
   assert.equal(migrated.revision,snapshot.revision);assert.deepEqual(readFileSync(path.join(workspace,'authoring-rig.json')),ir);assert.deepEqual(readFileSync(path.join(workspace,'source.png')),source);
   assert.equal(JSON.parse(readFileSync(path.join(workspace,'studio-state.json'),'utf8')).workspaceId,migrated.workspaceId);
 });
+
+test('semantic overrides preserve import estimates and support atomic history and recovery', () => {
+  const ir=fixture(), session=new DraftSession(ir,'base','semantic');
+  const original=structuredClone(ir.parts[0].semantic),partId=ir.parts[0].id;
+  session.apply(session.token(),[{type:'set_semantic',partId,tag:'TAIL',side:'left'}]);
+  const edited=session.inspect();
+  assert.equal(edited.changes[0].field,'semantic.override');
+  assert.deepEqual(edited.ir.parts[0].semantic,{...original,override:{tag:'TAIL',side:'left'}});
+  const record=checkpoint(workspaceId,edited),plan=recoveryPlan(record,ir,workspaceId);
+  const restored=new DraftSession(ir,'base','restored'); restored.apply(restored.token(),plan.commands);
+  assert.deepEqual(restored.inspect().ir,edited.ir);
+  const before=session.inspect();
+  assert.throws(()=>session.apply(session.token(),[{type:'reset_semantic',partId},{type:'set_semantic',partId,tag:'TYPO',side:'left'}]));
+  assert.deepEqual(session.inspect(),before);
+  session.apply(session.token(),[{type:'set_semantic',partId,tag:'TAIL',side:'left'}]);
+  assert.equal(session.inspect().revision,before.revision);
+  session.undo(session.token());assert.deepEqual(session.inspect().ir,ir);
+  session.redo(session.token());assert.deepEqual(session.inspect().ir,edited.ir);
+  session.apply(session.token(),[{type:'reset_semantic',partId}]);assert.deepEqual(session.inspect().ir,ir);
+  const reset=checkpoint(workspaceId,{...session.inspect(),changes:[{partId,field:'semantic.override',before:{tag:'TAIL',side:'left'},after:null}]});
+  assert.deepEqual(recoveryPlan(reset,edited.ir,workspaceId).commands,[{type:'reset_semantic',partId}]);
+});

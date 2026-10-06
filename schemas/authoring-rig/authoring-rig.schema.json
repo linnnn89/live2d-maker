@@ -205,6 +205,60 @@
               "type": "string",
               "enum": ["none", "left", "right"]
             },
+            "override": {
+              "type": "object",
+              "properties": {
+                "tag": {
+                  "type": "string",
+                  "enum": [
+                    "BACK_HAIR",
+                    "FRONT_HAIR",
+                    "HEADWEAR",
+                    "FACE",
+                    "FACE_DETAIL",
+                    "IRIDES",
+                    "EYEBROW",
+                    "EYEWHITE",
+                    "EYELASH",
+                    "EYE_CLOSE",
+                    "EYEWEAR",
+                    "EARS",
+                    "EARWEAR",
+                    "NOSE",
+                    "MOUTH",
+                    "MOUTH_OPEN",
+                    "MOUTH_CLOSE",
+                    "TOOTH_T",
+                    "TOOTH_B",
+                    "TONGUE",
+                    "NECK",
+                    "NECKWEAR",
+                    "TOPWEAR",
+                    "HANDWEAR",
+                    "BOTTOMWEAR",
+                    "LEGWEAR",
+                    "FOOTWEAR",
+                    "TAIL",
+                    "WINGS",
+                    "OBJECTS",
+                    "UNKNOWN"
+                  ]
+                },
+                "side": {
+                  "type": "string",
+                  "enum": [
+                    "none",
+                    "left",
+                    "right"
+                  ]
+                }
+              },
+              "required": [
+                "tag",
+                "side"
+              ],
+              "additionalProperties": false
+            },
             "confidence": {
               "type": "number",
               "minimum": 0,

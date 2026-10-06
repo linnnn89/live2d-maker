@@ -39,7 +39,13 @@ internal object MouthLipLayers {
                 lips + owner
             }
         }
-        return input.copy(layers = layers)
+        val mapping = input.sourceLayerIdByComponentId.toMutableMap()
+        layers.forEach { layer ->
+            (layer.source as? MouthLipLayer)?.let { lip ->
+                mapping[lip.id.raw] = mapping[lip.ownerId] ?: lip.ownerId
+            }
+        }
+        return input.copy(layers = layers, sourceLayerIdByComponentId = mapping)
     }
 
     /** Sample only the outside boundary, excluding interior details and transparent RGB noise. */
