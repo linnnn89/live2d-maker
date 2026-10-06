@@ -99,6 +99,8 @@ CLI 默认使用随仓应用 JAR；warps、physics、structure、authoringJourna
 
 同日 E3 已完成共享协议/生成 DTO、结构化错误和可选轻量 Agent 读取；真实 Python/HTTP/Edge 的保存冲突与导入闭环通过，构建与 48 项前端回归、5 项 Python Studio 回归通过。默认 v1 完整响应和持久化 IR 格式保持，后续接续 E4 恢复、E5/E6 与 R2–R8。
 
+同日 E4 已完成稳定 workspaceId 和 IndexedDB 增量检查点、明确恢复/部分兼容重放/冲突差异/旧记录导出，以及多标签页独立记录与过期删除保护。构建与 51 项回归、5 项 Python Studio 回归和实际 Edge 重启恢复/配额恢复/PNG 对照通过；恢复不自动写磁盘，不恢复旧撤销栈，浏览器清理或强制中断仍有明确边界。后续接续 E5/E6 与 R2–R8。
+
 ### P6 素材导入
 
 已提供 `import-generated` 和 Studio 的预检/确认入口。输入透明 RGBA PNG、画布大小二值 mask、放置矩形和生成说明；允许新增或按稳定 ID 替换。保护区内有像素变化即拒绝，不能裁掉违规像素来通过检查。

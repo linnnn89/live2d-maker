@@ -95,7 +95,7 @@ def open_workspace(root, source_ir=None, source_psd=None, overlay=None, overlay_
     write(root / "origin-ir.json", data)
     composite_ir(data, root).save(root / "source.png")
     state = {"source": str(source), "sourceSha256": hashlib.sha256(source.read_bytes()).hexdigest(),
-             "latestBuild": None, "latestQa": None, "overlay": None}
+             "workspaceId": uuid.uuid4().hex, "latestBuild": None, "latestQa": None, "overlay": None}
     if overlay:
         write(root / "overlay.json", read(overlay))
         write(root / "overlay-baseline.json", read(overlay_baseline))
@@ -109,6 +109,13 @@ def snapshot(root):
     data = read(root / "authoring-rig.json")
     validate_authoring_rig(data, root)
     state = read(root / "studio-state.json")
+    if not state.get("workspaceId"):
+        # Migrate old workspaces under the existing writer lock; do not touch the IR/source/builds.
+        with locked(root):
+            state = read(root / "studio-state.json")
+            if not state.get("workspaceId"):
+                state["workspaceId"] = uuid.uuid4().hex
+                write(root / "studio-state.json", state)
     build = state["latestBuild"]
     previous = read(root / build / "build-ir.json") if build else read(root / "origin-ir.json")
     # Browser JSON serializes 484.0 as 484. Equal IR values still describe the same artwork.
@@ -156,7 +163,7 @@ def snapshot(root):
                        "native_apply_required": True, "applied": False}
     with Image.open(root / "source.png") as image:
         bounds = image.getchannel("A").getbbox()
-    result = {"schemaVersion": 1, "status": "ok", "ir": data, "revision": revision(data), "stale": stale,
+    result = {"schemaVersion": 1, "workspaceId": state["workspaceId"], "status": "ok", "ir": data, "revision": revision(data), "stale": stale,
               "overlay": overlay, "sourceImage": "/studio-files/source.png", "sourceBounds": bounds,
               "artworkBounds": bounds, "build": None, "qa": None}
     if state.get("latestImport"):
