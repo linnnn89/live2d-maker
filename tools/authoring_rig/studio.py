@@ -15,7 +15,7 @@ from PIL import Image
 from .builder import build_psd
 from .exporter import export_psd
 from .generated import composite_ir, import_generated
-from .stale import evaluate_dag_stale, check_overlay_compatibility
+from .stale import evaluate_dag_stale, check_overlay_compatibility, model_input_signature
 from .validator import validate_authoring_rig
 from .studio_protocol import StudioError, validate_protocol
 
@@ -35,6 +35,15 @@ def write(path, data):
 
 def revision(data):
     return hashlib.sha256(json.dumps(data, sort_keys=True, ensure_ascii=False, allow_nan=False).encode()).hexdigest()
+
+
+def model_record_matches(record, data, built_ir):
+    """Versioned reports bind exact model inputs; legacy reports require their captured build IR."""
+    if record.get("signatureVersion") == 2:
+        return record.get("modelInputSignature") == model_input_signature(built_ir) == model_input_signature(data)
+    if "signatureVersion" in record:
+        return False
+    return record.get("revision") == revision(built_ir) and model_input_signature(built_ir) == model_input_signature(data)
 
 
 def overlay_inputs(root, state):
@@ -120,25 +129,28 @@ def snapshot(root):
     previous = read(root / build / "build-ir.json") if build else read(root / "origin-ir.json")
     # Browser JSON serializes 484.0 as 484. Equal IR values still describe the same artwork.
     same_ir = data == previous
-    current_revision = revision(data)
-    previous_revision = revision(previous)
     stale = evaluate_dag_stale(previous, previous if same_ir else data)["stale"]
+    report = read(root / build / "build-report.json") if build else None
+    model_matches = bool(report and model_record_matches(report, data, previous))
+    if report and not model_matches:
+        for stage in ("base_rig", "overlay_apply", "moc3", "review"):
+            stale[stage] = True
     if not build:
         for stage in ("psd", "base_rig", "overlay_apply", "moc3", "review"):
             stale[stage] = True
     qa = state["latestQa"]
-    qa_revision = read(root / qa / "review.json").get("studioRevision") if qa else None
-    stale["review"] = stale["review"] or not qa or not (qa_revision == current_revision
-                                                       or (same_ir and qa_revision == previous_revision))
+    review = read(root / qa / "review.json") if qa else None
+    qa_matches = bool(review and model_matches and (
+        (review.get("signatureVersion") == 2 and review.get("buildId") == build
+         and review.get("modelInputSignature") == model_input_signature(data))
+        or ("signatureVersion" not in review and review.get("studioRevision") == report.get("revision"))))
+    stale["review"] = stale["review"] or not qa_matches
     overlay = {"status": "not-loaded", "reasons": []}
     if state["overlay"]:
         inputs = overlay_inputs(root, state)
         evidence = read(root / "overlay-baseline.json")
         overlay = check_overlay_compatibility(read(root / "overlay.json"), data, evidence["objects"])
-        report = read(root / build / "build-report.json") if build else None
-        applied = (report and not stale["base_rig"] and report.get("overlayInputs") == inputs
-                   and (report.get("revision") == current_revision
-                        or (same_ir and report.get("revision") == previous_revision)))
+        applied = (model_matches and not stale["base_rig"] and report.get("overlayInputs") == inputs)
         if not applied:
             for stage in ("overlay_apply", "moc3", "review"):
                 stale[stage] = True
@@ -146,8 +158,8 @@ def snapshot(root):
             overlay = {"status": "needs-review", "reasons": ["Base rig changed; native replay must compare complete signatures"]}
         attempt = state.get("lastBuildAttempt")
         failed_ir = root / attempt["directory"] / "build-ir.json" if attempt else None
-        same_attempt = attempt and (attempt["revision"] == current_revision
-                                     or (failed_ir.exists() and read(failed_ir) == data))
+        same_attempt = attempt and (attempt["revision"] == revision(data)
+                                   or (failed_ir.exists() and model_record_matches(attempt, data, read(failed_ir))))
         if (same_attempt and attempt.get("overlayInputs") == inputs and attempt["status"] != "ok"):
             for stage in ("overlay_apply", "moc3", "review"):
                 stale[stage] = True
@@ -302,7 +314,8 @@ def rebuild_workspace(root):
         data = read(root / "authoring-rig.json")
         validate_authoring_rig(data, root)
         state = read(root / "studio-state.json")
-        context = {"revision": revision(data), "overlayInputs": overlay_inputs(root, state)}
+        context = {"revision": revision(data), "overlayInputs": overlay_inputs(root, state),
+                   "signatureVersion": 2, "modelInputSignature": model_input_signature(data)}
         build = root / "builds" / uuid.uuid4().hex
         build.mkdir(parents=True)
         write(build / "build-ir.json", data)
@@ -390,6 +403,9 @@ def qa_workspace(root, port):
             write(directory / "review.json", {"status": "error", "error": str(error)})
             raise
         review["studioRevision"] = view["revision"]
+        review["signatureVersion"] = 2
+        review["modelInputSignature"] = model_input_signature(data)
+        review["buildId"] = state["latestBuild"]
         write(directory / "review.json", review)
         state["latestQa"] = directory.relative_to(root).as_posix()
         write(root / "studio-state.json", state)
