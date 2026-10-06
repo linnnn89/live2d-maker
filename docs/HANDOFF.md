@@ -350,3 +350,13 @@ R6 首批范围完成：参数/姿态、受限透明度关键形、结构化阻�
 真实 Edge 新工程 82ddc51ca76149a4a5e4c35812c82580：基线 MOC cf1694d8a967245228444856e89a155ad53c728233ca1c7bbe50dccb7f7186f7；ArtMeshFace/ParamAngleX=30/opacity=0.4 复用重放后 MOC 8a70f64682e3d90b9b91b21a336449ec4244b394e527957bfcb11488f6a444d7，与 R6b 完整构建所有模型文件逐字节一致。Cubism 加载、16 姿态 QA 和 neutral 缩略图实际点击通过，最终页面/控制台异常为零。旧工程引擎指纹不符继续拒绝，保留旧模型/Overlay/基线，没有自动迁移。自定义物理原生重放复核 reused_prepared_model=false、规则计数 1 和 physics3 文件生成，完整构建回退通过。
 
 验收脚本首次过早读取问题 DOM，保存的真实失败证据正确，改为等待元素后续验；经历多轮热重载的 Vite 进程曾返回未注册路由，重启现有服务器后相同提交/完整流程通过，没有改路由实现。物理探针首次误用 camelCase 字段，按现有 source Overlay snake_case 契约修正，未放宽生产校验。证据 out/r7-prepared-evidence/。R7a 完成，UI 无关编辑用例及领域 RigBuilder 模块继续，R8 动态尚待实施。
+
+## 40. R7b：领域建模模块与显式构建上下文（2026-10-07）
+
+基于 R7a PR #24，main@c2544e1。RigBuildContext 捕获输入分析/贴图/配置及头部坐标、面部/头发框、图层 ID 和固定分组身份；每次构建新建，生成器无可变共享状态。HierarchyBuilder 返回变形器、成对部件框/父级映射与组织分组；DrawableBuilder 负责本次 ID 分配、网格/通道/遮罩/自定义参数及来源/贴图映射，返回 DrawableBuildResult。EyeRigGenerator、MouthRigGenerator、HairRigGenerator 各自承接已有领域计算；RigBuildMath 提供共享坐标及有序 keyform grid，固定原对象 ID 保留。RigBuilder 保留编排、最终 PuppetModel 组装与既有内部兼容入口；没有改变绑定公式、配置/文件格式或源栅格。
+
+复用既有建模/门面回归，无新增测试。针对建模与门面通过后，Kotlin 211 项完整回归通过（0 失败、0 错误、1 跳过）。前两次编译诊断为提取后缺上下文 anchors/faceTags 和兼容方法类型 import、随后共享 scalarGrid import；按实际诊断补齐，第三次针对回归通过，最终完整回归通过。共享 ninePoseAxes 放入数学模块，避免头发生成器反向依赖层级生成器。既有 CanvasViewportComposable 两项恒真警告保持。
+
+整理前随仓引擎与新源码 JAR 实际构建 ds：完整模型签名 64ad30622e1537d6a0b1066098380a733ccabb3d2094577c1a9796339d335f5a 相同，modelSignatures/对象/参数/警告相等，ds.moc3、model3、cdi3、psd2live 元数据与纹理逐字节一致。真实 Edge 新工程 4ca6b376e3804445afd68742283181e1 的基础模型和透明度 Overlay 复用重放与上一轮所有模型产物逐字节一致，Cubism 加载及 16 姿态 QA/neutral 实际点击通过，页面/控制台异常零；原生身份升级没有重设旧工程基线。源码/随仓 JAR 和 manifest 同步，安装 DryRun 哈希校验通过。证据 out/r7-domain-evidence/。
+
+首次项目探针误将 create 请求放入 project 嵌套字段，现有 schema 正确拒绝；依据现有 create_project 用例建立新验收工程后完成浏览器流程。一次编排移动脚本因 cwd 错误未执行，未改源；本批实际保留 RigBuilder 的父级覆盖/框映射编排，不能声称将全部编排搬进生成器。生成的空 .kotlin/sessions 缓存已按确认空目录清理，未纳入提交。R7 领域模块完成，编辑服务继续；R8 动态尚待实施。
