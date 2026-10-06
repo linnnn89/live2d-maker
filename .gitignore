@@ -21,6 +21,8 @@ venv/
 # Hugging Face / model weights / datasets
 **/.hf_home/
 **/workspace/
+!studio/src/workspace/
+!studio/src/workspace/**
 **/wandb/
 *.safetensors
 *.ckpt
