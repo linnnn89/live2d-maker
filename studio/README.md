@@ -157,3 +157,7 @@ CLI `studio-catalog --workspace <目录>` 从 stdin 接收 `{ "schemaVersion":1,
 “模型问题”首批列出未知分类、无效参数和 Overlay/构建阻断项，提供定位部件设置或修改证据的操作。完整导出警告仍在审计详情，未自动判断美术质量。QA 联系表保留，新增可点击的单姿态缩略图；当前 QA 可载入相应预览值，过期 QA 只供查看。
 
 `studio-rig-edit --workspace <工程目录>` 从 stdin 接收 v1 JSON。共同字段为 schemaVersion、revision、settingsRevision、overlayRevision（从 snapshot 读取）。`operation:"set-opacity"` 增加 `edit:{targetId:"ArtMeshFace",parameterId:"ParamAngleX",value:30,opacity:0.4}`；`operation:"remove"` 增加整数 index（来自 snapshot.rigEdits.edits）。接口拒绝任意几何/通道/对象创建；参数/目标和版本不符合时不写 Overlay。只开放 managed Studio 工程，完整工程归档携带修订与基线证据。
+
+### 原生准备模型复用
+
+Overlay 重放通过完整基线和引擎检查后，可直接导出同一配置的基础预览，避免重复读取/分类/打包/绑定。全部其他配置必须一致；自定义物理等设置改变会完整构建。报告 `native-replay.json.reused_prepared_model` 可核对选择结果。原生检查、回读和新增警告门禁保持；引擎升级后的旧 Overlay 基线不会自动重置。

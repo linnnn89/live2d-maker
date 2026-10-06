@@ -340,3 +340,13 @@ R6a 完成，R6b 受限 Overlay/结构化问题与冲突定位、R7 服务/建�
 浏览器连续三个中断分别为中立姿态空参数契约、按钮可访问名、自动修订读取占用门禁。按三失败规则暂停修改，核对调用链并查 React 官方 useEffect 生命周期后，明确 head 变化触发未锁定读取的新证据；修订读取改为当前操作完成后共用门禁，按 head 读取一次，实际修改/重建/重载/撤回续验通过。另有实际缩略图横向 flex 导致图片越界拦截点击，元素边界探针确认后改为纵向和换行，桌面/窄屏续验通过。定位脚本改用真实图层文本，未使用强制点击。主成功续验零页面/控制台异常；失败场景两个主动原生拒绝 400，另一次 409 经真实读取期间刷新复现，明确来自 /api/open，已有忙重试恢复就绪。最终页面异常为零；不隐瞒导航瞬间的预期 409。证据 out/r6-overlay-evidence/。
 
 R6 首批范围完成：参数/姿态、受限透明度关键形、结构化阻断问题与可执行定位/撤回及 QA 缩略图。完整网格编辑、复杂 Overlay 全组合和自动重定基线不在首批范围；R7 服务/领域建模与阶段复用、R8 物理/动作继续按规划推进。
+
+## 39. R7a：准备模型复用与同一导出检查（2026-10-07）
+
+基于 R6b PR #23，main@0b2877c。PSD2LivePipeline 将 exportAnalysis 的验证、格式写出、回读和 runtime/report 流程提为私有 exportPrepared；exportPreview 导出捕获的模型，exportReplayPreview 在未应用 Overlay 的基础预览上应用一次 Overlay 后进入同一导出流程。canReusePreview 核对全部 PipelineConfig 字段，只有 rigEdits 可不同。Python native_replay 在原完整基线/runtime/preflight/原生 applyTo/新增问题检查后选择复用；自定义物理等配置变化仍用原完整构建。报告增加 reused_prepared_model，不新增持久缓存或依赖，也不承诺未测量的提速比例。
+
+一个新增 Kotlin 回归核对实际 ds 复用/完整构建全部文件集合、逐字节内容、警告和 analysis/atlas 身份；贴图/转向/物理配置变化及已编辑基础模型在写出前拒绝。原有真实 Python 透明度回归增加复用结果断言。Kotlin 211 项、0 失败、0 错误、1 跳过；针对 Python 原生编辑/交付 4 项通过，Python 32 项完整回归通过（259 秒，含实际浏览器渲染/QA）。首次 Kotlin 失败仅为测试临时目录名不符合已有 ProjectArchive 清理约束，按约束修正后通过。随仓 JAR/源码 JAR 均 6268331 字节，SHA 330d89cc6dd9d3ec2e99bdb4ce09c02db5eb9e5cd745176507b55364813351a8；manifest 同步，安装 DryRun 通过。
+
+真实 Edge 新工程 82ddc51ca76149a4a5e4c35812c82580：基线 MOC cf1694d8a967245228444856e89a155ad53c728233ca1c7bbe50dccb7f7186f7；ArtMeshFace/ParamAngleX=30/opacity=0.4 复用重放后 MOC 8a70f64682e3d90b9b91b21a336449ec4244b394e527957bfcb11488f6a444d7，与 R6b 完整构建所有模型文件逐字节一致。Cubism 加载、16 姿态 QA 和 neutral 缩略图实际点击通过，最终页面/控制台异常为零。旧工程引擎指纹不符继续拒绝，保留旧模型/Overlay/基线，没有自动迁移。自定义物理原生重放复核 reused_prepared_model=false、规则计数 1 和 physics3 文件生成，完整构建回退通过。
+
+验收脚本首次过早读取问题 DOM，保存的真实失败证据正确，改为等待元素后续验；经历多轮热重载的 Vite 进程曾返回未注册路由，重启现有服务器后相同提交/完整流程通过，没有改路由实现。物理探针首次误用 camelCase 字段，按现有 source Overlay snake_case 契约修正，未放宽生产校验。证据 out/r7-prepared-evidence/。R7a 完成，UI 无关编辑用例及领域 RigBuilder 模块继续，R8 动态尚待实施。

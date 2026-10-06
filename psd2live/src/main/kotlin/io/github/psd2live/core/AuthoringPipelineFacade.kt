@@ -33,6 +33,12 @@ class AuthoringPipelineFacade {
     fun run(psd: Path, output: Path, config: PipelineConfig, progress: ProgressListener): PipelineResult =
         pipeline.run(psd, output, config, progress)
 
+    fun canReusePreview(base: RigPreviewModel, config: PipelineConfig): Boolean = pipeline.canReusePreview(base, config)
+
+    fun exportReplayPreview(base: RigPreviewModel, sourceName: String, output: Path,
+                            config: PipelineConfig, progress: ProgressListener): PipelineResult =
+        pipeline.exportReplayPreview(base, sourceName, output, config, progress)
+
     companion object {
         private val json = Json { ignoreUnknownKeys = false }
 

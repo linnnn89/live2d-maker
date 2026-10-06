@@ -40,6 +40,7 @@ class LimitedModelEdits(unittest.TestCase):
             captured=json.loads((work/'project-revisions'/before/'revision.json').read_text());self.assertIsNone(captured['overlay'])
             with self.assertRaisesRegex(ValueError,'Model inputs or Overlay changed'):update_rig_edits(work,request)
             replay=self.build(work);self.assertEqual(replay['overlay']['status'],'ok');self.assertNotEqual(replay['build']['modelSha256'],base['build']['modelSha256']);self.assertEqual((work/'overlay-baseline.json').read_bytes(),baseline)
+            state=json.loads((work/'studio-state.json').read_text());self.assertTrue(json.loads((work/state['latestBuild']/'native/native-replay.json').read_text())['reused_prepared_model'])
             archive=pack_archive(work);clone=create_project(catalog,{'schemaVersion':1,'kind':'archive','name':'Copy','data':base64.b64encode((work/'downloads'/Path(archive['url']).name).read_bytes()).decode()})
             copied=snapshot(project_root(catalog,clone['project']['id']));self.assertEqual(copied['rigEdits']['edits'],replay['rigEdits']['edits']);self.assertEqual(copied['rigEdits']['baselineModelSha256'],replay['rigEdits']['baselineModelSha256'])
             removed=update_rig_edits(work,{**self.request(replay),'operation':'remove','index':0});self.assertEqual(removed['rigEdits']['edits'],[])

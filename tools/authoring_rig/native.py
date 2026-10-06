@@ -523,7 +523,14 @@ def native_replay(psd, overlay_file, baseline_file, out, native_jar=None, config
     introduced = sorted(set(map(str, warnings)) - set(map(str, base_warnings)))
     if introduced:
         return {"status": "needs-review", "action": "native-replay", "reasons": introduced, "applied": False}
-    result = export_native(pipeline, psd, out, config_for(jp, native, configuration), jp)
+    export_config = config_for(jp, native, configuration)
+    reuse = bool(pipeline.canReusePreview(preview, export_config))
+    if reuse:
+        listener = jp.JProxy("io.github.psd2live.core.ProgressListener", dict(update=lambda stage, fraction: None))
+        result = pipeline.exportReplayPreview(preview, Path(psd).name, jp.JClass("java.nio.file.Paths").get(str(Path(out).resolve())), export_config, listener)
+    else:
+        # Physics/configuration changes can affect generated rig fields; preserve the full route.
+        result = export_native(pipeline, psd, out, export_config, jp)
     export_warnings = old["warnings"]
     if configuration and any(configuration.get(key) for key in ("exportCmo3", "exportMotions", "generatePhysics")):
         # The complete base fingerprint already matched. Compare conversion notices under the
@@ -539,6 +546,7 @@ def native_replay(psd, overlay_file, baseline_file, out, native_jar=None, config
               "native_keyform_copies": len(native.getKeyformCopyEdits()),
               "native_keyform_deletes": len(native.getKeyformDeleteEdits()),
               "native_parameter_edits": len(native.getParameterEdits()),
+              "reused_prepared_model": reuse,
               "native_warp_edits": len(native.getWarpEdits()),
               "native_physics_edits": len(native.getPhysicsEdits()),
               "native_structure_edits": len(native.getStructureEdits()),
