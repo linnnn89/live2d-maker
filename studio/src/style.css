@@ -81,10 +81,12 @@ a{
   overflow:hidden
 }
 .topbar{
-  height:64px;
+  min-height:64px;
+  height:auto;
   flex-shrink:0;
-  padding:0 26px;
+  padding:10px 26px;
   display:flex;
+  flex-wrap:wrap;
   align-items:center;
   gap:28px;
   background:#fbfdff;
@@ -107,7 +109,8 @@ h1 span{
 .actions{
   margin-left:auto;
   display:flex;
-  gap:20px
+  flex-wrap:wrap;
+  gap:8px
 }
 .actions button{
   min-height:42px;
@@ -711,3 +714,9 @@ footer>div{
   .import-modal>.panel-heading,.import-actions{padding:12px}
   .import-actions button{padding:9px 12px}
 }
+
+.draft-diff { margin: 4px 6px; font-size: 12px; max-height: 160px; overflow: auto; flex-shrink: 0; }
+.draft-diff summary { cursor: pointer; }
+.draft-diff ul { padding-left: 18px; }
+.draft-diff li { margin: 10px 0; overflow-wrap: anywhere; }
+.draft-diff code, .draft-diff li span { display: block; margin-top: 4px; }

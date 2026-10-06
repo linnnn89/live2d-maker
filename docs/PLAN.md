@@ -8,6 +8,8 @@
 
 R1a 已完成浏览器预览适配器、参数按帧重绘和模型来源标识；Linux 前端构建、7 项适配器回归及 Chromium 交互检查通过。原生建模和 Windows 调用链的变更留待 PC 实测，见交接记录第 20 节。
 
+R1b 已实现人和 Agent 共用的编辑命令与草稿事务：版本检查、批量原子应用、逐字段差异、撤销/重做、拖拽合并、保存/放弃，以及浏览器结构化入口和离线 JSON 提案工具。Linux 构建及 19 项回归通过，Chromium 使用固定 API 响应验证人/Agent 交替编辑；调用契约见 [STUDIO_DRAFT_COMMANDS.md](STUDIO_DRAFT_COMMANDS.md)，交接见第 21 节。实时图层合成与原生 Agent 联动尚未实施。
+
 ## 0. 数据与实现边界
 
 ```text
