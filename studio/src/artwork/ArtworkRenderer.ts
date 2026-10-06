@@ -1,7 +1,9 @@
 import type { ArtworkIR, Part, Bounds } from '../editor/contracts';
 import { ArtworkError, dimensions, type PixelFrame, type RasterAsset } from './contracts';
+import { MemoryBudget, type MemoryLease } from './MemoryBudget';
+import { artworkKey, checkCancelled, renderControl } from './content';
 
-export type AssetLoader = (part: Part) => Promise<RasterAsset>;
+export type AssetLoader = (part: Part, signal?: AbortSignal) => Promise<RasterAsset & { release?: () => void }>;
 const div255 = (value: number) => Math.floor((Math.floor(value / 256) + value) / 256);
 
 /** Pillow-compatible normal source-over, using its seven-bit integer coefficients. */
@@ -20,7 +22,7 @@ function blend(destination: Uint8ClampedArray, offset: number, source: Uint8Clam
 }
 
 /** Even-odd at pixel centers, with the same strict crossing comparison as raster.py. */
-export function prepareLayer(asset: RasterAsset, part: Part): RasterAsset {
+function* layerRows(asset: RasterAsset, part: Part): Generator<void, RasterAsset> {
   const data = new Uint8ClampedArray(asset.data);
   const polygon = part.geometry.polygon;
   const opacity = part.appearance?.opacity ?? 255;
@@ -41,9 +43,17 @@ export function prepareLayer(asset: RasterAsset, part: Part): RasterAsset {
       while (crossing < crossings.length && crossings[crossing] <= centerX) { inside = !inside; crossing++; }
       const alphaIndex = (y * asset.width + x) * 4 + 3;
       data[alphaIndex] = polygon && !inside ? 0 : Math.round(data[alphaIndex] * opacity / 255);
+      if (x % 16384 === 16383) yield;
     }
+    if (y % 32 === 31) yield;
   }
   return { width: asset.width, height: asset.height, data };
+}
+
+export function prepareLayer(asset: RasterAsset, part: Part): RasterAsset {
+  const rows = layerRows(asset, part); let step = rows.next();
+  while (!step.done) step = rows.next();
+  return step.value;
 }
 
 export function alphaBounds(frame: Pick<PixelFrame, 'width' | 'height' | 'data'>): Bounds | null {
@@ -58,36 +68,76 @@ export function alphaBounds(frame: Pick<PixelFrame, 'width' | 'height' | 'data'>
 
 /** Shared pixel engine for the worker, UI and explicit PNG capture. No DOM or native calls. */
 export class ArtworkRenderer {
-  private layers = new Map<string, { key: string; asset: RasterAsset }>();
-  constructor(private load: AssetLoader) {}
-  async render(ir: ArtworkIR): Promise<PixelFrame> {
+  private layers = new Map<string, { key: string; asset: RasterAsset; lease: MemoryLease }>();
+  private frames = new Map<string, { frame: PixelFrame; lease: MemoryLease }>();
+  private compositions = 0;
+  private running = false;
+  constructor(private load: AssetLoader, readonly memory = new MemoryBudget(), private yieldTask?: () => Promise<void>, private sliceMs=8) {}
+  get stats() { return { compositions: this.compositions, ...this.memory.stats }; }
+  async render(ir: ArtworkIR, signal?: AbortSignal): Promise<PixelFrame> {
+    const result = await this.acquire(ir, signal); result.release(); return result.frame;
+  }
+  async acquire(ir: ArtworkIR, signal?: AbortSignal): Promise<{ frame: PixelFrame; release(): void }> {
+    if (this.running) throw new ArtworkError('BACKEND_BUSY', '美术合成正在执行');
     dimensions(ir.canvas.width, ir.canvas.height);
-    const parts = [...ir.parts].sort((a, b) => a.z - b.z).filter(p => p.appearance?.visible !== false && p.appearance?.opacity !== 0);
-    // Start independent reads together; the loader deduplicates identical assets.
-    const assets = await Promise.all(parts.map(part => this.load(part)));
-    const data = new Uint8ClampedArray(ir.canvas.width * ir.canvas.height * 4);
-    const currentLayers = new Map<string, { key: string; asset: RasterAsset }>();
-    let cacheBytes = 0;
-    for (let i = 0; i < parts.length; i++) {
-      const part = parts[i], source = assets[i];
-      dimensions(source.width, source.height);
-      if (source.width !== part.asset.size.width || source.height !== part.asset.size.height || source.data.length !== source.width * source.height * 4) throw new ArtworkError('ASSET_SIZE', '素材尺寸与 IR 不一致', part.id);
-      const { left, top } = part.asset.offset;
-      if (!Number.isInteger(left) || !Number.isInteger(top)) throw new ArtworkError('INVALID_GEOMETRY', '素材位置必须是整数', part.id);
-      const key = JSON.stringify([part.asset, part.geometry.polygon, part.appearance?.opacity ?? 255]);
-      const previous = this.layers.get(part.id);
-      const layer = previous?.key === key ? previous.asset : prepareLayer(source, part);
-      // Keep only current layers, with a bounded cache; landmarks never invalidate it.
-      cacheBytes += layer.data.byteLength;
-      if (cacheBytes <= 128 * 1024 * 1024) currentLayers.set(part.id, { key, asset: layer });
-      for (let y = Math.max(0, -top); y < Math.min(layer.height, ir.canvas.height - top); y++) {
-        for (let x = Math.max(0, -left); x < Math.min(layer.width, ir.canvas.width - left); x++) {
-          blend(data, ((y + top) * ir.canvas.width + x + left) * 4, layer.data, (y * layer.width + x) * 4);
+    checkCancelled(signal); this.running = true;
+    const checkpoint = renderControl(signal, this.yieldTask, this.sliceMs), key = artworkKey(ir);
+    let entry = this.frames.get(key), output: MemoryLease | undefined, composite: MemoryLease | undefined;
+    try {
+      if (entry) { this.frames.delete(key); this.frames.set(key, entry); }
+      if (!entry) {
+        const parts = [...ir.parts].sort((a,b)=>a.z-b.z).filter(part=>part.appearance?.visible!==false && part.appearance?.opacity!==0);
+        composite = this.memory.reserve(ir.canvas.width * ir.canvas.height * 4);
+        const data = new Uint8ClampedArray(ir.canvas.width * ir.canvas.height * 4);
+        let left=ir.canvas.width, top=ir.canvas.height, right=0, bottom=0;
+        for (const part of parts) {
+          await checkpoint();
+          const layerKey=JSON.stringify([part.asset,part.geometry.polygon,part.appearance?.opacity??255]);
+          let cached=this.layers.get(part.id);
+          if (cached?.key!==layerKey) {
+            cached?.lease.release(); cached=undefined;
+            const source=await this.load(part,signal);
+            let storage: MemoryLease | undefined;
+            try {
+              checkCancelled(signal); dimensions(source.width,source.height);
+              if (source.width!==part.asset.size.width || source.height!==part.asset.size.height || source.data.length!==source.width*source.height*4) throw new ArtworkError('ASSET_SIZE','素材尺寸与 IR 不一致',part.id);
+              storage=this.memory.reserve(source.data.byteLength);
+              const rows=layerRows(source,part); let step=rows.next();
+              while (!step.done) { await checkpoint(); step=rows.next(); }
+              cached={key:layerKey,asset:step.value,lease:storage};
+              this.layers.set(part.id,cached);
+              const owned=cached;
+              storage.retain(()=>{ if(this.layers.get(part.id)===owned)this.layers.delete(part.id); });
+              storage=undefined;
+            } finally { storage?.release(); source.release?.(); }
+          }
+          const unpin=cached!.lease.pin(), layer=cached!.asset, offset=part.asset.offset;
+          try {
+            if (!Number.isInteger(offset.left) || !Number.isInteger(offset.top)) throw new ArtworkError('INVALID_GEOMETRY','素材位置必须是整数',part.id);
+            for (let y=Math.max(0,-offset.top);y<Math.min(layer.height,ir.canvas.height-offset.top);y++) {
+              for (let x=Math.max(0,-offset.left);x<Math.min(layer.width,ir.canvas.width-offset.left);x++) {
+                const target=((y+offset.top)*ir.canvas.width+x+offset.left)*4;
+                blend(data,target,layer.data,(y*layer.width+x)*4);
+                if (data[target+3]) { left=Math.min(left,x+offset.left);top=Math.min(top,y+offset.top);right=Math.max(right,x+offset.left+1);bottom=Math.max(bottom,y+offset.top+1); }
+                if (x%16384===16383) await checkpoint();
+              }
+              if (y%32===31) await checkpoint();
+            }
+          } finally { unpin(); }
         }
+        checkCancelled(signal);
+        const frame={width:ir.canvas.width,height:ir.canvas.height,data,bounds:right?[left,top,right,bottom] as Bounds:null};
+        entry={frame,lease:composite}; this.frames.set(key,entry);
+        const owned=entry; composite.retain(()=>{if(this.frames.get(key)===owned)this.frames.delete(key);}); composite=undefined;
+        this.compositions++;
+        while (this.frames.size>2) this.frames.values().next().value!.lease.release();
       }
-    }
-    this.layers = currentLayers;
-    const frame = { width: ir.canvas.width, height: ir.canvas.height, data };
-    return { ...frame, bounds: alphaBounds(frame) };
+      const unpin=entry.lease.pin();
+      try {
+        output=this.memory.reserve(entry.frame.data.byteLength);
+        const frame={...entry.frame,data:new Uint8ClampedArray(entry.frame.data),bounds:entry.frame.bounds?[...entry.frame.bounds] as Bounds:null};
+        const owned=output;output=undefined; return {frame,release:owned.release};
+      } finally { unpin(); }
+    } finally { output?.release();composite?.release();this.running=false; }
   }
 }

@@ -95,6 +95,8 @@ CLI 默认使用随仓应用 JAR；warps、physics、structure、authoringJourna
 
 界面只在本地 Vite 服务中工作；`dist/` 不能独立执行 Python CLI。美术画布通过 R1c 实时合成当前草稿，模型仍需显式重建。操作细节集中在 [Studio 使用说明](../studio/README.md)。
 
+2026-10-07 的 PC 迭代已完成 E1a/E1b 和 E2：索引/稳定快照、有界图层历史，以及独立像素身份、完整成图复用、串行解码、共享工作量预算和过期显示取消。E2 Windows 构建、45 项回归及实际 Edge/Python 工作区验收通过；注记不触发显示任务，PNG 与 Python 完整 RGBA 一致，超预算/队列请求失败后恢复正常。详细预算和边界见 [工程审阅](ENGINEERING_REVIEW_R1.md)；后续按 E3 协议统一、E4 恢复、E5 用例提取、E6/R2–R8 推进。
+
 ### P6 素材导入
 
 已提供 `import-generated` 和 Studio 的预检/确认入口。输入透明 RGBA PNG、画布大小二值 mask、放置矩形和生成说明；允许新增或按稳定 ID 替换。保护区内有像素变化即拒绝，不能裁掉违规像素来通过检查。

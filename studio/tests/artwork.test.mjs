@@ -20,16 +20,22 @@ const { ArtworkRenderer } = require(path.join(output, 'artwork/ArtworkRenderer.j
 const { captureArtwork } = require(path.join(output, 'artwork/capture.js'));
 const { DraftController } = require(path.join(output, 'editor/DraftController.js'));
 // Codec is ESM; resolve its dependency from the installed project, not the temp folder.
-for (const name of ['png', 'AssetCache']) {
+for (const name of ['png', 'AssetCache', 'ArtworkClient']) {
   const source = readFileSync(path.join(root, `src/artwork/${name}.ts`), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText
     .replaceAll("from './contracts'", "from './contracts.js'")
     .replaceAll("from './png'", "from './png.mjs'")
+    .replaceAll("from './MemoryBudget'", "from './MemoryBudget.js'")
+    .replaceAll("from './content'", "from './content.js'")
+    .replaceAll("from 'fflate'", `from ${JSON.stringify(pathToFileURL(path.join(root, 'node_modules/fflate/esm/index.mjs')).href)}`)
     .replaceAll("from 'fast-png'", `from ${JSON.stringify(pathToFileURL(path.join(root, 'node_modules/fast-png/lib/index.js')).href)}`);
   writeFileSync(path.join(output, `artwork/${name}.mjs`), code);
 }
 const { decodeAsset, encodeFrame } = await import(pathToFileURL(path.join(output, 'artwork/png.mjs')));
 const { AssetCache } = await import(pathToFileURL(path.join(output, 'artwork/AssetCache.mjs')));
+const { ArtworkClient } = await import(pathToFileURL(path.join(output, 'artwork/ArtworkClient.mjs')));
+const { MemoryBudget } = require(path.join(output,'artwork/MemoryBudget.js'));
+const { artworkKey } = require(path.join(output,'artwork/content.js'));
 const fixtures = JSON.parse(readFileSync(path.join(root, 'tests/fixtures/artwork.json')));
 const bytes = value => Buffer.from(value, 'base64');
 
@@ -111,4 +117,82 @@ test('capture never assigns an old image to a version edited or saved while rend
   await c.execute({ schemaVersion: 1, operation: 'commit', state: c.getSnapshot() });
   resolve({ width: 8, height: 7, bounds: null, dataUrl: 'fixture' });
   assert.equal((await saving).error.code, 'DRAFT_CONFLICT');
+});
+
+test('pixel identities reuse complete frames, isolate outputs and cancel obsolete work at a deterministic boundary', async () => {
+  const ir=structuredClone(fixtures.cases[0].ir), original=structuredClone(ir);
+  let reads=0, inFlight=0, maximum=0;
+  const renderer=new ArtworkRenderer(async part=>{
+    reads++;inFlight++;maximum=Math.max(maximum,inFlight);await Promise.resolve();inFlight--;
+    return decodeAsset(bytes(fixtures.assets[part.asset.path]));
+  });
+  const frame=await renderer.render(ir); frame.data.fill(0);
+  ir.parts[0].geometry.landmarks={note:[1,2]};
+  assert.equal(artworkKey(ir),artworkKey(original));
+  assert.deepEqual(Buffer.from((await renderer.render(ir)).data),bytes(fixtures.cases[0].rgba));
+  assert.equal(renderer.stats.compositions,1);assert.equal(reads,1);
+  ir.parts[0].appearance.opacity=80;await renderer.render(ir);
+  assert.equal(renderer.stats.compositions,2);
+  await renderer.render(original);assert.equal(renderer.stats.compositions,2);
+  assert.equal(maximum,1);
+  const controller=new AbortController();let yields=0;
+  const memory=new MemoryBudget(1024*1024);
+  const large={...original,canvas:{width:256,height:256},parts:[{...original.parts[0],asset:{...original.parts[0].asset,size:{width:256,height:256}},geometry:{bbox:[0,0,256,256]}}]};
+  const cancelling=new ArtworkRenderer(async()=>({width:256,height:256,data:new Uint8ClampedArray(256*256*4)}),memory,
+    async()=>{if(++yields===2)controller.abort();},0);
+  await assert.rejects(cancelling.render(large,controller.signal),{code:'ABORTED'});
+  assert.equal(cancelling.stats.compositions,0);assert.equal(memory.stats.usedBytes,0);
+  await cancelling.render(large);assert.equal(cancelling.stats.compositions,1);
+  assert.ok(memory.stats.peakBytes<=memory.stats.limitBytes);
+});
+
+test('one memory budget accounts pinned work and evicts caches; PNG inflation and failed decoding stay bounded', async () => {
+  const memory=new MemoryBudget(64);let evicted=0;
+  const cached=memory.reserve(32);cached.retain(()=>evicted++);
+  const unpin=cached.pin();const active=memory.reserve(32);
+  assert.throws(()=>memory.reserve(1),{code:'MEMORY_BUDGET'});
+  active.release();unpin();
+  const replacement=memory.reserve(40);assert.equal(evicted,1);assert.equal(memory.stats.usedBytes,40);
+  replacement.release();assert.equal(memory.stats.usedBytes,0);assert.equal(memory.stats.peakBytes,64);
+  const actual=new MemoryBudget(64*1024*1024), part=structuredClone(fixtures.cases[0].ir.parts[0]);
+  let broken=true;
+  const cache=new AssetCache(async()=>{
+    const png=new Uint8Array(bytes(fixtures.assets[part.asset.path]));
+    if(broken)new DataView(png.buffer).setUint32(16,1);
+    return png;
+  },actual);
+  await assert.rejects(cache.acquire(part),{code:'ASSET_SIZE'});assert.equal(actual.stats.usedBytes,0);
+  const bomb=new Uint8Array(bytes(fixtures.assets[part.asset.path]));
+  new DataView(bomb.buffer).setUint32(16,1);new DataView(bomb.buffer).setUint32(20,1);
+  assert.throws(()=>decodeAsset(bomb),{code:'ASSET_FORMAT'});
+  broken=false;
+  const renderer=new ArtworkRenderer(cache.acquire,actual);
+  const frame=await renderer.render(fixtures.cases[0].ir);
+  assert.deepEqual(Buffer.from(frame.data),bytes(fixtures.cases[0].rgba));
+  assert.ok(actual.stats.peakBytes<=actual.stats.limitBytes);
+  assert.ok(actual.stats.peakBytes>48*1024*1024);
+  await assert.rejects(new ArtworkRenderer(async()=>{},new MemoryBudget(128)).render({canvas:{width:100,height:100},parts:[]}),{code:'MEMORY_BUDGET'});
+});
+
+test('client keeps one active task, coalesces display updates, bounds captures and acknowledges transfer ownership', async () => {
+  const sent=[];const port={onmessage:null,onerror:null,postMessage:value=>sent.push(value),terminate:()=>{}};
+  const client=new ArtworkClient(()=>port), ir=fixtures.cases[0].ir;
+  const first=client.render(ir).catch(error=>error.code);
+  const displays=[];
+  for(let i=0;i<100;i++)displays.push(client.render(ir).catch(error=>error.code));
+  const captures=Array.from({length:4},()=>client.capture(ir));
+  await assert.rejects(client.capture(ir),{code:'QUEUE_FULL'});
+  assert.equal(client.stats.activeJobs,1);assert.equal(client.stats.queuedJobs,5);
+  assert.equal(sent.filter(value=>value.kind==='render').length,1);
+  assert.equal(sent.filter(value=>value.kind==='cancel').length,1);
+  const reply=()=>{const job=sent.filter(value=>value.kind==='render'||value.kind==='capture').at(-1);port.onmessage({data:{id:job.id,ok:true,value:{width:1,height:1,bounds:null,data:new Uint8ClampedArray(4),dataUrl:'fixture'},metrics:{compositions:1}}});return job;};
+  reply();assert.equal(await first,'ABORTED');
+  assert.equal(reply().kind,'render');
+  for(let i=0;i<4;i++)assert.equal(reply().kind,'capture');
+  assert.equal((await Promise.all(displays)).filter(value=>value==='ABORTED').length,99);
+  assert.equal((await Promise.all(captures)).length,4);
+  assert.equal(client.stats.queuedJobs,0);assert.equal(client.stats.activeJobs,0);
+  assert.equal(sent.filter(value=>value.kind==='ack').length,6);
+  await assert.rejects(client.capture({...ir,metadata:{name:'x'.repeat(2*1024*1024)}}),{code:'MEMORY_BUDGET'});
+  const closing=client.capture(ir);client.dispose();await assert.rejects(closing,{code:'ABORTED'});
 });
