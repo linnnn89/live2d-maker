@@ -226,3 +226,5 @@ Python 预检可读取从核心导出的别名/标签数据；复杂分类以原
 R1b 已按用户确认调整为对 LLM Agent 直接可用的共享命令层，而非仅增加 UI 撤销按钮。编辑领域逻辑与 JSON 工具可在 Linux 独立运行；浏览器 commit 复用已有保存接口，未扩展 Python/Kotlin/native 契约。Linux 构建、19 项回归和 Chromium 人/Agent 交互检查通过，浏览器使用受控工作区 API 响应。
 
 R1c 的 Linux 构建与 37 项回归通过；像素样本使用现有 Python raster/composite 函数生成，Chromium 验证实际显示与导出。下一步优先优化草稿增量状态和有界历史，再推进渲染失效范围、协议统一和草稿恢复，具体代码依据与切片见 [ENGINEERING_REVIEW_R1.md](ENGINEERING_REVIEW_R1.md)。R2/R3 涉及原生配置及 ID 映射、现有 Kotlin Agent 事务联动的接入保留为 PC 迭代项。
+
+2026-10-07 PC 迭代：R1c PR #7 已验收合并；按工程审阅的首选切片完成 E1a（图层索引、轻量内部 token、差异缓存和稳定订阅快照）。Windows 构建、39 项回归及真实 Python 保存/Edge 编辑流程通过。E1a 仍保留整份候选 IR 和历史；有界 patch 历史、像素失效/总预算属于后续 E1b/E2，不能将本轮描述为全部增量编辑已完成。详见 [交接第 23 节](HANDOFF.md)。

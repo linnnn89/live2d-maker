@@ -132,3 +132,60 @@ test('offline CLI returns machine JSON with shared diffs and rejects invalid bat
   const invalid = run([hide, { ...opacity, opacity: -1 }]); assert.equal(invalid.status, 1); assert.equal(JSON.parse(invalid.stdout).error.code, 'INVALID_COMMAND');
   assert.deepEqual(input.ir, fixture());
 });
+
+test('stable subscription snapshots isolate mutable responses and survive no-ops and phase changes', async () => {
+  const { c } = controller(); let notifications = 0;
+  c.subscribe(() => notifications++);
+  const first = c.getSnapshot();
+  assert.equal(c.getSnapshot(), first);
+  assert.throws(() => { first.ir.parts[0].geometry.bbox[0] = 90; }, TypeError);
+  c.edit([{ ...hide, visible: true }]);
+  c.install(fixture(), 'saved-1');
+  assert.equal(c.getSnapshot(), first); assert.equal(notifications, 0);
+  const response = await request(c, 'apply', [opacity]);
+  const edited = c.getSnapshot();
+  response.state.ir.parts[0].appearance.opacity = 1;
+  response.state.changes[0].after = 1;
+  assert.equal(c.getSnapshot(), edited);
+  assert.equal(edited.ir.parts[0].appearance.opacity, 120);
+  assert.equal(edited.changes[0].after, 120);
+  const inspected = await request(c, 'inspect');
+  inspected.state.ir.parts.reverse(); inspected.state.changes.length = 0;
+  assert.equal(c.getSnapshot(), edited);
+  c.setBlocked(true); assert.equal(c.getSnapshot().phase, 'operation');
+  c.setBlocked(false); assert.equal(c.getSnapshot().phase, 'idle');
+  assert.deepEqual(c.getSnapshot().changes, edited.changes);
+  c.beginGesture(); assert.equal(c.getSnapshot().phase, 'gesture');
+  c.updateGesture([{ ...opacity, opacity: 80 }]); c.endGesture(true);
+  assert.deepEqual(c.getSnapshot().changes, edited.changes);
+  await request(c, 'undo'); assert.equal(c.getSnapshot().dirty, false);
+  await request(c, 'redo'); assert.deepEqual(c.getSnapshot().changes, edited.changes);
+  const saved = await request(c, 'commit');
+  assert.equal(saved.state.dirty, false); assert.equal(saved.state.changes.length, 0);
+  assert.equal(saved.state.baseRevision, 'saved-2');
+  assert.notEqual(saved.state.draftId, first.draftId);
+});
+
+test('indexed thousand-layer sequences preserve ID targeting, order and atomic history', async () => {
+  const ir = fixture();
+  ir.parts = Array.from({ length: 1000 }, (_, i) => ({ ...structuredClone(ir.parts[0]),
+    id: i === 999 ? '__proto__' : `id-${1000 - i}`, name: `layer-${i}`, z: 999 - i }));
+  const c = new DraftController(async p => ({ ir: p.ir, revision: 'saved-2' }), () => {}, () => 'large');
+  c.install(ir, 'saved-1');
+  const batch = [0, 499, 999].map(i => ({ type: 'set_landmark', partId: ir.parts[i].id, name: 'center', point: [i % 100, 30] }));
+  const applied = await request(c, 'apply', batch); assert.equal(applied.ok, true);
+  assert.deepEqual(applied.state.ir.parts.map(p => [p.id, p.z]), ir.parts.map(p => [p.id, p.z]));
+  assert.deepEqual(applied.state.changes.map(change => change.partId), batch.map(command => command.partId));
+  for (const command of batch) assert.deepEqual(applied.state.ir.parts.find(p => p.id === command.partId).geometry.landmarks.center, command.point);
+  const before = c.getSnapshot();
+  const rejected = await request(c, 'apply', [{ type: 'set_opacity', partId: ir.parts[0].id, opacity: 20 }, { type: 'set_opacity', partId: 'missing', opacity: 20 }]);
+  assert.equal(rejected.ok, false); assert.equal(c.getSnapshot(), before);
+  await request(c, 'undo'); assert.deepEqual(c.getSnapshot().ir, ir);
+  await request(c, 'redo'); assert.deepEqual(c.getSnapshot().ir, applied.state.ir);
+  c.beginGesture(); c.updateGesture([{ ...batch[2], point: [90, 40] }]); c.endGesture(true);
+  assert.deepEqual(c.getSnapshot().ir, applied.state.ir);
+  await request(c, 'discard'); assert.deepEqual(c.getSnapshot().ir, ir);
+  assert.equal(c.getSnapshot().canUndo, false); assert.equal(c.getSnapshot().canRedo, false);
+  const reordered = { ...ir, parts: [...ir.parts].reverse() };
+  assert.deepEqual(require(path.join(output, 'commands.js')).diffArtwork(ir, reordered), []);
+});

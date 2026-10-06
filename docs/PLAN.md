@@ -1,6 +1,6 @@
 # 开发计划与当前状态
 
-更新于 2026-10-05。目标是完成 PSD 编辑、素材导入、Live2D 重建和验证这些软件功能。角色素材只作为测试样本，不要求逐类制作完整角色。
+更新于 2026-10-07。目标是完成 PSD 编辑、素材导入、Live2D 重建和验证这些软件功能。角色素材只作为测试样本，不要求逐类制作完整角色。
 
 设计参考：[Mesh Avatar Studio](https://github.com/shinshin86/mesh-avatar-studio)。安装与使用见 [环境说明](environment.md) 和 [Studio 使用说明](../studio/README.md)；历史验证记录见 [HANDOFF.md](HANDOFF.md)。
 
@@ -11,6 +11,8 @@ R1a 已完成浏览器预览适配器、参数按帧重绘和模型来源标识�
 R1b 已实现人和 Agent 共用的编辑命令与草稿事务：版本检查、批量原子应用、逐字段差异、撤销/重做、拖拽合并、保存/放弃，以及浏览器结构化入口和离线 JSON 提案工具。Linux 构建及 19 项回归通过，Chromium 使用固定 API 响应验证人/Agent 交替编辑；调用契约见 [STUDIO_DRAFT_COMMANDS.md](STUDIO_DRAFT_COMMANDS.md)，交接见第 21 节。R1c 已补充即时合成，原生 Agent 联动尚未实施。
 
 R1c 已实现 Worker 像素合成、当前草稿/已保存美术/原始参照对照与带版本的 Agent PNG 读取。Linux 构建、37 项回归及 Chromium 桌面/手机宽度交互通过；原生链未改动。R1 之后的工程审阅与下一步优先级见 [ENGINEERING_REVIEW_R1.md](ENGINEERING_REVIEW_R1.md)，交接见第 22 节。
+
+E1a 已实现图层 ID 索引、轻量内部 token、差异缓存和稳定只读订阅快照，公开 v1 命令及独立响应保持兼容。Windows Node 24.19.0 构建与 39 项回归通过；Edge 154 使用真实 Python 工作区验证隐藏/撤销/裁切、保存/刷新及 PNG 逐像素一致。1000 图层合成样本的编辑中位耗时由 27.774 ms 降至 15.620 ms；测量范围及尚未处理的历史/渲染预算见工程审阅和交接第 23 节。
 
 ## 0. 数据与实现边界
 
