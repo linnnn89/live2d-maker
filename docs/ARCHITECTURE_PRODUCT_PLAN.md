@@ -238,3 +238,5 @@ R1c 的 Linux 构建与 37 项回归通过；像素样本使用现有 Python ras
 同日完成 E4：工作区稳定 ID 及旧状态迁移、增量草稿检查点、明确恢复/基线冲突差异/部分兼容重放、旧记录导出和多标签页保护。构建、51 项回归、5 项 Python Studio 回归及真实 Edge 重启恢复/存储失败重试/PNG 对照通过。当前草稿恢复为一个新编辑步骤，不恢复旧撤销栈；磁盘保存仍需明确提交。继续 E5 用例与桥接提取、E6/R2–R8 原生及产品迭代。
 
 同日完成 E5：工作区用例与画布/图层/点编辑/差异组件提取，Node transport/runner/resources 独立并可注入验证。构建及 54 项回归、实际 Edge 编辑/保存/导入/原生重建/Cubism 参数/16 姿态 QA 通过；保留原生警告，未修改引擎算法或建立后台任务服务。接续 E6/R2–R8；详情见工程审阅 E5 与交接第 28 节。
+
+同日继续完成 E6a：显式 Kotlin AuthoringPipelineFacade 和版本化 JSON 构建 DTO 替代 Python 配置字段顺序反射；随仓 JAR/哈希同步更新。源码构建、205 项 Kotlin 回归及额外实际 DLL GPU 渲染、旧/新模型签名与完整产物对照、实际 Edge Overlay/Studio 重建通过。E6 的签名分层/WorkspaceService 和 R2–R8 剩余内容继续推进，详情见工程审阅 E6a 与交接第 29 节。
