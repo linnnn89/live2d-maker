@@ -1,8 +1,9 @@
 import type { useArtworkEditing } from './useArtworkEditing';
 import { SemanticInspector } from './SemanticInspector';
+import { assetUrl } from '../project/paths';
 export function PointInspector({editing}:{editing:ReturnType<typeof useArtworkEditing>}){
   const {part,canvasLocked,currentPoint,active,setActive,changePoint,landmarkName,setLandmarkName}=editing;
-  return <><div className="inspector"><span className="muted">已选图层</span>{part && <><img src={'/studio-files/' + part.asset.path} alt=""/><strong>{part.name}</strong></>}
+  return <><div className="inspector"><span className="muted">已选图层</span>{part && <><img src={assetUrl(part.asset.path)} alt=""/><strong>{part.name}</strong></>}
           <label>X <input aria-label="顶点 X" type="number" step="0.01" disabled={canvasLocked || !currentPoint} value={currentPoint?.[0] ?? ''} onChange={e => { if (active && currentPoint && Number.isFinite(e.target.valueAsNumber)) changePoint(active, [e.target.valueAsNumber, currentPoint[1]]); }}/></label>
           <label>Y <input aria-label="顶点 Y" type="number" step="0.01" disabled={canvasLocked || !currentPoint} value={currentPoint?.[1] ?? ''} onChange={e => { if (active && currentPoint && Number.isFinite(e.target.valueAsNumber)) changePoint(active, [currentPoint[0], e.target.valueAsNumber]); }}/></label>
         </div><SemanticInspector/>

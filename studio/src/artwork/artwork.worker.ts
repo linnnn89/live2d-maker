@@ -7,8 +7,9 @@ import { MemoryBudget } from './MemoryBudget';
 import { checkCancelled } from './content';
 import { errorDetail } from '../protocol';
 
-type Job = { id: number; kind: 'render' | 'capture' | 'cancel' | 'ack'; ir: ArtworkIR };
-const memory=new MemoryBudget(), renderer=new ArtworkRenderer(new AssetCache(fetchAsset,memory).acquire,memory);
+type Job = { id: number; kind: 'render' | 'capture' | 'cancel' | 'ack'; ir: ArtworkIR; assetPrefix?:string };
+let assetPrefix:string|undefined;
+const memory=new MemoryBudget(), renderer=new ArtworkRenderer(new AssetCache((part,signal)=>fetchAsset(part,signal,assetPrefix||''),memory).acquire,memory);
 let active: {id:number;controller:AbortController}|null=null;
 const outbound=new Map<number,()=>void>();
 const sendError=(id:number,error:unknown)=>postMessage({id,ok:false,metrics:renderer.stats,error:errorDetail(error,'RENDER_FAILED','artwork')});
@@ -17,6 +18,9 @@ onmessage=(event:MessageEvent<Job>)=>{
   const job=event.data;
   if(job.kind==='ack'){outbound.get(job.id)?.();outbound.delete(job.id);return;}
   if(job.kind==='cancel'){if(active?.id===job.id)active.controller.abort();return;}
+  const prefix=job.assetPrefix||'';
+  if(prefix!==''&&!/^\/projects\/[a-f0-9]{32}$/.test(prefix)||assetPrefix!==undefined&&prefix!==assetPrefix){sendError(job.id,new ArtworkError('ASSET_PATH','美术线程的工程资源身份不一致'));return;}
+  assetPrefix=prefix;
   if(active){sendError(job.id,new ArtworkError('BACKEND_BUSY','美术合成正在执行'));return;}
   const controller=new AbortController();active={id:job.id,controller};
   void (async()=>{

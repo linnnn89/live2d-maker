@@ -14,10 +14,11 @@ const output=mkdtempSync(path.join(tmpdir(),'studio-bridge-test-'));
 symlinkSync(path.join(studio,'node_modules'),path.join(output,'node_modules'),'junction');
 after(()=>rmSync(output,{recursive:true,force:true}));
 const compile=spawnSync(process.execPath,[path.join(studio,'node_modules/typescript/bin/tsc'),'--target','ES2022',
-  '--module','commonjs','--esModuleInterop','--strict','--skipLibCheck','--outDir',output,'bridge/runner.ts','bridge/transport.ts'],{cwd:studio,encoding:'utf8'});
+  '--module','commonjs','--esModuleInterop','--strict','--skipLibCheck','--outDir',output,'bridge/runner.ts','bridge/transport.ts','bridge/projects.ts'],{cwd:studio,encoding:'utf8'});
 assert.equal(compile.status,0,compile.stdout+compile.stderr);
 const require=createRequire(import.meta.url),{createRunner}=require(path.join(output,'bridge/runner.js'));
 const {createTransport}=require(path.join(output,'bridge/transport.js'));
+const {createProjectTransport}=require(path.join(output,'bridge/projects.js'));
 const snapshot={schemaVersion:1,workspaceId:'0'.repeat(32),status:'ok',revision:'base',ir:{canvas:{width:2,height:2},parts:[]},
   stale:{},overlay:{status:'not-loaded',reasons:[]},sourceImage:'/studio-files/source.png',sourceBounds:null,artworkBounds:null,build:null,qa:null};
 const config=()=>({repo,workspace:path.join(output,'workspace'),python:path.join(repo,'python/Scripts/python.exe'),port:0,env:{}});
@@ -103,4 +104,28 @@ test('build settings transport validates the versioned preference contract and p
     const denied=await fetch(service.url+'/api/build-settings',{method:'POST',body:JSON.stringify(payload)});
     assert.equal(denied.status,409);assert.equal((await denied.json()).detail.code,'SETTINGS_CONFLICT');
   }finally{await service.close();}
+});
+
+test('project transport pins independent page roots and resources and rejects unregistered or redirected projects',async()=>{
+  const localRepo=path.join(output,'catalog-repo'), catalog=path.join(localRepo,'out/studio-projects');
+  const ids=['a'.repeat(32),'b'.repeat(32)];
+  for(const id of ids){const root=path.join(catalog,id);mkdirSync(root,{recursive:true});writeFileSync(path.join(root,'studio-state.json'),JSON.stringify({projectId:id}));writeFileSync(path.join(root,'source.json'),JSON.stringify({id}));}
+  let handle;const server=createServer((req,res)=>void handle(req,res,()=>{res.writeHead(404);res.end();}));
+  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+  const c={...config(),repo:localRepo,port:server.address().port};const calls=[];
+  handle=createProjectTransport(c,configuration=>async(command,payload)=>{calls.push({workspace:configuration.workspace,command,payload});return command==='studio-catalog'?{schemaVersion:1,projects:[]}:snapshot;});
+  const url=`http://127.0.0.1:${c.port}`;
+  try{
+    const catalogResponse=await fetch(url+'/api/catalog',{method:'POST',body:JSON.stringify({schemaVersion:1,operation:'list'})});assert.equal(catalogResponse.status,200);
+    assert.equal(calls[0].workspace,catalog);
+    for(const id of [...ids,ids[0]]){
+      const response=await fetch(url+`/projects/${id}/api/open`,{method:'POST'});assert.equal(response.status,200);assert.equal(calls.at(-1).workspace,path.join(catalog,id));
+      assert.deepEqual(await (await fetch(url+`/projects/${id}/studio-files/source.json`)).json(),{id});
+    }
+    assert.equal((await fetch(url+'/projects/'+('c'.repeat(32))+'/api/open',{method:'POST'})).status,404);
+    const external=path.join(output,'external-project');mkdirSync(external);writeFileSync(path.join(external,'studio-state.json'),JSON.stringify({projectId:'d'.repeat(32)}));symlinkSync(external,path.join(catalog,'d'.repeat(32)),'junction');
+    assert.equal((await fetch(url+'/projects/'+('d'.repeat(32))+'/api/open',{method:'POST'})).status,404);
+    const rejected=await fetch(url+`/projects/${ids[0]}/api/project-restore`,{method:'POST',body:JSON.stringify({schemaVersion:1,revision:'r',settingsRevision:'0'.repeat(64),head:ids[0],id:'../other'})});assert.equal(rejected.status,400);
+    const denied=await fetch(url+`/projects/${ids[0]}/api/open`,{method:'POST',headers:{Origin:'https://example.test'}});assert.equal(denied.status,403);
+  }finally{await new Promise(resolve=>server.close(resolve));}
 });

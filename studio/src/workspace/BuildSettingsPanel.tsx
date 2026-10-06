@@ -4,11 +4,12 @@ import { validateProtocol } from '../protocol';
 import { useWorkspace } from './WorkspaceContext';
 
 export function BuildSettingsPanel() {
-  const { saved, dirty, editingLocked, saveBuildSettings, readBuildSettings, setError } = useWorkspace();
+  const { saved, dirty, editingLocked, saveBuildSettings, readBuildSettings, setError, setSettingsPending } = useWorkspace();
   const [form, setForm] = useState<BuildSettingsState | null>(null);
   const current = saved?.buildSettings;
   useEffect(() => { setForm(current ? structuredClone(current) : null); }, [saved?.workspaceId, current?.revision]);
   const pending = !!form && JSON.stringify(form.settings) !== JSON.stringify(current?.settings);
+  useEffect(()=>{setSettingsPending(pending);return()=>setSettingsPending(false);},[pending,setSettingsPending]);
   useEffect(() => {
     if (!pending) return;
     const warn = (event: BeforeUnloadEvent) => event.preventDefault();

@@ -147,6 +147,15 @@ def cmd_import_generated(args):
 def cmd_studio(args):
     from authoring_rig.studio import (open_workspace, snapshot, save_workspace, rebuild_workspace,
                                      qa_workspace, preview_generated, commit_generated, save_build_settings)
+    from authoring_rig.projects import recover_project, save_project, restore_project, revision_list, pack_archive, create_project, list_projects
+    if args.command == "studio-catalog":
+        request = json.load(sys.stdin)
+        from authoring_rig.studio_protocol import validate_protocol
+        validate_protocol("ProjectCatalogRequest", request)
+        result = list_projects(args.workspace) if request["operation"] == "list" else create_project(args.workspace, request["input"])
+        validate_protocol("ProjectCatalog" if request["operation"] == "list" else "ProjectCreateResult", result)
+        print(json.dumps(result, ensure_ascii=False, allow_nan=False)); return 0
+    recover_project(args.workspace)
     if args.command == "studio-open":
         result = open_workspace(args.workspace, args.ir, args.psd, args.overlay, args.overlay_baseline)
     elif args.command == "studio-snapshot":
@@ -155,6 +164,14 @@ def cmd_studio(args):
         result = save_workspace(args.workspace, json.load(sys.stdin))
     elif args.command == "studio-build-settings":
         result = save_build_settings(args.workspace, json.load(sys.stdin))
+    elif args.command == "studio-project-save":
+        result = save_project(args.workspace, json.load(sys.stdin))
+    elif args.command == "studio-project-restore":
+        result = restore_project(args.workspace, json.load(sys.stdin))
+    elif args.command == "studio-project-revisions":
+        result = revision_list(args.workspace)
+    elif args.command == "studio-project-archive":
+        result = pack_archive(args.workspace)
     elif args.command == "studio-rebuild":
         result = rebuild_workspace(args.workspace)
     elif args.command == "studio-import-preview":
@@ -167,7 +184,9 @@ def cmd_studio(args):
     result["schemaVersion"] = 1
     # Validate the JSON wire value: Pillow returns tuple bounds, serialized as arrays.
     result = json.loads(json.dumps(result, ensure_ascii=False, allow_nan=False))
-    validate_protocol("ImportPreview" if args.command == "studio-import-preview" else "Snapshot", result)
+    response_type = {"studio-import-preview": "ImportPreview", "studio-project-save": "ProjectRevisions",
+                     "studio-project-revisions": "ProjectRevisions", "studio-project-archive": "ProjectDownload"}.get(args.command, "Snapshot")
+    validate_protocol(response_type, result)
     print(json.dumps(result, indent=2, ensure_ascii=False, allow_nan=False))
     return 0
 
@@ -236,7 +255,8 @@ def main():
     p_replay.set_defaults(func=cmd_native)
 
     for command in ("studio-open", "studio-snapshot", "studio-save", "studio-rebuild", "studio-qa",
-                    "studio-import-preview", "studio-import-commit", "studio-build-settings"):
+                      "studio-import-preview", "studio-import-commit", "studio-build-settings", "studio-catalog",
+                      "studio-project-save", "studio-project-restore", "studio-project-revisions", "studio-project-archive"):
         studio = sub.add_parser(command, help="Local Studio workspace operation")
         studio.add_argument("--workspace", required=True)
         if command == "studio-open":

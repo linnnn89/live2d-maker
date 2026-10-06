@@ -750,3 +750,15 @@ footer>div{
 .build-settings input { width:90px; }
 .settings-actions { display:flex; flex-wrap:wrap; gap:6px; }
 .settings-actions button { font-size:12px; padding:6px 8px; }
+.project-start { width:min(840px,100%); margin:0 auto; padding:24px; overflow-y:auto; }
+.project-start .panel { padding:20px; margin:18px 0; }
+.project-start fieldset { border:0; padding:0; display:flex; flex-direction:column; gap:16px; }
+.project-start label { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+.project-start input { min-width:0; max-width:100%; }
+.project-start li { margin:12px 0; overflow-wrap:anywhere; }
+.project-panel { padding:10px 12px; background:white; border:1px solid #dfe7f1; border-radius:8px; font-size:13px; flex-shrink:0; }
+.project-panel summary { font-weight:600; cursor:pointer; }
+.project-panel input { max-width:100%; }
+.project-panel ul { max-height:240px; overflow-y:auto; padding-left:18px; }
+.project-panel li { margin:10px 0; overflow-wrap:anywhere; }
+.preview-panel { min-height:220px; flex-shrink:0; }

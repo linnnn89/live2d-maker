@@ -3,6 +3,7 @@ import { api, ApiError } from '../api';
 import { DraftController } from '../editor/DraftController';
 import type { EditCommand } from '../editor/contracts';
 import type { Snapshot } from '../protocol';
+import type { ProjectRevisions } from '../protocol/generated';
 import type { BuildSettings } from '../protocol/generated';
 
 /** Owns open/save/native-operation gates; views use the same editor and saved baseline. */
@@ -13,6 +14,7 @@ export function useWorkspaceActions() {
   const [selected,setSelected]=useState('');
   const [busy,setBusy]=useState('正在打开工作区…');
   const [message,setMessage]=useState(''),[error,setError]=useState('');
+  const [settingsPending,setSettingsPending]=useState(false);
   const [showQa,setShowQa]=useState(false),[showImport,setShowImport]=useState(false),[openAttempt,setOpenAttempt]=useState(0);
   const editingLocked=!!busy||draft?.phase!=='idle';
   const apply=(snapshot:Snapshot)=>{setSaved(snapshot);editor.install(snapshot.ir,snapshot.revision);};
@@ -114,6 +116,24 @@ export function useWorkspaceActions() {
     catch (failure) { setError(failure instanceof Error ? failure.message : String(failure)); }
     finally { editor.setBlocked(false); setBusy(''); }
   }
+  async function saveProject(head:string,message:string):Promise<ProjectRevisions|null> {
+    if(!saved||editingLocked||settingsPending)return null;
+    setBusy('正在保存工程修订…');setError('');
+    try {
+      let current=saved;
+      if(dirty){const result=await editor.execute({schemaVersion:1,operation:'commit',state:draft!});if(!result.ok)throw new Error(result.error.message);current=result.saved||current;}
+      editor.setBlocked(true);
+      const result=await api<ProjectRevisions>('project-save',{schemaVersion:1,revision:current.revision,settingsRevision:current.buildSettings!.revision,head,message});
+      setMessage('工程修订已保存');return result;
+    }catch(e){setError(e instanceof Error?e.message:String(e));return null;}finally{editor.setBlocked(false);setBusy('');}
+  }
+  async function restoreProject(head:string,id:string):Promise<boolean> {
+    if(!saved||editingLocked||dirty||settingsPending)return false;
+    editor.setBlocked(true);setBusy('正在恢复工程修订…');setError('');
+    try{apply(await api<Snapshot>('project-restore',{schemaVersion:1,revision:saved.revision,settingsRevision:saved.buildSettings!.revision,head,id}));setMessage('已恢复修订；恢复前状态保留为新修订');return true;}
+    catch(e){setError(e instanceof Error?e.message:String(e));return false;}finally{editor.setBlocked(false);setBusy('');}
+  }
   return {saved,editor,draft,ir,dirty,selected,setSelected,busy,message,error,setMessage,setError,editingLocked,
-    showQa,setShowQa,showImport,openImport,closeImport,commitImport,retryOpen,action,edit,history,saveBuildSettings,readBuildSettings};
+    showQa,setShowQa,showImport,openImport,closeImport,commitImport,retryOpen,action,edit,history,saveBuildSettings,readBuildSettings,
+    settingsPending,setSettingsPending,setBusy,saveProject,restoreProject};
 }

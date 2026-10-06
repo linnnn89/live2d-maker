@@ -5,7 +5,9 @@ export class ApiError extends ProtocolError {
 }
 
 export async function api<T>(route: string, payload?: unknown, signal?: AbortSignal): Promise<T> {
-  const response = await fetch('/api/' + route, {
+  const project = new URLSearchParams(typeof window === 'undefined' ? '' : window.location.search).get('project');
+  const prefix = route !== 'catalog' && project && /^[a-f0-9]{32}$/.test(project) ? '/projects/'+project : '';
+  const response = await fetch(prefix+'/api/' + route, {
     method: route === 'snapshot' ? 'GET' : 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: payload ? JSON.stringify(payload) : undefined,
@@ -15,6 +17,10 @@ export async function api<T>(route: string, payload?: unknown, signal?: AbortSig
   try { data = await response.json(); }
   catch { throw new ProtocolError('PROTOCOL_ERROR', '服务端返回无效 JSON', 'transport'); }
   if (!response.ok) throw new ApiError(backendError(data, response.status, route), response.status);
-  validateProtocol(route === 'import-preview' ? 'ImportPreview' : 'Snapshot', data, 'PROTOCOL_ERROR', route);
+  const responseType = route === 'catalog' ? ((payload as {operation:string}).operation === 'list' ? 'ProjectCatalog' : 'ProjectCreateResult')
+    : route === 'import-preview' ? 'ImportPreview'
+    : ['project-save','project-revisions'].includes(route) ? 'ProjectRevisions'
+    : route === 'project-archive' ? 'ProjectDownload' : 'Snapshot';
+  validateProtocol(responseType, data, 'PROTOCOL_ERROR', route);
   return data as T;
 }

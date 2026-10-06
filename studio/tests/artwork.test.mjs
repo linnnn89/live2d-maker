@@ -14,7 +14,7 @@ symlinkSync(path.join(root, 'node_modules'), path.join(output, 'node_modules'), 
 after(() => rmSync(output, { recursive: true, force: true }));
 const compiled = spawnSync(process.execPath, [path.join(root, 'node_modules/typescript/bin/tsc'),
   '--target', 'ES2022', '--module', 'commonjs', '--lib', 'ES2022,DOM', '--strict', '--skipLibCheck',
-  '--outDir', output, 'src/artwork/ArtworkRenderer.ts', 'src/artwork/capture.ts', 'src/editor/DraftController.ts'], { cwd: root, encoding: 'utf8' });
+  '--outDir', output, 'src/artwork/ArtworkRenderer.ts', 'src/artwork/capture.ts', 'src/editor/DraftController.ts', 'src/project/paths.ts'], { cwd: root, encoding: 'utf8' });
 assert.equal(compiled.status, 0, compiled.stdout + compiled.stderr);
 const require = createRequire(import.meta.url);
 const { ArtworkRenderer } = require(path.join(output, 'artwork/ArtworkRenderer.js'));
@@ -29,6 +29,7 @@ for (const name of ['png', 'AssetCache', 'ArtworkClient']) {
     .replaceAll("from './MemoryBudget'", "from './MemoryBudget.js'")
     .replaceAll("from './content'", "from './content.js'")
     .replaceAll("from '../protocol'", "from '../protocol/index.js'")
+    .replaceAll("from '../project/paths'", "from '../project/paths.js'")
     .replaceAll("from 'fflate'", `from ${JSON.stringify(pathToFileURL(path.join(root, 'node_modules/fflate/esm/index.mjs')).href)}`)
     .replaceAll("from 'fast-png'", `from ${JSON.stringify(pathToFileURL(path.join(root, 'node_modules/fast-png/lib/index.js')).href)}`);
   writeFileSync(path.join(output, `artwork/${name}.mjs`), code);

@@ -2,6 +2,7 @@ import type { ArtworkIR, DraftFailure } from '../editor/contracts';
 import { ArtworkError, type PixelFrame, type PngFrame } from './contracts';
 import { MAX_CAPTURES, MAX_IR_BYTES } from './MemoryBudget';
 import { ProtocolError } from '../protocol';
+import { projectPrefix } from '../project/paths';
 
 type Job = { id: number; kind: 'render' | 'capture'; ir: ArtworkIR; cancelled?: boolean;
   resolve(value: PixelFrame | PngFrame): void; reject(error: unknown): void };
@@ -54,7 +55,7 @@ export class ArtworkClient {
   private pump(): void {
     if (this.active || !this.queue.length || !this.worker) return;
     this.active=this.queue.shift()!;
-    try { this.worker.postMessage({ id:this.active.id,kind:this.active.kind,ir:this.active.ir }); }
+    try { this.worker.postMessage({ id:this.active.id,kind:this.active.kind,ir:this.active.ir,assetPrefix:projectPrefix() }); }
     catch(error) { this.active.reject(error);this.active=null;this.pump(); }
   }
   private rejectAll(error: Error): void { this.active?.reject(error); for(const job of this.queue)job.reject(error); this.active=null;this.queue=[]; }

@@ -3,7 +3,7 @@ import path from 'node:path';
 import {ProtocolError,backendError,validateProtocol} from '../src/protocol';
 export type BridgeConfig={repo:string;workspace:string;python:string;port:number;env:NodeJS.ProcessEnv};
 export type StudioRunner=(command:string,payload?:string)=>Promise<unknown>;
-const allowed=new Set(['studio-open','studio-snapshot','studio-save','studio-rebuild','studio-qa','studio-import-preview','studio-import-commit','studio-build-settings']);
+const allowed=new Set(['studio-open','studio-snapshot','studio-save','studio-rebuild','studio-qa','studio-import-preview','studio-import-commit','studio-build-settings','studio-catalog','studio-project-save','studio-project-restore','studio-project-revisions','studio-project-archive']);
 export function createRunner(config:BridgeConfig,launch:typeof spawn=spawn):StudioRunner {
  const {repo,workspace,python,port,env}=config;
  return function run(command: string, payload?: string): Promise<unknown> {
@@ -28,7 +28,11 @@ export function createRunner(config:BridgeConfig,launch:typeof spawn=spawn):Stud
           const detail = backendError(result, 400, command);
           reject(new ProtocolError(detail.code, detail.message, detail.stage, detail.retryable, detail.partId, detail.field));
         } else {
-          validateProtocol(command === 'studio-import-preview' ? 'ImportPreview' : 'Snapshot', result, 'CLI_PROTOCOL_ERROR', command);
+          const responseType = command === 'studio-catalog' ? (JSON.parse(payload!).operation === 'list' ? 'ProjectCatalog' : 'ProjectCreateResult')
+            : command === 'studio-import-preview' ? 'ImportPreview'
+            : ['studio-project-save','studio-project-revisions'].includes(command) ? 'ProjectRevisions'
+            : command === 'studio-project-archive' ? 'ProjectDownload' : 'Snapshot';
+          validateProtocol(responseType, result, 'CLI_PROTOCOL_ERROR', command);
           resolve(result);
         }
       } catch (error) { reject(error instanceof ProtocolError ? error : new ProtocolError('CLI_PROTOCOL_ERROR', `CLI returned invalid JSON: ${stderr || String(error)}`, command)); }
