@@ -126,3 +126,5 @@ CLI 和界面不调用生成 API，不自动绘制 mask，也不处理全尺寸�
 技能包独立发布检查仍有 vendor 台账 TODO 与真实 Agent 行为评测未运行，状态分别保存在 [vendor 台账](../skills/live2d-studio/references/vendor-manifest.md) 和 [行为评测记录](../skills/live2d-studio/tests/behavior-evaluation.json)。它们不代表已交付的本地软件功能失效，也不应被结构校验结果替代。
 
 同日完成 E5：工作区用例与画布/图层/点编辑/差异组件提取，Node transport/runner/resources 独立并可注入验证。构建及 54 项回归、实际 Edge 编辑/保存/导入/原生重建/Cubism 参数/16 姿态 QA 通过；保留原生警告，未修改引擎算法或建立后台任务服务。接续 E6/R2–R8；详情见工程审阅 E5 与交接第 28 节。
+
+同日继续完成 E6a：显式 Kotlin AuthoringPipelineFacade 和版本化 JSON 构建 DTO 替代 Python 配置字段顺序反射；随仓 JAR/哈希同步更新。源码构建、205 项 Kotlin 回归及额外实际 DLL GPU 渲染、旧/新模型签名与完整产物对照、实际 Edge Overlay/Studio 重建通过。E6 的签名分层/WorkspaceService 和 R2–R8 剩余内容继续推进，详情见工程审阅 E6a 与交接第 29 节。

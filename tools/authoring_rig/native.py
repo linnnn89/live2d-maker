@@ -34,6 +34,8 @@ def start_native(native_jar=None):
         with ZipFile(source_jar) as archive:
             if "io/github/psd2live/core/PSD2LivePipeline.class" not in archive.namelist():
                 raise ValueError("native-jar must be a built PSD2Live application JAR")
+            if "io/github/psd2live/core/AuthoringPipelineFacade.class" not in archive.namelist():
+                raise ValueError("Application JAR lacks AuthoringPipelineFacade; rebuild current source or use the current bundled JAR")
         # Replace only the application; dependency JARs and JVM remain pinned and untouched.
         jars = [source_jar] + [p for p in jars if not p.name.startswith("psd2live-")]
     resources = ROOT / "dependencies/native/cubism-runtime.jar"
@@ -87,23 +89,10 @@ def plain(obj, jp):
 
 
 def config_for(jp, overlay=None):
-    config = jp.JClass("io.github.psd2live.core.PipelineConfig")()
-    # Fixed configuration is part of the native-baseline contract; no dynamic option copying.
-    overrides = {"atlasSize": jp.JInt(2048), "meshSpacing": jp.JInt(24),
-                 "generatePhysics": jp.JBoolean(False), "exportCmo3": jp.JBoolean(False),
-                 "exportMotions": jp.JBoolean(False)}
-    if overlay is not None:
-        overrides["rigEdits"] = overlay
-        if overlay.getPhysicsEdits():
-            overrides.update({"generatePhysics": jp.JBoolean(True), "physicsFrontHair": jp.JBoolean(False),
-                              "physicsBackHair": jp.JBoolean(False), "physicsEyeJelly": jp.JBoolean(False)})
-    args = []
-    for field in config.getClass().getDeclaredFields():
-        if jp.JClass("java.lang.reflect.Modifier").isStatic(field.getModifiers()):
-            continue
-        field.setAccessible(True)
-        args.append(overrides.get(str(field.getName()), field.get(config)))
-    return config.copy(*args)
+    if overlay is None:
+        overlay_class = jp.JClass("io.github.psd2live.core.RigEditOverlay")
+        overlay = overlay_class.class_.getField("Companion").get(None).getEmpty()
+    return jp.JClass("io.github.psd2live.core.AuthoringPipelineFacade").configuration("{}", overlay)
 
 
 def native_objects(model):
@@ -149,7 +138,7 @@ def export_native(pipeline, psd, out, config, jp):
 def native_base(psd, out, native_jar=None):
     out = empty_output(out)
     jp, runtime = start_native(native_jar)
-    pipeline = jp.JClass("io.github.psd2live.core.PSD2LivePipeline")()
+    pipeline = jp.JClass("io.github.psd2live.core.AuthoringPipelineFacade")()
     result = export_native(pipeline, psd, out, config_for(jp), jp)
     evidence = snapshot(result.getPreviewModel(), runtime, jp)
     evidence["warnings"] = [str(v) for v in result.getWarnings()]
@@ -466,7 +455,7 @@ def native_replay(psd, overlay_file, baseline_file, out, native_jar=None):
         fields = {str(field.getName()) for field in jp.JClass("io.github.psd2live.core.RigEditOverlay").class_.getDeclaredFields()}
         if "authoringJournal" not in fields:
             return {"status": "needs-review", "action": "native-replay", "reasons": ["Selected application lacks source authoring capabilities"], "applied": False}
-    pipeline = jp.JClass("io.github.psd2live.core.PSD2LivePipeline")()
+    pipeline = jp.JClass("io.github.psd2live.core.AuthoringPipelineFacade")()
     path = jp.JClass("java.nio.file.Paths").get(str(Path(psd).resolve()))
     preview = pipeline.buildPreview(path, config_for(jp))
     current = snapshot(preview, runtime, jp)

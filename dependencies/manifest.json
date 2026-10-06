@@ -104,8 +104,8 @@
   ],
   "nativeJar": {
     "file": "native/psd2live-0.7.1.jar",
-    "bytes": 5839104,
-    "sha256": "34c4b9ee31a3955c020dc4bce7357f8287d7f68d5b6174918acbb6926592ce9d",
+    "bytes": 6254633,
+    "sha256": "3a35d360e46124a8c2eaef3bdcbb2dbd1d0e5fdafe380eab5413741cd0e6e06b",
     "source": "psd2live/ source in this repository",
     "license": "GPL-3.0"
   },

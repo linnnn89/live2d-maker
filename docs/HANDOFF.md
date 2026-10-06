@@ -228,3 +228,15 @@ Node 桥接拆成 transport、runner、resources；Vite 只组合配置/插件�
 新增三个契约测试覆盖 HTTP 校验/并发与失败释放、真实文件和 junction 越界/HEAD、CLI 参数/响应失败及实际 Windows Python snapshot。构建与 54 项回归通过。真实 Edge 154 验证图层搜索/显示/撤销重做/放弃、真实拖点一次历史、坐标编辑/差异/显示来源锁、保存和 PNG 与 Python 逐像素一致、导入期间 Agent BUSY/取消解锁、预检不写 IR/确认增加至 25 层。实际 Kotlin 重建成功，导出审计 30 层、保留 17 条既有原生偏差等警告；Cubism 就绪后键盘调整 ParamAngleX，实际 Pose QA 16 姿态成功并展示结果。桌面/窄屏无溢出，结束验收无页面/控制台错误；证据在 out/e5-evidence/。首次参数验收脚本填充值不符合 range 步长，改用实际键盘操作，仅续验未完成流程。
 
 未加依赖或改生产 Python/Kotlin。Vite 8.3.2 现有 loader 构建/启动正常，未来 native loader 扩展名提示仍保留；后续切换 loader 时按版本处理。E6/R2–R8 继续推进。
+
+## 29. E6a：原生配置门面（2026-10-07）
+
+基于 E5 PR #13，main@6945ee3。AuthoringPipelineFacade 是无 UI 依赖的 inspect/buildPreview/run 入口；AuthoringBuildConfig JSON DTO 版本 1 明确 atlasSize、meshSpacing、generatePhysics、exportCmo3、exportMotions。拒绝未知字段/版本和非正尺寸；当前 Python 仍传空配置采用固定预览默认值，不声称已有产品构建设置界面。Kotlin 通过命名参数构造 PipelineConfig，Python config_for 不再遍历 declared fields 或按字段顺序 copy。显式 physics Overlay 保持启用指定物理/禁用默认 hair/eye 规则。
+
+随仓应用 JAR 和 dependencies/manifest.json 同步更新，安装器 DryRun 哈希校验通过。自选旧应用 JAR 缺少门面时，在启动 JVM 前明确拒绝并提示重建/使用当前包；旧 Overlay baseline 因 runtime hash 不同仍需重新核对，不自动放宽兼容判定。模型 getter/Overlay 转换的既有反射仍存在，本轮只移除配置顺序耦合。
+
+本机缓存 JDK 21/Gradle 9.6.1 源码构建成功；离线首次测试缺固定测试依赖，随后正常解析仓库已声明依赖，未安装全局工具或新运行时。新增三个 Kotlin 配置/错误/物理规则契约测试。Kotlin 全套 205 项、0 失败/错误、1 跳过；额外启用 CubismNativeRuntimeTest，实际 DLL 在 AMD GPU 上加载并渲染 ±20 参数成功。
+
+使用同一 ds PSD，对照旧包/旧配置与新门面：完整模型签名、66 个对象、warnings 一致，所有模型/纹理/分类导出文件逐字节一致。实际 Edge Cubism 中 neutral/X+30 像素一致，geometry/channels/physics Overlay 重放成功，指定 X+30 opacity 改动产生 3571 个变化像素；physics3 仅含一条指定规则，不声称已验收实时物理播放。Studio 实际 Rebuild/模型就绪通过。证据在 out/e6-evidence/；Python 全套 19 项通过，包含实际默认随仓 JAR 的 native-base/replay、拒绝非法 Overlay、Cubism 图像和临时 PSD 往返。
+
+E6 仍有注记与构建签名分层、WorkspaceService 提取等内容，R2 的 ID/语义映射和后续产品迭代未完成。

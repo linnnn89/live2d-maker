@@ -78,3 +78,5 @@ setup-windows.bat -WithSeeThrough -WithModels
 ```
 
 `-WithModels` 会连同推理环境一起处理并下载数十 GB 模型，缓存位于 `see-through/.hf_home/`。固定来源为 `layerdifforg/seethroughv0.0.2_layerdiff3d`、`24yearsold/seethroughv0.0.1_marigold`、`24yearsold/l2d_sam_iter2`。本项目未验证这套可选推理环境；其他平台与推理方法见 [See-through README](../see-through/README.md)。
+
+E6a 的 Python 原生入口要求应用 JAR 含 `AuthoringPipelineFacade`，仓库随附版本已经同步。自选旧 JAR 会在 JVM 启动前被拒绝；重建当前源码或使用当前随仓 JAR。更新应用 JAR 会改变原生 runtime hash，即使模型像素相同也不会自动重用旧 Overlay baseline。
