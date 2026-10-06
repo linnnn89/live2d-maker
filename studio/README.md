@@ -8,6 +8,10 @@
 
 前端检查：`npm run build`；预览适配器、草稿命令与美术像素回归：`npm test`。这些用例不依赖 Python、JVM、Edge 或 Windows。
 
+E3 的命令、捕获、工作区快照、导入和错误 DTO 来自 `schemas/studio/protocol.schema.json`。修改契约后在 studio 中执行 `npm run protocol:generate`；生成的 TypeScript/运行时 schema 一起提交，build 会检查生成结果是否过期。浏览器和 Node 使用同一解析入口，Python 使用仓库既有 jsonschema。新增三项协议回归，其中真实 CLI 用例在存在项目 Windows Python 时执行，否则明确跳过；其余前端回归仍无需原生环境。
+
+Agent 的 inspect/diff 默认仍返回完整 v1 状态，可选择 summary 或指定图层以减少响应。UI/CLI/Agent 按稳定 code 识别错误，新增 stage/retryable，HTTP/Python 保留旧错误字符串供兼容。保存冲突不会自动重试或清空草稿。具体字段与兼容规则见命令契约。
+
 R1b 提供撤销、重做、放弃草稿和逐字段差异；一次拖动为一个撤销步骤，保存或导入新版本后清空草稿历史。人和 Agent 共用版本化命令。浏览器 Agent 使用 `window.studioDraft.execute`；无浏览器的 Agent 使用 `node studio/scripts/draft-cli.mjs` 从 JSON 生成候选 IR 与差异。调用契约、并发和保存边界见 [STUDIO_DRAFT_COMMANDS.md](../docs/STUDIO_DRAFT_COMMANDS.md)。离线工具只生成提案，工作区保存仍需现有完整验证。
 
 E1b 的撤销/重做合计保留最近最多 100 步，历史 JSON 负载不超过 16 MiB；每步仅记录受影响图层。达到预算后淘汰最早步骤并提示可用历史数量。单步超过预算时保留编辑结果，但该步不可撤销，并切断旧历史；放弃草稿仍可恢复已保存 IR。取消拖拽不占用历史。这里的 16 MiB 是序列化历史预算，不是整个浏览器内存上限；统计和精确定义见命令契约。

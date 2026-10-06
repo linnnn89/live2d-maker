@@ -1,6 +1,6 @@
 # R1 之后的工程改进审阅
 
-审阅日期：2026-10-06；进度更新：2026-10-07。审阅基线：已合并 R1a/R1b 的 `main@5006207`，以及 R1c 分支中的即时合成实现。下文代码观察和旧测量保留审阅时含义；E1a/E1b/E2 已实施，结果见末节，E3–E6 尚未实施。
+审阅日期：2026-10-06；进度更新：2026-10-07。审阅基线：已合并 R1a/R1b 的 `main@5006207`，以及 R1c 分支中的即时合成实现。下文代码观察和旧测量保留审阅时含义；E1a/E1b/E2/E3 已实施，结果见末节，E4–E6 尚未实施。
 
 ## 结论与优先级
 
@@ -99,7 +99,7 @@ Vite 配置中路由、资源服务、body 解析、child process 和全局 busy
 
 **E1a 已于 2026-10-07 实施：按 ID 索引、轻量内部 token、差异缓存及稳定订阅快照**。保持公开命令和保存行为不变，37 项既有回归加 2 项状态隔离/千层序列回归通过。
 
-E1b 有界图层历史和 E2 渲染失效与预算已完成，随后依次是 E3 协议统一、E4 恢复。Python/原生签名与 WorkspaceService 等改造继续在用户 Windows PC 上按用例推进。
+E1b 有界图层历史、E2 渲染失效与预算和 E3 协议统一已完成，随后是 E4 恢复。Python/原生签名与 WorkspaceService 等改造继续在用户 Windows PC 上按用例推进。
 
 ### E1a 实施与本机对照
 
@@ -142,3 +142,15 @@ Edge 154.0.4258.53 在 1440×1000 和 390×844 使用实际 Studio/Python API，
 素材逐个读取、解码；检查 PNG IHDR 和精确 IDAT 扫描线解压长度，再交给现有 codec，去除非像素辅助块。已有 `fflate@0.8.3` 由间接改为直接依赖，版本/传递依赖未变。裁切/合成协作让出并取消旧显示；同步 codec 只在调用前后检查取消。使用 Worker 的 [setTimeout](https://developer.mozilla.org/en-US/docs/Web/API/WorkerGlobalScope/setTimeout) 让出，未依赖兼容性仍有限的 [scheduler.yield](https://developer.mozilla.org/en-US/docs/Web/API/Scheduler/yield)。未实施局部矩形重合成。
 
 构建和 45 项回归通过，新增三项针对缓存/取消、共享预算/解压长度、显示替换/截图队列。实际 Edge 154 / Python ds 24 层工作区：注记修改未新增显示请求，旧显示 `ABORTED`，四个截图成功、第五 `QUEUE_FULL`，4096² 捕获 `MEMORY_BUDGET` 后正常恢复，共享池记录峰值 169,158,976 B（上限 352,321,536 B）。完整 PNG RGBA 对照 Python 一致；105 编辑/100 撤销重做、实际拖点、保存/刷新/下载、桌面/窄屏无溢出且无页面/控制台错误。证据在 `out/e2-evidence/`。生产 Python/Kotlin、模型构建/Overlay 和安装器未改动。
+
+### E3 实施与 Windows 验收（2026-10-07）
+
+新增 `schemas/studio/protocol.schema.json`，封装版本 1 与 IR 版本独立；生成 TypeScript DTO 和运行时 schema，build 检查生成新鲜度。浏览器/离线 CLI/Node 桥接共享 AJV 解析，Python 用现有 jsonschema。命令类型/字段/坐标、capture、保存/导入请求及 snapshot/preview/error 的结构不再由多处手写；图层是否存在、保留名称、原子编辑、完整 IR/素材及保存范围仍由领域/持久化层检查。默认 v1 完整响应保持，新增 summary 和按 ID 的 parts 读取，返回隔离副本并共用 token。
+
+错误新增 code/stage/retryable 和可选 partId/field，Python/HTTP 保留旧 error 字符串并增加 detail。保存冲突、工作区忙和编辑范围在发生位置给出稳定 code，UI 不再匹配英文文案；旧文案适配只留一处。非法 JSON/字段、体积、来源、方法和 CLI 响应错误明确区分。保存/导入请求可省略新增 envelope 版本，未知显式版本拒绝；IR 持久化格式未改动。
+
+新增项目内 MIT `ajv@8.20.0`（5 个生产包含本体）和开发依赖 `json-schema-to-typescript@16.0.0`（11 个包含本体），与现有 Node 要求兼容；避免维护自制 JSON Schema 解释器和手工 DTO。依据 [AJV 官方 schema 管理建议](https://ajv.js.org/guide/managing-schemas.html) 在单一模块缓存编译器与校验函数。代码和 schema 为仓库可信输入，无外部 schema 读取。
+
+Windows 构建、48 项回归通过，仅新增三项（含实际 Python CLI schema 对照、快照/冲突/锁）；既有 Python Studio 5 项通过。真实 Edge/Python 24 层工作区验证完整/轻量读取、成功保存下载、CLI 外部修改后 Agent/UI 都返回 BASE_CONFLICT 且保留草稿/撤销/磁盘内容、非法字段和忙状态；UI 预检不改活动 IR，确认后 25 层，完整 PNG RGBA 与 Python 一致。桌面/窄屏无溢出和页面异常；仅两个主动触发保存冲突的 HTTP 409 控制台记录。证据在 `out/e3-evidence/`。实际验收发现 Pillow tuple bounds，CLI 先序列化为 JSON wire value 再校验；该场景纳入同一 CLI 回归。
+
+本切片未修改 Kotlin/原生建模/Overlay/安装器，Node 进程与资源路由拆分留 E5。Vite 8.3.2 现有 loader 构建/启动通过，但提示扩展名省略不兼容其未来 native loader 默认值；本轮未升级 Vite 或切换 loader。

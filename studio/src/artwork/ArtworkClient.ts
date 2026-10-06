@@ -1,6 +1,7 @@
 import type { ArtworkIR, DraftFailure } from '../editor/contracts';
 import { ArtworkError, type PixelFrame, type PngFrame } from './contracts';
 import { MAX_CAPTURES, MAX_IR_BYTES } from './MemoryBudget';
+import { ProtocolError } from '../protocol';
 
 type Job = { id: number; kind: 'render' | 'capture'; ir: ArtworkIR; cancelled?: boolean;
   resolve(value: PixelFrame | PngFrame): void; reject(error: unknown): void };
@@ -33,7 +34,7 @@ export class ArtworkClient {
         this.active=null;
         if (job.cancelled) job.reject(new ArtworkError('ABORTED','画面已被更新的草稿替代'));
         else if (event.data.ok) job.resolve(event.data.value);
-        else job.reject(new ArtworkError(event.data.error.code,event.data.error.message,event.data.error.partId));
+        else job.reject(new ProtocolError(event.data.error.code,event.data.error.message,event.data.error.stage,event.data.error.retryable,event.data.error.partId,event.data.error.field));
         this.pump();
       };
       this.worker.onerror = () => { this.worker?.terminate(); this.worker = null; this.rejectAll(new ArtworkError('RENDER_FAILED', '美术渲染线程发生错误，请重试')); };

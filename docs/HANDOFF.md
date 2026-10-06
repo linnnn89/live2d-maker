@@ -196,3 +196,13 @@ Windows Node 24.19.0：构建和 42 项回归通过，新增 3 项针对批次�
 Windows Node 24.19.0：构建及 45 项回归通过，仅新增三项测试覆盖像素缓存/取消、共享预算/PNG 解压长度、显示替换/截图队列。Edge 154.0.4258.53 使用实际 Python ds 24 层工作区验证注记无渲染请求、旧显示 ABORTED、四截图成功/第五 QUEUE_FULL、4096² 编码 MEMORY_BUDGET 后恢复；记录共享池峰值 169,158,976 B（上限 352,321,536 B）。完整 PNG 与 Python RGBA 一致；105 步编辑/100 撤销重做、实际拖点、保存重载/下载、桌面/窄屏无溢出且无页面/控制台错误。证据保存在忽略目录 `out/e2-evidence/`。
 
 本切片未修改 Python/Kotlin、原生重建/Overlay/DLL 或安装器，未宣称整个计划完成。接续 E3 协议统一，再按规划推进恢复、用例和原生/项目交付。
+
+## 26. Studio E3：共享协议与结构化错误（2026-10-07）
+
+接续已合并 E2 PR #10（`main@255f139`），新增 `schemas/studio/protocol.schema.json`；生成 TypeScript DTO 与运行时 schema，build 检查生成结果。命令、捕获、snapshot、保存/导入和错误在浏览器/Node/离线 CLI 使用共享解析器，Python 使用同一 schema 的既有 jsonschema。封装版本 1 与持久化 IR 0.1.0 独立，完整 IR/素材/编辑范围检查继续执行。
+
+错误携带 code/stage/message/retryable 及可选 partId/field；HTTP/Python 保留旧 error 字符串并增加 detail，UI 按 code 判断冲突/忙，不依赖英文文案。旧字符串适配只留协议模块。默认 v1 完整状态保持；inspect/diff 可选 summary 或 parts/partIds，轻量 token 仍能命令编辑，返回对象与草稿隔离。保存失败保留草稿/历史，不自动重试写操作。保存/导入旧无 envelope 请求仍接受，未知显式版本拒绝。
+
+项目内新增固定版本 MIT AJV 8.20.0 和开发用 json-schema-to-typescript 16.0.0，未全局安装或改变运行时。Windows Node 24.19.0 构建/48 项回归通过（只新增三项，含实际 Python CLI），既有 Python Studio 5 项通过。真实 Edge 154 / Python 工作区验证成功保存/下载与 PNG oracle、轻量读取、外部 CLI 基线改变后 Agent/UI BASE_CONFLICT 并保留草稿/撤销/磁盘、忙状态和非法字段、导入预检不写活动 IR/确认后 25 层/完整 PNG 对照一致、重载与窄屏布局。无页面异常，仅两个预期的主动保存冲突 HTTP 409 日志；证据在忽略目录 `out/e3-evidence/`。
+
+CLI 响应先转为 JSON wire value 再校验，兼容 Pillow 返回的 tuple bounds；回归覆盖实际 snapshot 命令。没有修改 Kotlin、原生配置/Overlay/DLL/安装器，桥接 runner/resource 拆分留 E5。Vite 8.3.2 构建/启动通过，但其未来 native loader 扩展名规则仍有提示；未升级或切换 loader。接续 E4 恢复，不将本切片称为整个规划完成。

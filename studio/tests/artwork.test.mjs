@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test, after } from 'node:test';
-import { mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -10,6 +10,7 @@ import ts from 'typescript';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const output = mkdtempSync(path.join(tmpdir(), 'studio-artwork-test-'));
+symlinkSync(path.join(root, 'node_modules'), path.join(output, 'node_modules'), 'junction');
 after(() => rmSync(output, { recursive: true, force: true }));
 const compiled = spawnSync(process.execPath, [path.join(root, 'node_modules/typescript/bin/tsc'),
   '--target', 'ES2022', '--module', 'commonjs', '--lib', 'ES2022,DOM', '--strict', '--skipLibCheck',
@@ -27,6 +28,7 @@ for (const name of ['png', 'AssetCache', 'ArtworkClient']) {
     .replaceAll("from './png'", "from './png.mjs'")
     .replaceAll("from './MemoryBudget'", "from './MemoryBudget.js'")
     .replaceAll("from './content'", "from './content.js'")
+    .replaceAll("from '../protocol'", "from '../protocol/index.js'")
     .replaceAll("from 'fflate'", `from ${JSON.stringify(pathToFileURL(path.join(root, 'node_modules/fflate/esm/index.mjs')).href)}`)
     .replaceAll("from 'fast-png'", `from ${JSON.stringify(pathToFileURL(path.join(root, 'node_modules/fast-png/lib/index.js')).href)}`);
   writeFileSync(path.join(output, `artwork/${name}.mjs`), code);

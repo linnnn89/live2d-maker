@@ -1,5 +1,6 @@
 import type { DraftState, SavedArtwork, ArtworkIR } from '../editor/contracts';
 import { ArtworkError, type CaptureResult, type PngFrame } from './contracts';
+import { validateProtocol, errorDetail, type CaptureRequest } from '../protocol';
 
 /** Optimistic read: never label asynchronously rendered pixels with a newer token. */
 export async function captureArtwork(input: unknown,
@@ -8,9 +9,8 @@ export async function captureArtwork(input: unknown,
   capture: (ir: ArtworkIR) => Promise<PngFrame>,
 ): Promise<CaptureResult> {
   try {
-    if (!input || typeof input !== 'object' || Array.isArray(input)) throw new ArtworkError('INVALID_REQUEST', '图像请求必须是对象');
-    const request = input as Record<string, unknown>;
-    if (request.schemaVersion !== 1 || Object.keys(request).some(key => !['schemaVersion', 'state', 'source'].includes(key)) || (request.source !== undefined && request.source !== 'draft' && request.source !== 'saved')) throw new ArtworkError('INVALID_REQUEST', '图像请求版本、来源或字段无效');
+    validateProtocol('CaptureRequest', input);
+    const request = input as CaptureRequest;
     const initial = read();
     if (!initial) throw new ArtworkError('NOT_LOADED', '请先打开工作区');
     const token = request.state as Partial<DraftState> | null;
@@ -25,7 +25,6 @@ export async function captureArtwork(input: unknown,
     return { ok: true, image: { ...frame, mimeType: 'image/png', renderVersion: 1, source,
       draftId: initial.draftId, revision: initial.revision, baseRevision: initial.baseRevision } };
   } catch (error) {
-    return { ok: false, error: { code: error instanceof ArtworkError ? error.code : 'RENDER_FAILED',
-      message: error instanceof Error ? error.message : String(error), partId: error instanceof ArtworkError ? error.partId : undefined } };
+    return { ok: false, error: errorDetail(error, 'RENDER_FAILED', 'artwork') };
   }
 }

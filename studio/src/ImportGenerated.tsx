@@ -1,13 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from './api';
+import type { ImportPreview as Preview, Part } from './protocol';
 
-type ImportPart = { id: string; name: string; geometry: { bbox: number[] }; appearance?: { visible: boolean } };
-type Preview = {
-  id: string; revision: string; partId: string; name: string; semantic: { tag: string };
-  beforeImage: string; afterImage: string;
-  report: { bounds: number[]; changed_pixels: number; outside_visible_pixels: number; outside_changed_pixels: number;
-    outside_max_diff: number; registration: { input_size: number[]; fitted_size?: number[]; excluded_visible_pixels?: number } };
-};
 
 async function pngContent(file: File | null) {
   if (!file || file.size > 16 * 1024 * 1024) throw new Error('请选择 PNG 文件，每个文件不超过 16 MB');
@@ -20,7 +14,7 @@ async function pngContent(file: File | null) {
 }
 
 export function ImportGenerated({ revision, canvas, parts, selectedId, onClose, onCommit }: {
-  revision: string; canvas: { width: number; height: number }; parts: ImportPart[]; selectedId: string;
+  revision: string; canvas: { width: number; height: number }; parts: Part[]; selectedId: string;
   onClose: () => void; onCommit: (id: string, revision: string, partId: string) => Promise<void>;
 }) {
   const selected = parts.find(p => p.id === selectedId) || parts[0];
@@ -30,7 +24,7 @@ export function ImportGenerated({ revision, canvas, parts, selectedId, onClose, 
   const [target, setTarget] = useState(selected?.id || '');
   const [name, setName] = useState('');
   const [prompt, setPrompt] = useState('');
-  const [bounds, setBounds] = useState(selected?.geometry.bbox || [0, 0, canvas.width, canvas.height]);
+  const [bounds, setBounds] = useState<number[]>(selected?.geometry.bbox || [0, 0, canvas.width, canvas.height]);
   const [fit, setFit] = useState(false);
   const [cropEnabled, setCropEnabled] = useState(false);
   const [crop, setCrop] = useState([0, 0, 0, 0]);

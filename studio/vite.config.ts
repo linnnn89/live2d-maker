@@ -5,6 +5,7 @@ import { realpath, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { ProtocolError, backendError, errorDetail, errorStatus, validateProtocol } from './src/protocol';
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const workspace = path.resolve(repo, process.env.STUDIO_WORKSPACE || 'out/studio');
@@ -26,13 +27,18 @@ function run(command: string, payload?: string): Promise<unknown> {
     let stdout = '', stderr = '';
     child.stdout.on('data', chunk => { stdout += chunk; });
     child.stderr.on('data', chunk => { stderr = (stderr + chunk).slice(-16000); });
-    child.on('error', reject);
+    child.on('error', error => reject(new ProtocolError('CLI_START_FAILED', error.message, command)));
     child.on('close', code => {
       try {
         const result = JSON.parse(stdout);
-        if (code !== 0) reject(new Error(result.error || stderr || 'CLI failed'));
-        else resolve(result);
-      } catch (error) { reject(new Error(`CLI returned invalid JSON: ${stderr || String(error)}`)); }
+        if (code !== 0) {
+          const detail = backendError(result, 400, command);
+          reject(new ProtocolError(detail.code, detail.message, detail.stage, detail.retryable, detail.partId, detail.field));
+        } else {
+          validateProtocol(command === 'studio-import-preview' ? 'ImportPreview' : 'Snapshot', result, 'CLI_PROTOCOL_ERROR', command);
+          resolve(result);
+        }
+      } catch (error) { reject(error instanceof ProtocolError ? error : new ProtocolError('CLI_PROTOCOL_ERROR', `CLI returned invalid JSON: ${stderr || String(error)}`, command)); }
     });
     child.stdin.end(payload || '');
   });
@@ -43,12 +49,17 @@ function json(res: ServerResponse, status: number, value: unknown) {
   res.end(JSON.stringify(value));
 }
 
+function sendError(res: ServerResponse, error: unknown, stage: string) {
+  const detail = errorDetail(error, 'BACKEND_FAILED', stage);
+  json(res, errorStatus(detail.code), { schemaVersion: 1, status: 'error', error: detail.message, detail });
+}
+
 async function body(req: IncomingMessage, limit = 2 * 1024 * 1024) {
   let size = 0;
   const chunks = [];
   for await (const chunk of req) {
     size += chunk.length;
-    if (size > limit) throw new Error(`Request exceeds ${limit / 1024 / 1024} MB`);
+    if (size > limit) throw new ProtocolError('REQUEST_SIZE', `Request exceeds ${limit / 1024 / 1024} MB`, 'transport');
     chunks.push(chunk);
   }
   return Buffer.concat(chunks).toString('utf-8');
@@ -89,20 +100,25 @@ function studioBridge(): Plugin {
         if (!pathname.startsWith('/api/')) { next(); return; }
         const routes: Record<string, string> = { '/api/open': 'studio-open', '/api/snapshot': 'studio-snapshot', '/api/save': 'studio-save', '/api/rebuild': 'studio-rebuild', '/api/qa': 'studio-qa', '/api/import-preview': 'studio-import-preview', '/api/import-commit': 'studio-import-commit' };
         const command = routes[pathname];
-        if (!command || req.method !== (command === 'studio-snapshot' ? 'GET' : 'POST')) { json(res, 405, { error: 'Unsupported route or method' }); return; }
+        if (!command || req.method !== (command === 'studio-snapshot' ? 'GET' : 'POST')) { sendError(res, new ProtocolError('METHOD_NOT_ALLOWED', 'Unsupported route or method', 'transport'), 'transport'); return; }
         // Reject cross-origin writes and DNS rebinding; no browser input becomes a shell command/path.
         const origin = `http://127.0.0.1:${port}`;
         if (req.headers.host !== `127.0.0.1:${port}` || (req.headers.origin && req.headers.origin !== origin) || req.headers['sec-fetch-site'] === 'cross-site') {
-          json(res, 403, { error: 'Studio accepts same-origin loopback requests only' }); return;
+          sendError(res, new ProtocolError('FORBIDDEN', 'Studio accepts same-origin loopback requests only', 'transport'), 'transport'); return;
         }
-        if (busy) { json(res, 409, { error: 'Studio is busy; wait for the active command' }); return; }
+        if (busy) { sendError(res, new ProtocolError('BACKEND_BUSY', 'Studio is busy; wait for the active command', 'transport', true), 'transport'); return; }
         busy = true;
         try {
           const input = ['studio-save', 'studio-import-preview', 'studio-import-commit'].includes(command)
             ? await body(req, command === 'studio-import-preview' ? 48 * 1024 * 1024 : undefined) : undefined;
+          if (input !== undefined) {
+            let value: unknown;
+            try { value = JSON.parse(input); } catch { throw new ProtocolError('INVALID_REQUEST', 'Request must be valid JSON', 'protocol'); }
+            validateProtocol(command === 'studio-save' ? 'SaveRequest' : command === 'studio-import-preview' ? 'ImportPreviewRequest' : 'ImportCommitRequest', value);
+          }
           json(res, 200, await run(command, input));
         }
-        catch (error) { json(res, 400, { status: 'error', error: error instanceof Error ? error.message : String(error) }); }
+        catch (error) { sendError(res, error, command); }
         finally { busy = false; }
       });
     },

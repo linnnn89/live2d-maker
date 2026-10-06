@@ -1,6 +1,7 @@
 import { DraftSession } from './DraftSession';
 import { same } from './commands';
-import { DraftError, failure, type ArtworkIR, type DraftResult, type DraftState, type EditCommand, type SavedArtwork } from './contracts';
+import { DraftError, failure, type ArtworkIR, type DraftResult, type DraftReadResult, type DraftReadRequest, type DraftState, type EditCommand, type SavedArtwork } from './contracts';
+import { parseDraftRequest } from '../protocol';
 
 /** Shared boundary for UI and structured callers. Subscribers receive immutable snapshots. */
 export class DraftController<T extends SavedArtwork = SavedArtwork> {
@@ -29,16 +30,24 @@ export class DraftController<T extends SavedArtwork = SavedArtwork> {
   updateGesture(commands: EditCommand[]): void { this.ready().updateGesture(commands); this.publish(); }
   endGesture(cancel: boolean): void { this.session?.endGesture(cancel); this.publish(); }
 
-  async execute(input: unknown): Promise<DraftResult<T>> {
+  execute(input: DraftReadRequest): Promise<DraftReadResult>;
+  execute(input: unknown): Promise<DraftResult<T>>;
+  async execute(input: unknown): Promise<DraftResult<T> | DraftReadResult> {
+    let compact = false;
     try {
-      if (!input || typeof input !== 'object' || Array.isArray(input)) throw new DraftError('INVALID_REQUEST', '请求必须是对象');
-      const request = input as Record<string, unknown>;
+      const request = parseDraftRequest(input);
       const operation = request.operation;
-      const operations = ['inspect', 'diff', 'apply', 'undo', 'redo', 'discard', 'commit'];
-      const allowed = ['schemaVersion', 'operation', ...(['inspect', 'diff'].includes(String(operation)) ? [] : ['state']), ...(operation === 'apply' ? ['commands'] : [])];
-      if (request.schemaVersion !== 1 || typeof operation !== 'string' || !operations.includes(operation) || Object.keys(request).some(key => !allowed.includes(key))) throw new DraftError('INVALID_REQUEST', '请求版本、操作或字段无效');
+      compact = 'response' in request && (request.response === 'summary' || request.response === 'parts');
       if (!this.session) throw new DraftError('NOT_LOADED', '请先打开工作区');
-      if (operation === 'inspect' || operation === 'diff') return this.result();
+      if (request.operation === 'inspect' || request.operation === 'diff') {
+        if (!compact) return this.result();
+        const { ir, ...state } = this.snapshot!;
+        const parts = request.response === 'parts' ? ir.parts.filter(part => !request.partIds || request.partIds.includes(part.id)) : undefined;
+        const missing = request.partIds?.find(id => !ir.parts.some(part => part.id === id));
+        if (missing !== undefined) throw new DraftError('PART_NOT_FOUND', '读取的图层不存在', missing);
+        return { ok: true, state: structuredClone({ ...state, response: request.response as 'summary' | 'parts', ...(parts ? { parts } : {}) }) };
+      }
+      if (!('state' in request)) throw new DraftError('INVALID_REQUEST', '写命令缺少 state');
       const session = this.ready();
       if (operation === 'apply') session.apply(request.state, request.commands);
       else if (operation === 'undo') session.undo(request.state);
@@ -61,7 +70,7 @@ export class DraftController<T extends SavedArtwork = SavedArtwork> {
       }
       this.publish();
       return this.result();
-    } catch (error) { return { ok: false, error: failure(error), state: this.read() }; }
+    } catch (error) { return { ok: false, error: failure(error), state: compact ? null : this.read() }; }
   }
   private ready(): DraftSession {
     if (!this.session) throw new DraftError('NOT_LOADED', '请先打开工作区');

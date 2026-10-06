@@ -6,7 +6,7 @@
 
 ## 状态和版本
 
-`inspect` 和 `diff` 都返回 `{ok:true,state}`。`state` 含：
+`inspect` 和 `diff` 默认返回完整 `{ok:true,state}`。`state` 含：
 
 | 字段 | 含义 |
 | --- | --- |
@@ -73,7 +73,13 @@ if (!committed.ok) throw new Error(committed.error.message);
 
 成功返回新草稿状态及保存 API 的 `saved` 快照，并刷新界面的已保存版本。`commit` 只保存 IR，模型仍可能待重建；无修改时跳过 API。保存期间禁止其他修改，失败保留候选 IR 和撤销历史。`SAVE_MISMATCH` 表示保存响应与候选不一致，需重新打开工作区核对；这不保证远端保存未发生。
 
-错误格式为 `{ok:false,error:{code,message,partId?,field?},state}`，未加载时 `state:null`。主要错误：`INVALID_REQUEST`、`INVALID_COMMAND`、`PART_NOT_FOUND`、`LANDMARK_NOT_FOUND`、`DRAFT_CONFLICT`、`BUSY`、`NOT_LOADED`；保存层还可能返回 `BASE_CONFLICT`、`BACKEND_BUSY`、`SAVE_FAILED`、`SAVE_MISMATCH`。失败响应含当前状态供重新核对，不应盲目重试覆盖。
+错误格式为 `{ok:false,error:{code,stage,message,retryable,partId?,field?},state}`，未加载时 `state:null`。E3 新增 `stage` 和 `retryable`，既有 code/message 不变；调用方按 code 分支，message 仅供显示。主要错误：`INVALID_REQUEST`、`INVALID_COMMAND`、`PART_NOT_FOUND`、`LANDMARK_NOT_FOUND`、`DRAFT_CONFLICT`、`BUSY`、`NOT_LOADED`；保存层还可能返回 `BASE_CONFLICT`、`BACKEND_BUSY`、`EDIT_SCOPE`、`SAVE_FAILED`、`SAVE_MISMATCH`。失败响应含当前状态供重新核对，不应盲目重试覆盖；retryable 也不授权自动重发写操作。
+
+E3 增加只读响应选择：`inspect` / `diff` 可带 `response:"summary"`，返回 token、基线、差异、历史和阶段，不返回 `ir`；或带 `response:"parts",partIds:["<ID>"]`，额外返回独立的 `parts` 副本。省略 partIds 时返回所有图层，指定 ID 时保持 IR 原顺序；任一 ID 不存在则整体失败。partIds 仅用于 parts 响应，不能用于修改或捕获请求。轻量响应中的 token 与完整状态相同，仍可提交命令；它不包含 IR，不能将其当作完整离线提案。有效的轻量读取失败时 state 为 null，避免重新返回完整 IR。默认或 `response:"full"` 保持旧 v1 完整响应，无须修改既有 Agent。
+
+协议单一来源为 [protocol.schema.json](../schemas/studio/protocol.schema.json)，封装版本 `1` 与 IR 自身 `schemaVersion:"0.1.0"` 分开。共享解析入口用于浏览器、离线 Node 和 HTTP 桥接；Python 使用同一 schema。IR 部分只是传输结构，保存时仍核对完整 authoring-rig schema、素材/哈希、稳定 ID、编辑范围与 revision，不替代任何持久化验证。
+
+HTTP / Python Studio 成功快照和导入预检新增 `schemaVersion:1`。失败仍保留旧 `status:"error",error:"message"`，同时新增 `detail:{code,stage,message,retryable,partId?,field?}`。HTTP 的版本/忙冲突为 409，非法请求为 400，体积超限为 413，CLI 启动/非法响应为 502；来源与方法限制继续执行。旧服务端字符串仅在统一适配器内解释。旧无 envelope 的保存/导入请求保持接受，显式携带未知 schemaVersion 会拒绝。
 
 ## 无浏览器的 JSON 工具
 
@@ -144,7 +150,7 @@ const imageInput = result.image.dataUrl;
 
 图像只包含平面美术，没有棋盘格、选中轮廓、关键点标记、页面文字或 Cubism 模型。预览姿态、画布聚焦和屏幕尺寸不影响导出像素；隐藏图层与零透明度不出现在图像中。渲染共享现有 Python 的像素中心裁切、even-odd 和普通 alpha 合成规则；导出 PNG 的 RGBA 与仓库的 Python 对照样本逐字节一致。
 
-调用前或异步完成时 token 不匹配均返回 `DRAFT_CONFLICT`，不返回可能被误认成新版本的图像。拖拽、保存或工作区操作中返回 `BUSY`。失败格式为 `{ok:false,error:{code,message,partId?}}`；素材读取、哈希、尺寸、格式问题分别可能返回 `ASSET_LOAD`、`ASSET_HASH`、`ASSET_SIZE`、`ASSET_FORMAT`，超出 16777216 像素限制返回 `IMAGE_SIZE`。16 位 PNG 当前明确拒绝；工作区原文件不会因此改变。返回错误后可修复素材或重新读取状态再尝试，不会悄悄跳过图层。
+调用前或异步完成时 token 不匹配均返回 `DRAFT_CONFLICT`，不返回可能被误认成新版本的图像。拖拽、保存或工作区操作中返回 `BUSY`。失败格式为 `{ok:false,error:{code,stage,message,retryable,partId?,field?}}`；素材读取、哈希、尺寸、格式问题分别可能返回 `ASSET_LOAD`、`ASSET_HASH`、`ASSET_SIZE`、`ASSET_FORMAT`，超出 16777216 像素限制返回 `IMAGE_SIZE`。16 位 PNG 当前明确拒绝；工作区原文件不会因此改变。返回错误后可修复素材或重新读取状态再尝试，不会悄悄跳过图层。
 
 界面“导出美术 PNG”调用相同读取流程。只有显式导出编码 PNG，日常拖动传输 RGBA 并重绘。解码和逐像素工作在 Worker 中；屏幕显示使用 Canvas，缩放插值不能作为原始像素相等性的判据。
 

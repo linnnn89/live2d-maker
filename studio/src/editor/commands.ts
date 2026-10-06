@@ -1,16 +1,7 @@
 import { DraftError, type ArtworkIR, type DraftChange, type EditCommand, type Part, type Point } from './contracts';
+import { parseCommands } from '../protocol';
 
 const reservedNames = new Set(['__proto__', 'constructor', 'prototype', 'parameter', 'parameters', 'deformer', 'keyform', 'physics']);
-const fields: Record<EditCommand['type'], string[]> = {
-  set_visibility: ['visible'], set_opacity: ['opacity'], set_polygon: ['points'],
-  set_landmark: ['name', 'point'], remove_landmark: ['name'],
-};
-
-function point(value: unknown, partId: string, field: string): asserts value is Point {
-  if (!Array.isArray(value) || value.length !== 2 || !value.every(v => typeof v === 'number' && Number.isFinite(v))) {
-    throw new DraftError('INVALID_COMMAND', '坐标必须是两个有限数值', partId, field);
-  }
-}
 
 function landmarkName(value: unknown, partId: string): asserts value is string {
   if (typeof value !== 'string' || !value.trim() || value !== value.trim() || reservedNames.has(value.toLowerCase())) {
@@ -32,37 +23,26 @@ export type LayerPatch = { index: number; before: Part; after: Part };
 
 /** Internal immutable batch: copy only targeted parts and edited fields. */
 export function applyCommandBatch(ir: ArtworkIR, input: unknown, index = indexArtwork(ir)): { ir: ArtworkIR; patches: LayerPatch[] } {
-  if (!Array.isArray(input) || input.length === 0) throw new DraftError('INVALID_COMMAND', 'commands 必须是非空命令数组');
+  const commands = parseCommands(input);
   const candidate = { ...ir, parts: [...ir.parts] };
   const touched = new Set<number>();
-  for (const raw of input) {
-    if (!raw || typeof raw !== 'object' || Array.isArray(raw) || !Object.hasOwn(fields, raw.type)) {
-      throw new DraftError('INVALID_COMMAND', '不支持的编辑命令');
-    }
-    const allowed = ['type', 'partId', ...fields[raw.type as EditCommand['type']]];
-    if (Object.keys(raw).some(key => !allowed.includes(key)) || typeof raw.partId !== 'string') {
-      throw new DraftError('INVALID_COMMAND', '命令包含未知字段或缺少 partId');
-    }
+  for (const raw of commands) {
     const position = index.get(raw.partId);
     if (position === undefined || candidate.parts[position]?.id !== raw.partId) throw new DraftError('PART_NOT_FOUND', '目标图层不存在', raw.partId);
     if (!touched.has(position)) { candidate.parts[position] = { ...candidate.parts[position] }; touched.add(position); }
     const part = candidate.parts[position];
     switch (raw.type) {
       case 'set_visibility':
-        if (typeof raw.visible !== 'boolean') throw new DraftError('INVALID_COMMAND', 'visible 必须是布尔值', part.id, 'visible');
         part.appearance = { visible: raw.visible, opacity: part.appearance?.opacity ?? 255 };
         break;
       case 'set_opacity':
-        if (!Number.isInteger(raw.opacity) || raw.opacity < 0 || raw.opacity > 255) throw new DraftError('INVALID_COMMAND', 'opacity 必须是 0–255 的整数', part.id, 'opacity');
         part.appearance = { visible: part.appearance?.visible ?? true, opacity: raw.opacity };
         break;
       case 'set_polygon':
-        if (!Array.isArray(raw.points) || raw.points.length < 3) throw new DraftError('INVALID_COMMAND', '轮廓至少需要三个点', part.id, 'points');
-        for (const value of raw.points) point(value, part.id, 'points');
         part.geometry = { ...part.geometry, polygon: structuredClone(raw.points) };
         break;
       case 'set_landmark':
-        landmarkName(raw.name, part.id); point(raw.point, part.id, 'point');
+        landmarkName(raw.name, part.id);
         part.geometry = { ...part.geometry, landmarks: { ...part.geometry.landmarks, [raw.name]: [...raw.point] } };
         break;
       case 'remove_landmark':
