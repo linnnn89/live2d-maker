@@ -127,6 +127,10 @@ def export_model(root,payload):
                           'files':{name:{'bytes':len(raw),'sha256':hashlib.sha256(raw).hexdigest()} for name,raw in files.items()},
                           'warnings':cache['warnings']}
         files['export-report.json']=json.dumps(package_manifest,ensure_ascii=False,indent=2).encode()
+        # Serve precisely the selected package, not the cache (which also contains omitted motions/editor files).
+        preview=delivery/'model';preview.mkdir()
+        for name,raw in files.items():
+            file=preview/name;file.parent.mkdir(parents=True,exist_ok=True);file.write_bytes(raw)
         output=root/'downloads';output.mkdir(exist_ok=True);filename=identifier+'.model.zip';temporary=output/(filename+'.tmp')
         try:
             with zipfile.ZipFile(temporary,'w',zipfile.ZIP_DEFLATED) as archive:
@@ -135,6 +139,7 @@ def export_model(root,payload):
         finally:temporary.unlink(missing_ok=True)
         project_name=read(root/'project.json')['name'] if (root/'project.json').exists() else data.get('metadata',{}).get('name','model')
         report={'schemaVersion':1,'target':payload['target'],'url':file_url(root,output/filename),
+                'modelUrl':file_url(root,preview/model_path.name),
                 'filename':project_name+('.cmo3.zip' if payload['target']=='editor' else '.model.zip'),
                 'files':[{'name':name,'bytes':len(raw),'sha256':hashlib.sha256(raw).hexdigest()} for name,raw in files.items()],
                 'warnings':cache['warnings'],'cacheId':directory.name,'reused':reused,'buildSettings':settings,

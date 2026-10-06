@@ -203,6 +203,12 @@ def snapshot(root):
     if state.get("latestExport"):
         delivery = read(root / state["latestExport"] / "export-report.json")
         delivery["url"] = file_url(root, root / "downloads" / (Path(state["latestExport"]).name + ".model.zip"))
+        if "modelUrl" in delivery:
+            model = root / state["latestExport"] / "model" / Path(delivery["modelUrl"]).name
+            if model.name.endswith(".model3.json") and model.is_file():
+                delivery["modelUrl"] = file_url(root, model)
+            else:
+                delivery.pop("modelUrl")
         result["export"] = {"result": delivery, "current": delivery["modelInputSignature"] == model_input_signature(data)
                             and delivery["buildSettings"] == settings and delivery["overlayRevision"] == result["overlayRevision"]}
     if state.get("latestImport"):

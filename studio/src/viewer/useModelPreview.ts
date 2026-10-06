@@ -31,17 +31,22 @@ export function useModelPreview(modelUrl: string | undefined, modelBounds: Bound
 
   function setParameter(id: string, value: number) {
     const parameters = adapter.current?.setParameter(id, value);
-    if (parameters && modelUrl) setConnection({ modelUrl, state: { status: 'ready', parameters } });
+    if (parameters && modelUrl) setConnection(previous => ({ modelUrl, state: { ...previous?.state, status: 'ready', parameters } }));
   }
 
   function reset() {
     const parameters = adapter.current?.reset();
-    if (parameters && modelUrl) setConnection({ modelUrl, state: { status: 'ready', parameters } });
+    if (parameters && modelUrl) setConnection(previous => ({ modelUrl, state: { ...previous?.state, status: 'ready', parameters } }));
   }
   function applyPose(values: Record<string, number>) {
     const parameters = adapter.current?.applyPose(values);
-    if (parameters && modelUrl) setConnection({ modelUrl, state: { status: 'ready', parameters } });
+    if (parameters && modelUrl) setConnection(previous => ({ modelUrl, state: { ...previous?.state, status: 'ready', parameters } }));
   }
 
-  return { attachFrame, onLoad, parameters, previewStatus, setParameter, reset, applyPose };
+  return { attachFrame, onLoad, parameters, previewStatus, setParameter, reset, applyPose,
+    dynamics: current?.status === 'ready' ? current.dynamics : undefined,
+    playing: current?.status === 'ready' && !!current.playing,
+    play: () => adapter.current?.play(), pause: () => adapter.current?.pause(),
+    step: () => adapter.current?.step(), selectMotion: (id: string | null) => adapter.current?.selectMotion(id),
+    setPhysics: (enabled: boolean) => adapter.current?.setPhysics(enabled) };
 }

@@ -801,3 +801,17 @@ footer>div{
 .qa-shots button{flex-direction:column;min-width:0;overflow:hidden}
 .qa-shots span{max-width:100%;overflow-wrap:anywhere;white-space:normal}
 .qa-shots button img{width:100%;max-height:180px;object-fit:contain}
+
+.dynamic-modal{width:min(1080px,100%);max-height:90vh;overflow:auto;background:white;border-radius:10px;padding:16px;font-size:13px}
+.dynamic-modal .panel-heading{gap:12px;flex-wrap:wrap}
+.dynamic-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(240px,340px);gap:16px}
+.dynamic-layout .preview{height:min(65vh,700px);min-height:280px}
+.dynamic-controls{min-width:0;overflow-wrap:anywhere}
+.dynamic-controls>label{display:block;margin:12px 0}
+.dynamic-controls select{display:block;width:100%;margin-top:6px}
+.dynamic-actions{display:flex;flex-wrap:wrap;gap:8px}
+.dynamic-parameter{display:block;margin:10px 0}
+.dynamic-parameter input{display:block;width:100%}
+.dynamic-controls details{max-height:280px;overflow:auto}
+.dynamic-time{font-variant-numeric:tabular-nums}
+@media(max-width:700px){.dynamic-layout{grid-template-columns:1fr}.dynamic-modal{padding:12px}.dynamic-layout .preview{height:42vh;min-height:220px}.dynamic-modal h2{font-size:17px}}
