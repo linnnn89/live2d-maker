@@ -360,3 +360,15 @@ R6 首批范围完成：参数/姿态、受限透明度关键形、结构化阻�
 整理前随仓引擎与新源码 JAR 实际构建 ds：完整模型签名 64ad30622e1537d6a0b1066098380a733ccabb3d2094577c1a9796339d335f5a 相同，modelSignatures/对象/参数/警告相等，ds.moc3、model3、cdi3、psd2live 元数据与纹理逐字节一致。真实 Edge 新工程 4ca6b376e3804445afd68742283181e1 的基础模型和透明度 Overlay 复用重放与上一轮所有模型产物逐字节一致，Cubism 加载及 16 姿态 QA/neutral 实际点击通过，页面/控制台异常零；原生身份升级没有重设旧工程基线。源码/随仓 JAR 和 manifest 同步，安装 DryRun 哈希校验通过。证据 out/r7-domain-evidence/。
 
 首次项目探针误将 create 请求放入 project 嵌套字段，现有 schema 正确拒绝；依据现有 create_project 用例建立新验收工程后完成浏览器流程。一次编排移动脚本因 cwd 错误未执行，未改源；本批实际保留 RigBuilder 的父级覆盖/框映射编排，不能声称将全部编排搬进生成器。生成的空 .kotlin/sessions 缓存已按确认空目录清理，未纳入提交。R7 领域模块完成，编辑服务继续；R8 动态尚待实施。
+
+## 41. R7c：UI 无关编辑准备与提交服务（2026-10-07）
+
+基于 R7b PR #25，main@b4a8c09。WorkspaceService 在既有工程归档用例上增加源/分析预览准备、PreparedWorkspaceEdit 和 prepareEdit/commitEdit。准备前核对候选 Overlay/可见性/分类/删除/父级/网格与 PipelineConfig 一致，原生构建及注册素材中立位置验证完成后才返回未发布结果。提交持有历史树锁，核对期望 HEAD、有效新 revision/说明/actor，然后调用适配器的 live-state CAS；拒绝则不追加历史。UI 适配器仍持有会话 historyLock/编辑 mutex，负责 Compose 发布、SDK 加载、状态文字和持久调度，不把 UI 状态或窗口句柄传入服务。
+
+素材新增、软删除、参数和关键形四条 Agent 用例共用准备/提交，校准/素材中立验证从 agent 移到 application，计算保持。桌面层编辑共用 captured analysis 的预览准备（仍剔除生成嘴唇后再准备），历史恢复/项目打开通过共享源预览准备。设置 codec/公开 MCP 请求解析及 UI 手势仍在适配器；没有宣称整份 ViewModel 或所有 Agent 辅助流程迁走，也没有新增任务调度器。
+
+新增三个集成回归：实际 ds 编辑模型与原 pipeline/桌面 captured preview MOC 一致、user/agent 各一次发布、原栅格不变、临时历史实际持久恢复；发布 CAS 拒绝与并发 HEAD 变化不写历史/不调用发布，非法说明在发布前拒绝；候选配置不符及实际缺失父级坐标框构建失败保留原文档/历史/MOC。针对服务 6 项通过，Kotlin 214 项全套通过（0 失败、0 错误、1 跳过）。首次编译因新构造参数位于尾随 lambda 后影响旧测试调用，保留原 lambda 作为最后参数；测试 MOC 改按实际 runtimeBundle.assets 契约读取。第二轮误用核心允许的新参数轴作为异常，依据 DrawableBuilder 已明确失败的缺父框条件修正，第三轮通过，再完整回归通过。未放宽生产校验。
+
+源码/随仓 JAR 6309327 字节，SHA 58576bca75c95c31a76695c39a9ee832232175c23002cae73d726914da9a5f4e，manifest 同步，安装 DryRun 哈希校验通过。实际 Windows 使用已有 JDK21、当前 JAR、便携依赖和 skiko 路径启动，PID 4920/HWND 0x570C14 窗口正常；WinCode 只读 PrintWindow 图像正常，stderr 空。便携裁剪 runtime 本身不带 java.exe，首次启动路径不存在；改用已验证的现有 JDK，没有安装运行时。Compose UIA 仍只暴露两个容器，没有声称实测桌面图层修改/项目保存操作；模型编辑行为由真实原生及历史集成验收。本次自建空白桌面进程已关闭，证据 out/r7-workspace-evidence/ 和本会话 WinCode 截图。
+
+R7 规划首批完成：工程及共享编辑准备/提交服务、领域建模模块、原生准备模型导出复用；仅注记不触发模型失效已在 E6b/R4b 实测。持久化后台 job、任意局部增量绑定和进一步 UI 适配拆分没有被引入。接续 R8 物理/动作播放，可选智能辅助仍需明确需求和环境决策。

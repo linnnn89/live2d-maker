@@ -4,6 +4,14 @@ import io.github.psd2live.agent.AgentTaskSnapshot
 import io.github.psd2live.agent.AgentViewSpatialMetadata
 import io.github.psd2live.agent.AgentWorkspaceDocument
 import io.github.psd2live.agent.AgentWorkspaceStore
+import io.github.psd2live.core.PSD2LivePipeline
+import io.github.psd2live.core.PipelineConfig
+import io.github.psd2live.core.ProgressListener
+import io.github.psd2live.core.RigPreviewModel
+import io.github.psd2live.core.MouthLipLayer
+import io.github.psd2live.history.StaleWorkspaceHeadException
+import io.github.psd2live.history.WorkspaceHistorySelection
+import org.umamo.format.art.SourceArt
 import io.github.psd2live.history.WorkspaceHistoryState
 import io.github.psd2live.history.WorkspaceHistoryTree
 import io.github.psd2live.project.ProjectArchive
@@ -43,10 +51,55 @@ internal class OpenedWorkspaceProject(
     }
 }
 
-/** UI-independent portable project read/write. Callers serialize saves and schedule disk IO. */
+/** A completed CPU edit, still unpublished. The adapter performs its live-state CAS when committing. */
+internal data class PreparedWorkspaceEdit(
+    val before: AgentWorkspaceDocument,
+    val after: AgentWorkspaceDocument,
+    val preview: RigPreviewModel,
+)
+
+/** UI-independent editing and portable projects. Adapters own scheduling, presentation and persistence. */
 internal class WorkspaceService(
+    private val pipeline: PSD2LivePipeline = PSD2LivePipeline(),
     private val writeArchive: (Path, Path, String) -> Unit = ProjectArchive::write,
 ) {
+    fun preview(source: SourceArt, config: PipelineConfig): RigPreviewModel = pipeline.buildPreview(source, config)
+
+    /** Desktop layer edits keep their captured analysis, excluding generated lips before preparing anew. */
+    fun preview(previous: RigPreviewModel, config: PipelineConfig, progress: ProgressListener): RigPreviewModel {
+        val analysis = previous.analysis.copy(layers = previous.analysis.layers.filter { it.source !is MouthLipLayer })
+        return pipeline.buildPreview(analysis, config, progress)
+    }
+
+    fun prepareEdit(before: AgentWorkspaceDocument, after: AgentWorkspaceDocument,
+                    config: PipelineConfig): PreparedWorkspaceEdit {
+        require(config.rigEdits == after.rigEdits && config.layerVisibility == after.layerVisibility &&
+            config.deletedLayerIds == after.deletedLayerIds && config.layerOverrides == after.layerOverrides &&
+            config.parentOverrides == after.parentOverrides && config.meshOverrides == after.meshOverrides) {
+            "Edit configuration does not describe the candidate workspace"
+        }
+        val preview = preview(after.source, config)
+        if (after.rigEdits.assetLayers != before.rigEdits.assetLayers ||
+            after.rigEdits.calibrationLayerIds != before.rigEdits.calibrationLayerIds) {
+            validateRegisteredNeutral(preview, after.rigEdits.assetLayers.filter { (id, record) ->
+                before.rigEdits.assetLayers[id] != record
+            }.keys)
+        }
+        return PreparedWorkspaceEdit(before, after, preview)
+    }
+
+    /** Caller also holds its session lock. A stale HEAD or rejected live CAS never appends history. */
+    fun commitEdit(prepared: PreparedWorkspaceEdit, tree: WorkspaceHistoryTree<AgentWorkspaceDocument>,
+                   expectedHead: String, revision: String, summary: String, actor: String, taskId: String?,
+                   publish: (PreparedWorkspaceEdit) -> Boolean): WorkspaceHistorySelection<AgentWorkspaceDocument> = synchronized(tree) {
+        val head = tree.head().node
+        if (head.id != expectedHead) throw StaleWorkspaceHeadException(expectedHead, head.id)
+        require(revision.isNotBlank() && revision != head.revisionId) { "Operation did not change the workspace" }
+        require(summary.isNotBlank() && actor.isNotBlank()) { "History summary and actor are required" }
+        check(publish(prepared)) { "Workspace changed while the operation was being built; retry from current state" }
+        tree.commit(expectedHead, prepared.after, revision, revision, summary, actor, taskId)
+    }
+
     fun save(capture: WorkspaceProjectCapture, target: Path): String {
         val root = Files.createTempDirectory("psd2live-project-")
         try {
