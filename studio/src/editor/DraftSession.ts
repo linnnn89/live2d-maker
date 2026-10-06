@@ -28,6 +28,7 @@ export class DraftSession {
   }
 
   hasBase(ir: ArtworkIR, revision: string): boolean { return revision === this.baseRevision && same(ir, this.base); }
+  inspectBase(): { ir: ArtworkIR; revision: string } { return { ir: structuredClone(this.base), revision: this.baseRevision }; }
   touch(): void { this.revision++; }
 
   apply(token: unknown, commands: unknown): void {

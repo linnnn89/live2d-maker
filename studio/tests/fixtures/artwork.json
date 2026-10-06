@@ -1,0 +1,487 @@
+{
+  "oracle": "Existing raster.py/composite_ir and Pillow 12.3.0",
+  "assets": {
+    "base.png": "iVBORw0KGgoAAAANSUhEUgAAAAcAAAAGCAYAAAAPDoR2AAAAuUlEQVR4nAGuAFH/AV5LjPrtI5s9/i/EfARtXvC5qeWHvxNvG21UKjgAn7I8PtSAmebW8AdLs+A9AonbhvX8O9hZaAIM3QBqKBCJiaMDInCoMb1AUsMRJ6tSK/AkElyw83gWAD3HcrM7Z05Q0H/W8X0RYpwFw9f/3AblHD5Qw2ABDLjSMekCdT3HJOcIXatSgCx05EpXEqJoBHD9FAHHVECCzh4mUJ96+sYfSDMn1rR2xh1X1FLbIX7mX+xPVGihxf8AAAAASUVORK5CYII=",
+    "top.png": "iVBORw0KGgoAAAANSUhEUgAAAAUAAAAFCAYAAACNbyblAAAAdElEQVR4nAFpAJb/Abbudtj3Hgj3KXVs1R1/u110DtlhANUIfF30M831M9QaDKAh1z3GNqRDAkg4Go71T4xsAZFTGCbomqyr7g/3AMbJFoIljeo2FoivjLjuGN0HUBmGAv3G+voViDKans2h+x6sJaW93eDkMCUzr5X4YT4AAAAASUVORK5CYII=",
+    "solid.png": "iVBORw0KGgoAAAANSUhEUgAAAAcAAAAGCAYAAAAPDoR2AAAAFUlEQVR4nGMMiEr5z4ADMOGSGChJAGN7AhkHTsFnAAAAAElFTkSuQmCC"
+  },
+  "cases": [
+    {
+      "name": "integer crop",
+      "ir": {
+        "canvas": {
+          "width": 8,
+          "height": 7
+        },
+        "parts": [
+          {
+            "id": "solid",
+            "name": "solid",
+            "z": 0,
+            "asset": {
+              "path": "solid.png",
+              "offset": {
+                "left": 0,
+                "top": 0
+              },
+              "size": {
+                "width": 7,
+                "height": 6
+              }
+            },
+            "geometry": {
+              "bbox": [
+                0,
+                0,
+                7,
+                6
+              ],
+              "polygon": [
+                [
+                  1,
+                  1
+                ],
+                [
+                  4,
+                  1
+                ],
+                [
+                  4,
+                  5
+                ],
+                [
+                  1,
+                  5
+                ]
+              ]
+            },
+            "appearance": {
+              "visible": true,
+              "opacity": 255
+            },
+            "semantic": {
+              "tag": "FACE",
+              "side": "none"
+            }
+          }
+        ]
+      },
+      "rgba": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAUFpk/1BaZP9QWmT/AAAAAAAAAAAAAAAAAAAAAAAAAABQWmT/UFpk/1BaZP8AAAAAAAAAAAAAAAAAAAAAAAAAAFBaZP9QWmT/UFpk/wAAAAAAAAAAAAAAAAAAAAAAAAAAUFpk/1BaZP9QWmT/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+      "bounds": [
+        1,
+        1,
+        4,
+        5
+      ]
+    },
+    {
+      "name": "fractional edge at pixel center",
+      "ir": {
+        "canvas": {
+          "width": 8,
+          "height": 7
+        },
+        "parts": [
+          {
+            "id": "solid",
+            "name": "solid",
+            "z": 0,
+            "asset": {
+              "path": "solid.png",
+              "offset": {
+                "left": 0,
+                "top": 0
+              },
+              "size": {
+                "width": 7,
+                "height": 6
+              }
+            },
+            "geometry": {
+              "bbox": [
+                0,
+                0,
+                7,
+                6
+              ],
+              "polygon": [
+                [
+                  1.5,
+                  0.5
+                ],
+                [
+                  3.5,
+                  0.5
+                ],
+                [
+                  3.5,
+                  4.5
+                ],
+                [
+                  1.5,
+                  4.5
+                ]
+              ]
+            },
+            "appearance": {
+              "visible": true,
+              "opacity": 255
+            },
+            "semantic": {
+              "tag": "FACE",
+              "side": "none"
+            }
+          }
+        ]
+      },
+      "rgba": "AAAAAFBaZP9QWmT/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAUFpk/1BaZP8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABQWmT/UFpk/wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFBaZP9QWmT/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+      "bounds": [
+        1,
+        0,
+        3,
+        4
+      ]
+    },
+    {
+      "name": "self intersecting even odd",
+      "ir": {
+        "canvas": {
+          "width": 8,
+          "height": 7
+        },
+        "parts": [
+          {
+            "id": "solid",
+            "name": "solid",
+            "z": 0,
+            "asset": {
+              "path": "solid.png",
+              "offset": {
+                "left": 0,
+                "top": 0
+              },
+              "size": {
+                "width": 7,
+                "height": 6
+              }
+            },
+            "geometry": {
+              "bbox": [
+                0,
+                0,
+                7,
+                6
+              ],
+              "polygon": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  6,
+                  6
+                ],
+                [
+                  6,
+                  0
+                ],
+                [
+                  0,
+                  6
+                ]
+              ]
+            },
+            "appearance": {
+              "visible": true,
+              "opacity": 255
+            },
+            "semantic": {
+              "tag": "FACE",
+              "side": "none"
+            }
+          }
+        ]
+      },
+      "rgba": "AAAAAAAAAAAAAAAAAAAAAAAAAABQWmT/AAAAAAAAAABQWmT/AAAAAAAAAAAAAAAAUFpk/1BaZP8AAAAAAAAAAFBaZP9QWmT/AAAAAFBaZP9QWmT/UFpk/wAAAAAAAAAAUFpk/1BaZP8AAAAAUFpk/1BaZP9QWmT/AAAAAAAAAABQWmT/AAAAAAAAAAAAAAAAUFpk/1BaZP8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAUFpk/wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+      "bounds": [
+        0,
+        0,
+        6,
+        6
+      ]
+    },
+    {
+      "name": "RGBA stacking offsets opacity",
+      "ir": {
+        "canvas": {
+          "width": 8,
+          "height": 7
+        },
+        "parts": [
+          {
+            "id": "top",
+            "name": "top",
+            "z": 8,
+            "asset": {
+              "path": "top.png",
+              "offset": {
+                "left": 2,
+                "top": 1
+              },
+              "size": {
+                "width": 5,
+                "height": 5
+              }
+            },
+            "geometry": {
+              "bbox": [
+                2,
+                1,
+                7,
+                6
+              ]
+            },
+            "appearance": {
+              "visible": true,
+              "opacity": 157
+            },
+            "semantic": {
+              "tag": "FACE",
+              "side": "none"
+            }
+          },
+          {
+            "id": "base",
+            "name": "base",
+            "z": -2,
+            "asset": {
+              "path": "base.png",
+              "offset": {
+                "left": -1,
+                "top": -1
+              },
+              "size": {
+                "width": 7,
+                "height": 6
+              }
+            },
+            "geometry": {
+              "bbox": [
+                -1,
+                -1,
+                6,
+                5
+              ]
+            },
+            "appearance": {
+              "visible": true,
+              "opacity": 73
+            },
+            "semantic": {
+              "tag": "FACE",
+              "side": "none"
+            }
+          }
+        ]
+      },
+      "rgba": "1ICZQtbwBxWz4D0BiduGRvw72BloAgw/AAAAAAAAAACJowMKcKgxNrTrd4enE3yF2XTNdbrQfgdnDn48AAAAADtnThfQf9ZFtAtyXM1Lz7WMaIUPezPPPcY2pCkAAAAA9bpHH7zeLiIcTZKvyplbSnksKELBGmGncSSzJAAAAACVcmY8NOxgLKGZPnYnu3lCJnC+f6DYIqEHUBlTAAAAAAAAAAAAAAAAw48QTDoVHIC0VVBT1po9UMQt+UEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+      "bounds": [
+        0,
+        0,
+        7,
+        6
+      ]
+    },
+    {
+      "name": "opaque foreground and off canvas",
+      "ir": {
+        "canvas": {
+          "width": 8,
+          "height": 7
+        },
+        "parts": [
+          {
+            "id": "base",
+            "name": "base",
+            "z": 0,
+            "asset": {
+              "path": "base.png",
+              "offset": {
+                "left": -2,
+                "top": 2
+              },
+              "size": {
+                "width": 7,
+                "height": 6
+              }
+            },
+            "geometry": {
+              "bbox": [
+                -2,
+                2,
+                5,
+                8
+              ]
+            },
+            "appearance": {
+              "visible": true,
+              "opacity": 255
+            },
+            "semantic": {
+              "tag": "FACE",
+              "side": "none"
+            }
+          },
+          {
+            "id": "solid",
+            "name": "solid",
+            "z": 1,
+            "asset": {
+              "path": "solid.png",
+              "offset": {
+                "left": 3,
+                "top": -2
+              },
+              "size": {
+                "width": 7,
+                "height": 6
+              }
+            },
+            "geometry": {
+              "bbox": [
+                3,
+                -2,
+                10,
+                4
+              ]
+            },
+            "appearance": {
+              "visible": true,
+              "opacity": 255
+            },
+            "semantic": {
+              "tag": "FACE",
+              "side": "none"
+            }
+          }
+        ]
+      },
+      "rgba": "AAAAAAAAAAAAAAAAUFpk/1BaZP9QWmT/UFpk/1BaZP8AAAAAAAAAAAAAAABQWmT/UFpk/1BaZP9QWmT/UFpk/0md67NNCkmjBrMuKlBaZP9QWmT/UFpk/1BaZP9QWmT/1vAHS7PgPQKJ24b1UFpk/1BaZP9QWmT/UFpk/1BaZP9wqDG9QFLDESerUivwJBJcsPN4FgAAAAAAAAAAAAAAANB/1vF9EWKcBcPX/9wG5Rw+UMNgAAAAAAAAAAAAAAAAvN4udhmJgPZF/WRAnA8GqKB/A7wAAAAAAAAAAAAAAAA=",
+      "bounds": [
+        0,
+        0,
+        8,
+        7
+      ]
+    },
+    {
+      "name": "hidden and zero opacity",
+      "ir": {
+        "canvas": {
+          "width": 8,
+          "height": 7
+        },
+        "parts": [
+          {
+            "id": "base",
+            "name": "base",
+            "z": 0,
+            "asset": {
+              "path": "base.png",
+              "offset": {
+                "left": 0,
+                "top": 0
+              },
+              "size": {
+                "width": 7,
+                "height": 6
+              }
+            },
+            "geometry": {
+              "bbox": [
+                0,
+                0,
+                7,
+                6
+              ]
+            },
+            "appearance": {
+              "visible": false,
+              "opacity": 255
+            },
+            "semantic": {
+              "tag": "FACE",
+              "side": "none"
+            }
+          },
+          {
+            "id": "top",
+            "name": "top",
+            "z": 1,
+            "asset": {
+              "path": "top.png",
+              "offset": {
+                "left": 0,
+                "top": 0
+              },
+              "size": {
+                "width": 5,
+                "height": 5
+              }
+            },
+            "geometry": {
+              "bbox": [
+                0,
+                0,
+                5,
+                5
+              ]
+            },
+            "appearance": {
+              "visible": true,
+              "opacity": 0
+            },
+            "semantic": {
+              "tag": "FACE",
+              "side": "none"
+            }
+          }
+        ]
+      },
+      "rgba": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+      "bounds": null
+    }
+  ],
+  "formats": [
+    {
+      "mode": "RGBA",
+      "png": "iVBORw0KGgoAAAANSUhEUgAAAAMAAAACCAYAAACddGYaAAAAGUlEQVR4nGPgSj7J2MCr68vMwvqfiQEJAAA/kANMcHSadwAAAABJRU5ErkJggg==",
+      "rgba": "CmPJAYANLU0DBAX/CmPJAYANLU0DBAX/"
+    },
+    {
+      "mode": "RGB",
+      "png": "iVBORw0KGgoAAAANSUhEUgAAAAMAAAACCAIAAAASFvFNAAAABnRSTlMABAAFAAZ0jsaPAAAAFUlEQVR4nGNkZGJmZmYOK1NnYoABAAzAAQacd/xLAAAAAElFTkSuQmCC",
+      "rgba": "AQID/wQFBgBaey3/AQID/wQFBgBaey3/"
+    },
+    {
+      "mode": "L",
+      "png": "iVBORw0KGgoAAAANSUhEUgAAAAMAAAACCAAAAAC4HznGAAAAAnRSTlMARuksKZ0AAAAQSURBVHicY2Bw+8/EwMAAAAavAUjVxLPiAAAAAElFTkSuQmCC",
+      "rgba": "AAAA/0ZGRgD/////AAAA/0ZGRgD/////"
+    },
+    {
+      "mode": "LA",
+      "png": "iVBORw0KGgoAAAANSUhEUgAAAAMAAAACCAQAAAA3fa6RAAAAFklEQVR4nGPgYkz2/f+fiYGBgYGBAQAY3AK8vRatTwAAAABJRU5ErkJggg==",
+      "rgba": "CgoKAWNjY03/////CgoKAWNjY03/////"
+    },
+    {
+      "mode": "1",
+      "png": "iVBORw0KGgoAAAANSUhEUgAAAAMAAAACAQAAAAC1D1u3AAAADElEQVR4nGNwYFgAAAFkAOGROt8sAAAAAElFTkSuQmCC",
+      "rgba": "AAAA//////8AAAD//////wAAAP//////"
+    },
+    {
+      "mode": "P",
+      "png": "iVBORw0KGgoAAAANSUhEUgAAAAMAAAACCAMAAACqqpYoAAADAFBMVEUKY8mADS0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADUwHazAAAAAnRSTlMBTWflwVQAAAAOSURBVHicY2BgZAAiRgAAEgAEnlUaXwAAAABJRU5ErkJggg==",
+      "rgba": "CmPJAYANLU0KY8kBgA0tTQpjyQGADS1N"
+    }
+  ]
+}

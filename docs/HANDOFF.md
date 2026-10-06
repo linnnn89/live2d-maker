@@ -145,3 +145,18 @@ Chromium 151.0.7922.34 / Playwright：1440×1000 与 390×844，真实加载仓�
 Chromium 151.0.7922.34（Linux，1440×1000 / 390×844）使用固定工作区 API 响应及仓库 yelan 模型验证 UI/Agent 共用历史、差异、无效批次、过期版本、真实拖拽及取消、模拟失败/成功保存、模型来源与替换、参数实际像素变化、无预览 PNG 编码、响应式布局和重新加载。除刻意模拟失败保存产生的 HTTP 400 外，无控制台错误/警告。本轮浏览器检查未执行 Python/JVM 原生流程。
 
 本次只改 Studio TypeScript/Node/CSS、测试与文档。Python、Kotlin、portable JVM、DLL/OpenGL、Overlay 和 Windows 安装路径均未修改。R1a PR #5 尚未合并，R1b PR 以其分支为基线，需按顺序合并。实时图层合成、草稿跨刷新持久化及原生 Agent 工作区联动留待后续切片/PC 验证。
+
+
+## 22. Studio R1c：即时合成与版本化图像读取（2026-10-06）
+
+R1a #5、R1b #6 已按用户指令合并到 main（`5006207`）。本轮在其上实施 R1c：`studio/src/artwork/` 分离像素领域层、PNG 编解码、素材缓存、Worker 及 React 画布。新增纯 JavaScript `fast-png@8.0.0`（含 fflate/iobuffer），像素解码不通过 Canvas，避免未预乘颜色被舍入；Worker 内执行像素中心 even-odd 裁切、透明度与 Pillow 兼容普通 alpha 合成。
+
+画布切换当前草稿、已保存美术和原始参照；保存更新美术对照基线。普通编辑按帧提交显示任务，排队的旧显示任务可被替换，日常重绘不编码 PNG。显式 `window.studioDraft.capture` 与 UI 导出共用像素渲染器，输出完整画布 PNG、alpha bounds、草稿/基线版本，渲染期间编辑或保存会拒绝旧结果。详情见 [STUDIO_DRAFT_COMMANDS.md](STUDIO_DRAFT_COMMANDS.md)。
+
+验证：`npm run build` 与 `npm test` 通过，37 项（新增 18 项图片/渲染/捕获回归）。`tests/fixtures/generate-artwork-fixtures.py` 提取现有 `composite_ir` 函数，结合原 `raster.py` 与 Pillow 12.3.0 生成固定对照，覆盖分数边界、自交、层序、负位置、透明度、隐藏以及 RGB/RGBA/灰度/调色板解码；日常 Node 测试不需要 Python。
+
+Browser plugin 不可用，使用已有 Python Playwright / Chromium 151，在 1440×1000 与 390×844 验证实际画面、隐藏/撤销/重做、裁切透明度导出与 Python 逐字节一致、对照、PNG 下载、拖动/取消、版本冲突及渲染并发、失败/成功保存、素材哈希错误与重新加载恢复、viewer 参数和布局。工作区 API 为固定响应，浏览器没有调用 Python/JVM；Python 仅作为图片对照 oracle。除刻意模拟失败保存的 HTTP 400 外，无控制台错误或警告。截图和临时脚本保留在执行环境 /tmp，未加入仓库。
+
+边界：仅 2D 平面普通合成；16 位 PNG 暂不支持，单素材/画布最多 16777216 像素。解码缓存与当前裁切层缓存各有 128 MiB 限额，但尚不是整个 Worker 的总峰值内存预算；全图重合成和加载并发仍有优化空间。用户追加要求的工程审阅已写入 [ENGINEERING_REVIEW_R1.md](ENGINEERING_REVIEW_R1.md)，优先处理草稿全量复制、二次复杂度差异查询和历史增长，再扩展恢复与原生联动。
+
+本轮未修改 Python 生产代码、Kotlin、portable JVM、DLL/OpenGL、Overlay 或 Windows 进程路径；这些集成继续留待用户 PC 验证。新增 Python 文件仅生成图片测试样本。

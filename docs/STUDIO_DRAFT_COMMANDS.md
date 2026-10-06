@@ -1,4 +1,4 @@
-# Studio 草稿命令 v1（R1b）
+# Studio 草稿命令 v1（R1b / R1c）
 
 人和 Agent 共用 `studio/src/editor/` 的命令、版本、差异与历史规则。UI 的图层显示、轮廓坐标、关键点和拖拽都通过该领域层执行。Agent 可直接调用结构化接口，无须模拟点击或修改 React 状态。
 
@@ -101,4 +101,42 @@ node studio/scripts/draft-cli.mjs < request.json > proposal.json
 
 历史限于当前标签页当前草稿，不持久化。保存或成功导入新版本开始新草稿，清空历史；放弃草稿恢复最后已保存 IR 并清空历史。返回同一保存版本的构建/QA 快照不重置草稿。导入弹窗及构建/QA 期间可读状态，禁止命令写入。Cubism 参数预览属于独立 viewer 状态，不进入 IR 历史。
 
-本轮未实现实时图层合成、跨刷新恢复、原生绑定命令或现有 Kotlin Agent 工作区的事务联动。相关工作分别需要核对浏览器显示规则或用户 Windows PC 的端到端行为。
+R1c 已加入即时图层合成与下述图像读取接口。跨刷新恢复、原生绑定命令及现有 Kotlin Agent 工作区的事务联动尚未实现。
+
+
+## R1c 版本化美术图像输出
+
+浏览器新增独立只读方法 `window.studioDraft.capture(request)`，不改变原有 `execute` 契约、草稿版本或历史。请求为 `{schemaVersion:1,state:{draftId,revision},source?:"draft"|"saved"}`，默认 `draft`。`saved` 读取该草稿的保存基线；两种来源都要求当前草稿 token，以便明确对照关系。
+
+```javascript
+const read = await window.studioDraft.execute({schemaVersion: 1, operation: 'inspect'});
+if (!read.ok) throw new Error(read.error.message);
+const result = await window.studioDraft.capture({
+  schemaVersion: 1,
+  state: {draftId: read.state.draftId, revision: read.state.revision},
+  source: 'draft',
+});
+if (!result.ok) throw new Error(result.error.message);
+// 将 dataUrl 作为多模态 Agent 的图像输入；勿把 base64 当文本塞进提示词。
+console.log(result.image.draftId, result.image.revision, result.image.bounds);
+const imageInput = result.image.dataUrl;
+```
+
+成功响应为 `{ok:true,image}`，`image` 包含：
+
+| 字段 | 含义 |
+| --- | --- |
+| `mimeType`, `dataUrl` | `image/png`，以及 `data:image/png;base64,...` |
+| `width`, `height` | 完整 IR 画布的原始像素尺寸 |
+| `bounds` | 非零 alpha 范围 `[left,top,right,bottom]`，空画布为 `null` |
+| `source` | `draft` 或 `saved` |
+| `draftId`, `revision`, `baseRevision` | 图像绑定的草稿身份、请求版本和保存基线 |
+| `renderVersion` | 当前像素渲染契约为 `1` |
+
+图像只包含平面美术，没有棋盘格、选中轮廓、关键点标记、页面文字或 Cubism 模型。预览姿态、画布聚焦和屏幕尺寸不影响导出像素；隐藏图层与零透明度不出现在图像中。渲染共享现有 Python 的像素中心裁切、even-odd 和普通 alpha 合成规则；导出 PNG 的 RGBA 与仓库的 Python 对照样本逐字节一致。
+
+调用前或异步完成时 token 不匹配均返回 `DRAFT_CONFLICT`，不返回可能被误认成新版本的图像。拖拽、保存或工作区操作中返回 `BUSY`。失败格式为 `{ok:false,error:{code,message,partId?}}`；素材读取、哈希、尺寸、格式问题分别可能返回 `ASSET_LOAD`、`ASSET_HASH`、`ASSET_SIZE`、`ASSET_FORMAT`，超出 16777216 像素限制返回 `IMAGE_SIZE`。16 位 PNG 当前明确拒绝；工作区原文件不会因此改变。返回错误后可修复素材或重新读取状态再尝试，不会悄悄跳过图层。
+
+界面“导出美术 PNG”调用相同读取流程。只有显式导出编码 PNG，日常拖动传输 RGBA 并重绘。解码和逐像素工作在 Worker 中；屏幕显示使用 Canvas，缩放插值不能作为原始像素相等性的判据。
+
+这个图像入口需要当前 Studio 标签页以及可读取的工作区素材。离线 `draft-cli.mjs` 仍只生成 JSON 提案，没有新增远程渲染服务或自动保存能力。
