@@ -119,3 +119,15 @@ busy409 最多尝试三次，耗尽或其他错误提供手动重开；未加载
 ## 19. README 重写（2026-10-05）
 
 根 README 改为功能、安装、使用、目录与许可，去掉技能内部层级和重复介绍。只修改 README；核对16处本地链接与启动入口，确认远端内容一致，提交 `749a74b` 已推送。应用代码和运行时未变，未重新执行应用测试。
+
+## 20. Studio R1a：预览适配器和模型来源（2026-10-06）
+
+提取 `ViewerAdapter` 与 `useModelPreview`，统一加载/失败状态、取景、参数和重置。参数更新按动画帧合并调用 `render()`，PNG 编码仅用于明确截图；替换 iframe 时清理加载轮询和待绘制帧。viewer 新增可选 `embed=1`，移除 Studio 对 iframe 的样式注入。界面标明当前已保存模型，或上次模型对应的未保存/待重建修改。
+
+Linux Node 24.19.0：`npm run build` 通过，`npm test` 7/7。用例覆盖 ready/取景、实际参数限值、合并绘制、显式截图、加载等待、错误/超时、旧模型释放。
+
+Chromium 151.0.7922.34 / Playwright：1440×1000 与 390×844，真实加载仓库 yelan moc3 和 Cubism Web；滑块实际改变渲染像素，重置恢复参数，三种模型来源提示、iframe 替换及刷新恢复通过。预览交互未编码 PNG，页面无相关 console error/warning、无框架错误覆盖层；窄屏无横向溢出。Browser 插件不可用，使用独立 Playwright。
+
+浏览器检查的 open/save/rebuild 使用固定 API 响应，未调用 Python/JVM；它证明前端行为，不代表原生构建完成。临时脚本、截图和结果位于 `/tmp/live2d-r1a-browser-check.py`、`/tmp/live2d-r1a-evidence/`，不提交 Git。
+
+本轮保留 Windows 专属工作：portable/JVM 桥接、原生配置/导出/Overlay、DLL/OpenGL、桌面项目/界面及安装包。计划下一步为 R1b 的纯前端草稿命令与撤销/重做，原生接入待用户 PC 迭代。
