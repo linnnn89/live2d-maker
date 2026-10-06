@@ -124,3 +124,5 @@ CLI 和界面不调用生成 API，不自动绘制 mask，也不处理全尺寸�
 尚未覆盖：完整角色美术验收、桌面窗口逐项交互、sampleMotion 的真实 DLL 调用、Studio 物理实时播放、全部 Overlay 组合、独立 Studio 安装包和可选 See-through 推理环境。
 
 技能包独立发布检查仍有 vendor 台账 TODO 与真实 Agent 行为评测未运行，状态分别保存在 [vendor 台账](../skills/live2d-studio/references/vendor-manifest.md) 和 [行为评测记录](../skills/live2d-studio/tests/behavior-evaluation.json)。它们不代表已交付的本地软件功能失效，也不应被结构校验结果替代。
+
+同日完成 E5：工作区用例与画布/图层/点编辑/差异组件提取，Node transport/runner/resources 独立并可注入验证。构建及 54 项回归、实际 Edge 编辑/保存/导入/原生重建/Cubism 参数/16 姿态 QA 通过；保留原生警告，未修改引擎算法或建立后台任务服务。接续 E6/R2–R8；详情见工程审阅 E5 与交接第 28 节。

@@ -98,3 +98,5 @@ R1c 的 PNG 解码、像素中心 even-odd 裁切、透明度及普通 alpha 叠
 仅监听 127.0.0.1:5173，固定端口；API 检查 Host/Origin，写入串行化，Python 工作区也有排他锁，子进程不经 shell。仅服务工作区内的 PNG/JSON/moc3 与既有 viewer/vendor 白名单资源，不暴露整个仓库。若异常退出留下 `.studio.lock`，先确认该工作区没有运行中的命令，再移除这个锁文件。
 
 `npm run build` 进行 TypeScript 检查和前端打包；`dist` 不是可以独立执行 CLI 的发布包，操作功能需要 dev server。当前没有产品发布、打包安装器、Agent 自动生成几何、ImageGen 按钮、物理实时预览或 Cubism Editor 美术验收。默认 QA 是静态姿态检查。
+
+E5 将打开/保存/导入/原生任务编排放在 `src/workspace/useWorkspaceActions.ts`，画布、图层、点属性和差异在同目录。`bridge/transport.ts`、`runner.ts`、`resources.ts` 分别负责 HTTP、Python CLI 和资源白名单；Vite 配置只组合它们。交互、命令和单工作区排他请求语义保持，尚无后台任务队列。

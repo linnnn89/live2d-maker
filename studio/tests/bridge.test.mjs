@@ -1,0 +1,83 @@
+import assert from 'node:assert/strict';
+import {test,after} from 'node:test';
+import {mkdtempSync,rmSync,symlinkSync,writeFileSync,mkdirSync,existsSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
+import {createRequire} from 'node:module';
+import {spawnSync} from 'node:child_process';
+import {createServer} from 'node:http';
+import {EventEmitter} from 'node:events';
+import {PassThrough} from 'node:stream';
+const studio=fileURLToPath(new URL('..',import.meta.url)),repo=path.dirname(studio);
+const output=mkdtempSync(path.join(tmpdir(),'studio-bridge-test-'));
+symlinkSync(path.join(studio,'node_modules'),path.join(output,'node_modules'),'junction');
+after(()=>rmSync(output,{recursive:true,force:true}));
+const compile=spawnSync(process.execPath,[path.join(studio,'node_modules/typescript/bin/tsc'),'--target','ES2022',
+  '--module','commonjs','--esModuleInterop','--strict','--skipLibCheck','--outDir',output,'bridge/runner.ts','bridge/transport.ts'],{cwd:studio,encoding:'utf8'});
+assert.equal(compile.status,0,compile.stdout+compile.stderr);
+const require=createRequire(import.meta.url),{createRunner}=require(path.join(output,'bridge/runner.js'));
+const {createTransport}=require(path.join(output,'bridge/transport.js'));
+const snapshot={schemaVersion:1,workspaceId:'0'.repeat(32),status:'ok',revision:'base',ir:{canvas:{width:2,height:2},parts:[]},
+  stale:{},overlay:{status:'not-loaded',reasons:[]},sourceImage:'/studio-files/source.png',sourceBounds:null,artworkBounds:null,build:null,qa:null};
+const config=()=>({repo,workspace:path.join(output,'workspace'),python:path.join(repo,'python/Scripts/python.exe'),port:0,env:{}});
+async function serverFor(config,runner){
+  let handle;const server=createServer((req,res)=>void handle(req,res,()=>{res.writeHead(404);res.end();}));
+  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));config.port=server.address().port;
+  handle=createTransport(config,runner);
+  return {url:`http://127.0.0.1:${config.port}`,close:()=>new Promise(resolve=>server.close(resolve))};
+}
+
+test('transport validates methods, origin, body and protocol before running, and releases the exclusive gate on failure',async()=>{
+  const c=config(),calls=[];let release;
+  const service=await serverFor(c,(command,payload)=>{calls.push([command,payload]);return command==='studio-open'
+    ?new Promise(resolve=>release=resolve):Promise.resolve(snapshot);});
+  const error=async(route,options,code)=>{const response=await fetch(service.url+route,options);assert.equal((await response.json()).detail.code,code);};
+  try{
+    const open=fetch(service.url+'/api/open',{method:'POST'});while(!release)await new Promise(resolve=>setImmediate(resolve));
+    await error('/api/snapshot',{},'BACKEND_BUSY');release(snapshot);assert.equal((await (await open).json()).revision,'base');
+    await error('/api/save',{method:'GET'},'METHOD_NOT_ALLOWED');
+    await error('/api/save',{method:'POST',headers:{Origin:'https://elsewhere.invalid'},body:'{}'},'FORBIDDEN');
+    await error('/api/save',{method:'POST',body:'invalid'},'INVALID_REQUEST');
+    await error('/api/save',{method:'POST',body:JSON.stringify({revision:'base',ir:snapshot.ir,extra:true})},'INVALID_REQUEST');
+    await error('/api/save',{method:'POST',body:' '.repeat(2*1024*1024+1)},'REQUEST_SIZE');
+    assert.equal(calls.length,1);
+    const response=await fetch(service.url+'/api/save',{method:'POST',body:JSON.stringify({revision:'base',ir:snapshot.ir})});
+    assert.equal(response.status,200);assert.equal(calls[1][0],'studio-save');assert.equal(JSON.parse(calls[1][1]).revision,'base');
+    assert.equal((await fetch(service.url+'/api/snapshot')).status,200);
+  }finally{await service.close();}
+  const failed=await serverFor(config(),async()=>{throw new Error('fixture failed');});
+  try{for(let i=0;i<2;i++){const response=await fetch(failed.url+'/api/open',{method:'POST'});assert.equal((await response.json()).detail.code,'BACKEND_FAILED');}}
+  finally{await failed.close();}
+});
+
+test('resource provider serves real artifacts and HEAD while rejecting traversal, junction escape and unserved file types',async()=>{
+  const c=config();mkdirSync(c.workspace);mkdirSync(path.join(output,'outside'));
+  writeFileSync(path.join(c.workspace,'ok.json'),'{}');writeFileSync(path.join(c.workspace,'private.txt'),'private');
+  writeFileSync(path.join(output,'outside','secret.json'),'secret');
+  symlinkSync(path.join(output,'outside'),path.join(c.workspace,'escape'),'junction');
+  const service=await serverFor(c,async()=>snapshot);
+  try{
+    assert.equal(await (await fetch(service.url+'/studio-files/ok.json')).text(),'{}');
+    const head=await fetch(service.url+'/studio-files/ok.json',{method:'HEAD'});assert.equal(head.status,200);assert.equal(await head.text(),'');
+    for(const file of ['private.txt','escape/secret.json','%2e%2e%2foutside%2fsecret.json','%ZZ'])assert.equal((await fetch(service.url+'/studio-files/'+file)).status,404,file);
+    assert.equal((await fetch(service.url+'/studio-files/ok.json',{method:'POST'})).status,405);
+  }finally{await service.close();}
+});
+
+test('runner constructs shell-free Windows arguments and checks CLI results, with a real project Python snapshot when available',async()=>{
+  const c=config();c.env={STUDIO_IR:'fixture.json'};let child,args,options;
+  const launch=(program,a,o)=>{assert.equal(program,c.python);args=a;options=o;child=new EventEmitter();
+    child.stdout=new PassThrough();child.stderr=new PassThrough();child.stdin=new PassThrough();return child;};
+  const runner=createRunner(c,launch);
+  const opening=runner('studio-open');assert.ok(args.includes(path.join(repo,'fixture.json')));assert.equal(options.shell,false);
+  assert.equal(options.windowsHide,true);assert.equal(options.env.PYTHONIOENCODING,'utf-8');
+  child.stdout.write(JSON.stringify(snapshot));child.emit('close',0);assert.deepEqual(await opening,snapshot);
+  assert.throws(()=>runner('arbitrary-command'));
+  const failure=runner('studio-save','{}');child.stdout.write(JSON.stringify({error:'conflict',detail:{code:'BASE_CONFLICT',message:'conflict',stage:'save',retryable:false}}));
+  child.emit('close',1);await assert.rejects(failure,{code:'BASE_CONFLICT'});
+  const malformed=runner('studio-snapshot');child.stdout.write('{}');child.emit('close',0);await assert.rejects(malformed,{code:'CLI_PROTOCOL_ERROR'});
+  const cannotStart=runner('studio-snapshot');child.emit('error',new Error('fixture launch'));await assert.rejects(cannotStart,{code:'CLI_START_FAILED'});
+  const workspace=path.join(repo,'out/studio-e4-verified');
+  if(existsSync(c.python)&&existsSync(path.join(workspace,'studio-state.json'))){const real=await createRunner({...c,workspace})('studio-snapshot');assert.equal(real.status,'ok');assert.equal(real.workspaceId.length,32);}
+});
