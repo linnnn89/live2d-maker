@@ -2,7 +2,7 @@ import { createRoot } from 'react-dom/client';
 import './style.css';
 import { ImportGenerated } from './ImportGenerated';
 import { useModelPreview } from './viewer/useModelPreview';
-import type { Parameter } from './viewer/ViewerAdapter';
+import {ParameterPanel} from './model/ParameterPanel';
 import { RecoveryPanel } from './recovery/RecoveryPanel';
 import { WorkspaceProvider,useWorkspace } from './workspace/WorkspaceContext';
 import { ArtworkWorkspace } from './workspace/ArtworkWorkspace';
@@ -16,18 +16,13 @@ function App(){
   const {saved,editor,draft,ir,dirty,selected,busy,message,error,editingLocked,showQa,setShowQa,showImport,
     openImport,closeImport,commitImport,retryOpen,action,history}=useWorkspace();
   const modelUrl=saved?.build?.modelUrl;
-  const {attachFrame,onLoad,parameters,previewStatus,setParameter,reset}=useModelPreview(modelUrl,saved?.build?.modelBounds,!!saved);
+  const {attachFrame,onLoad,parameters,previewStatus,setParameter,reset,applyPose}=useModelPreview(modelUrl,saved?.build?.modelBounds,!!saved);
   const stale = (stage: string) => dirty || saved?.stale[stage];
   const overlayStatus = dirty && saved?.overlay.status !== 'not-loaded' ? 'needs-review' : saved?.overlay.status;
   const previewSource = !saved?.build ? '尚未生成模型'
     : dirty ? '上次生成模型 · 当前有未保存修改'
     : saved.stale.moc3 ? '上次生成模型 · 已保存修改尚未更新'
     : '当前已保存版本的模型';
-  const visibleParams = [...parameters].sort((a, b) => {
-    const preferred = ['ParamAngleX', 'ParamAngleY', 'ParamMouthOpenY', 'ParamEyeLOpen', 'ParamEyeROpen'];
-    const score = (p: Parameter) => preferred.includes(p.id) ? preferred.indexOf(p.id) : 99;
-    return score(a) - score(b);
-  });
 
   return <div className="app">
     <header className="topbar"><h1>Live2D <span>Studio</span></h1><div className="document-name">{saved?.project?.name || ir?.metadata?.name || '工作区'} · {ir?.parts.length || 0} 图层</div><div className="actions">
@@ -46,7 +41,7 @@ function App(){
       <aside className="preview-column"><section className="panel preview-panel"><div className="panel-heading"><h2>Cubism 预览</h2><span className="preview-status">{previewStatus}</span></div><p className="canvas-reference" role="status">{previewSource}</p><div className="preview checker">
         {modelUrl && ir ? <iframe key={modelUrl} ref={attachFrame} title="Cubism 实时预览" onLoad={onLoad} src={'/live2d-viewer/index.html?' + new URLSearchParams({ model: modelUrl, vendor: '/public/vendor/cubism/', canvaspx: `${ir.canvas.width},${ir.canvas.height}`, w: '640', h: '760', embed: '1' })}/> : <div className="empty">点击 Rebuild 生成预览</div>}
       </div></section>
-      <section className="panel parameters-panel"><div className="panel-heading"><h2>参数</h2><button className="text-button" disabled={!parameters.length} onClick={reset}>重置</button></div><div className="parameters">{visibleParams.map(p => <label className="parameter" key={p.id}><span>{p.id}</span><div><input aria-label={p.id} type="range" min={p.min} max={p.max} step={(p.max - p.min) / 200 || 0.01} value={p.value} onChange={e => setParameter(p.id, Number(e.target.value))}/><output>{p.value.toFixed(2)}</output></div></label>)}{!parameters.length && <p className="empty">模型就绪后显示原生参数</p>}</div></section>
+      <ParameterPanel parameters={parameters} setParameter={setParameter} reset={reset} applyPose={applyPose}/>
       <BuildSettingsPanel/>
       <ProjectPanel/>
       <ModelExportPanel/>

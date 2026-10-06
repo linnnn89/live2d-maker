@@ -125,13 +125,20 @@ def native_objects(model):
     return objects
 
 
+def native_parameters(model):
+    return [{"id": str(getter(parameter, "getId")), "min": float(parameter.getMin()),
+             "max": float(parameter.getMax()), "default": float(parameter.getDefault())}
+            for parameter in model.getParameters()]
+
+
 def snapshot(preview, runtime, jp):
     model = preview.getRig().getPuppet()
     state = plain(model, jp)
     # Persist per-field hashes, rather than tens of MB of duplicated keyform arrays.
     signatures = {key: digest(value) for key, value in state.items()}
     return {"format": "psd2live-native-base-v1", "runtime": runtime,
-            "modelSignatures": signatures, "modelSha256": digest(signatures), "objects": native_objects(model)}
+            "modelSignatures": signatures, "modelSha256": digest(signatures), "objects": native_objects(model),
+            "parameters": native_parameters(model)}
 
 
 def empty_output(out):
@@ -159,7 +166,7 @@ def native_base(psd, out, native_jar=None, configuration=None):
     file.write_text(json.dumps(evidence, indent=2, allow_nan=False), encoding="utf-8")
     return {"status": "ok", "action": "native-base", "baseline": str(file),
             "model_sha256": evidence["modelSha256"], "objects_count": len(evidence["objects"]),
-            "warnings": evidence["warnings"], "visual_acceptance": "pending Pose QA"}
+            "parameters": evidence["parameters"], "warnings": evidence["warnings"], "visual_acceptance": "pending Pose QA"}
 
 
 SUPPORTED_SECTIONS = {"parameters", "deletedParameterIds", "keyformSets", "keyformCopies", "keyformDeletes"}
@@ -538,6 +545,7 @@ def native_replay(psd, overlay_file, baseline_file, out, native_jar=None, config
               "native_journal_edits": len(native.getAuthoringJournal()) if native_jar else 0,
               "reasons": introduced, "warnings": list(map(str, result.getWarnings())),
               "runtime": runtime,
+              "parameters": native_parameters(result.getPreviewModel().getRig().getPuppet()),
               "exported_files": [str(v.getPath()) for v in result.getExportedFiles()],
               "visual_acceptance": "pending Pose QA; native validation alone is insufficient"}
     (out / "native-replay.json").write_text(json.dumps(report, indent=2), encoding="utf-8")

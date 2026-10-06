@@ -47,6 +47,14 @@ function fixture() {
   };
 }
 
+test('applying a complete pose rejects incompatible parameters before any reset or partial mutation',()=>{
+  const f=fixture();f.adapter.connect(()=>{});f.adapter.setParameter('Angle',12);f.frame();
+  const before=f.counts();assert.throws(()=>f.adapter.applyPose({Angle:20,Missing:1}),/Missing/);assert.equal(f.viewer.params()[0].value,12);assert.deepEqual(f.counts(),before);assert.equal(f.frames.size,0);
+  assert.throws(()=>f.adapter.applyPose({Angle:31}),/当前范围/);assert.throws(()=>f.adapter.applyPose({Angle:NaN}),/不兼容/);
+  assert.equal(f.adapter.applyPose({Angle:-20})[0].value,-20);assert.equal(f.frames.size,1);f.frame();assert.equal(f.counts().renders,before.renders+1);assert.equal(f.counts().captures,0);
+  assert.equal(f.adapter.applyPose({})[0].value,0);f.adapter.dispose();assert.equal(f.frames.size,0);assert.equal(f.adapter.applyPose({Angle:10}),undefined);
+});
+
 test('ready models are framed and rendered without encoding a screenshot', () => {
   const f = fixture();
   f.adapter.connect(state => f.states.push(state), [10, 20, 110, 220]);

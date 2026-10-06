@@ -20,7 +20,7 @@ ID = re.compile(r"^[a-f0-9]{32}$")
 MAX_UPLOAD = 128 * 1024 * 1024
 MAX_EXPANDED = 1024 * 1024 * 1024
 ROOT_FILES = {"authoring-rig.json", "origin-ir.json", "studio-state.json", "source.psd", "source.png",
-              "build-settings.json", "overlay.json", "overlay-baseline.json", "project.json"}
+              "build-settings.json", "overlay.json", "overlay-baseline.json", "project.json", "poses.json"}
 
 
 def now():
@@ -117,7 +117,8 @@ def capture(root):
     from .studio import read
     data = read(root / "authoring-rig.json"); validate_authoring_rig(data, root)
     state = read(root / "studio-state.json"); check_state_paths(state)
-    return {"ir": data, "settings": load_settings(root), "state": state,
+    from .poses import load_library
+    return {"ir": data, "settings": load_settings(root), "state": state, "poses": load_library(root),
             "overlay": read(root / "overlay.json") if state["overlay"] else None,
             "baseline": read(root / "overlay-baseline.json") if state["overlay"] else None}
 
@@ -133,6 +134,9 @@ def checkpoint(root, message, expected=None):
         from .delivery import overlay_revision
         if "overlayRevision" in expected and expected["overlayRevision"] != overlay_revision(root, value["state"]):
             raise StudioError("BASE_CONFLICT", "Overlay changed before project save", "project")
+        from .stale import _canonical_hash
+        if "posesRevision" in expected and expected["posesRevision"] != _canonical_hash(value["poses"]):
+            raise StudioError("POSE_CONFLICT", "Saved poses changed before project save", "project")
     metadata = read(root / "project.json")
     if expected and expected["head"] != metadata["head"]:
         raise StudioError("PROJECT_CONFLICT", "Saved project head changed; read revisions before saving", "project")
@@ -167,6 +171,8 @@ def save_project(root, payload):
 def validate_capture(value, root):
     validate_authoring_rig(value["ir"], root)
     validate_protocol("BuildSettings", value["settings"])
+    from .poses import validate_library, EMPTY
+    validate_library(value.get("poses", EMPTY))
     check_state_paths(value["state"])
     if value["state"]["overlay"] and (not isinstance(value["overlay"], dict) or not isinstance(value["baseline"], dict)):
         raise StudioError("INVALID_REQUEST", "Revision is missing its Overlay or baseline", "project")
@@ -183,6 +189,8 @@ def apply_transaction(root, transaction):
     value = transaction["capture"]
     write(root / "authoring-rig.json", value["ir"])
     write(root / "build-settings.json", value["settings"])
+    from .poses import EMPTY
+    write(root / "poses.json", value.get("poses", EMPTY))
     if value["state"]["overlay"]:
         write(root / "overlay.json", value["overlay"]); write(root / "overlay-baseline.json", value["baseline"])
     write(root / "studio-state.json", value["state"])
@@ -210,12 +218,17 @@ def restore_project(root, payload):
         from .delivery import overlay_revision
         if "overlayRevision" in payload and payload["overlayRevision"] != overlay_revision(root, current["state"]):
             raise StudioError("BASE_CONFLICT", "Overlay changed before restore", "project")
+        from .stale import _canonical_hash
+        if "posesRevision" in payload and payload["posesRevision"] != _canonical_hash(current["poses"]):
+            raise StudioError("POSE_CONFLICT", "Saved poses changed before restore", "project")
         record = read(root / "project-revisions" / payload["id"] / "revision.json")
         validate_capture(record, root)
         # Preserve the current working state before moving to an older branch point.
         checkpoint(root, "恢复前自动保存")
         metadata = read(root / "project.json")
         target = {key: copy.deepcopy(record[key]) for key in ("ir", "settings", "state", "overlay", "baseline")}
+        from .poses import EMPTY
+        target["poses"] = copy.deepcopy(record.get("poses", EMPTY))
         target["state"].update(workspaceId=current["state"]["workspaceId"], projectId=current["state"]["projectId"], source=current["state"]["source"])
         transaction = {"capture": target, "metadata": {**metadata, "head": record["id"], "updatedAt": now()}}
         write(root / ".project-transaction.json", transaction)

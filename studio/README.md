@@ -139,3 +139,11 @@ CLI `studio-catalog --workspace <目录>` 从 stdin 接收 `{ "schemaVersion":1,
 首次导出同时准备 cmo3 和动作，随后只切换目标或动作文件选择时复用同一验证模型。缓存键包含像素/绑定输入、构建设置、Overlay/基线、实际 JAR/JVM 身份和默认物理选择；注记变化可以复用，模型输入或设置变化须重新生成。复用前核对完整原生产物哈希，缺失或损坏会创建新产物，保留旧证据。首次准备两个格式的开销仍存在，不声称实现常驻建模服务。完整 Studio 工程归档现包含导出缓存、交付报告和模型 ZIP，仍受上述归档容量限制。
 
 `studio-model-export --workspace <目录>` 的 stdin 为 `{ "schemaVersion":1, "revision":"IR版本", "settingsRevision":"设置版本", "overlayRevision":"Overlay版本", "target":"playable或editor", "exportMotions":true, "generatePhysics":false }`。从 snapshot 获取三种版本，旧请求返回 `BASE_CONFLICT`，原生拒绝交付返回 `EXPORT_FAILED`；不修改 IR。返回下载 URL、逐文件长度/哈希、警告、缓存身份、模型哈希、实际动作数量及物理是否存在。
+
+## 参数与保存姿态
+
+模型就绪后，参数按头部、眼睛、嘴部、身体、头发及其他分组；数值输入与滑块遵循当前模型的真实范围，单项重置使用原生默认值。常用预设先恢复其他参数默认值，再应用指定参数。展开“姿态预设与保存”，命名后保存当前姿态；可读取、应用或删除已有姿态。姿态只改变预览数值，不修改美术、持久模型绑定或已有 QA。
+
+保存前须提交美术和构建设置，并完成当前模型重建。旧模型报告没有参数范围时，重建后才可保存。项目内 poses.json 独立记录最多 100 份姿态；项目修订与完整工程归档包含姿态库，旧修订按空库恢复。多窗口保存冲突会保留名称输入，点击“读取姿态库”后可再保存。当前模型缺少某参数或范围不兼容时，应用整体拒绝，保留当前全部参数并说明原因。
+
+`studio-poses --workspace <目录>` 从 stdin 接收 v1 JSON：保存为 `{ "schemaVersion":1, "operation":"save", "revision":"IR版本", "settingsRevision":"设置版本", "overlayRevision":"Overlay版本", "buildId":"builds/<32位ID>", "posesRevision":"姿态库版本", "name":"姿态名称", "values":{ "ParamAngleX":20 } }`，删除为 `{ "schemaVersion":1, "operation":"delete", "posesRevision":"姿态库版本", "id":"姿态ID" }`。版本来自 snapshot；未知参数、越界或非有限值拒绝写入。项目保存/恢复还可传 posesRevision，当前界面总是核对。此入口不提供关键形编辑。

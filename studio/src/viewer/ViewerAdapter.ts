@@ -89,6 +89,22 @@ export class ViewerAdapter {
     return this.viewer.params();
   }
 
+  applyPose(values: Record<string, number>): Parameter[] | undefined {
+    if (!this.viewer || this.disposed) return;
+    const parameters = new Map(this.viewer.params().map(parameter => [parameter.id, parameter]));
+    // Validate the entire pose before reset or any mutation; never silently skip an incompatible axis.
+    for (const [id, value] of Object.entries(values)) {
+      const parameter = parameters.get(id);
+      if (!parameter || !Number.isFinite(value) || value < parameter.min || value > parameter.max) {
+        throw new Error(`姿态参数不兼容：${id}=${value}${parameter ? `，当前范围 ${parameter.min}–${parameter.max}` : '，当前模型无此参数'}`);
+      }
+    }
+    this.viewer.reset();
+    if (Object.keys(values).length) this.viewer.setParams(values);
+    this.scheduleRender();
+    return this.viewer.params();
+  }
+
   capture(): string | undefined {
     if (!this.viewer || this.disposed) return;
     return this.viewer.snapshot();

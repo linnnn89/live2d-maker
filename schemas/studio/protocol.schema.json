@@ -736,6 +736,12 @@
                 },
                 "buildSettings": {
                   "$ref": "#/definitions/BuildSettings"
+                },
+                "parameters": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/ParameterRange"
+                  }
                 }
               },
               "required": [
@@ -821,6 +827,9 @@
               "additionalProperties": false
             }
           ]
+        },
+        "poses": {
+          "$ref": "#/definitions/PoseState"
         }
       },
       "required": [
@@ -864,20 +873,47 @@
         {
           "type": "object",
           "properties": {
-            "kind": { "type": "string", "enum": ["manual", "external"] },
-            "description": { "type": "string", "minLength": 1, "maxLength": 16000 }
+            "kind": {
+              "type": "string",
+              "enum": [
+                "manual",
+                "external"
+              ]
+            },
+            "description": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 16000
+            }
           },
-          "required": ["kind", "description"],
+          "required": [
+            "kind",
+            "description"
+          ],
           "additionalProperties": false
         },
         {
           "type": "object",
           "properties": {
-            "kind": { "const": "ai" },
-            "description": { "type": "string", "minLength": 1, "maxLength": 16000 },
-            "prompt": { "type": "string", "minLength": 1, "maxLength": 16000 }
+            "kind": {
+              "const": "ai"
+            },
+            "description": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 16000
+            },
+            "prompt": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 16000
+            }
           },
-          "required": ["kind", "description", "prompt"],
+          "required": [
+            "kind",
+            "description",
+            "prompt"
+          ],
           "additionalProperties": false
         }
       ]
@@ -892,7 +928,9 @@
           "type": "string",
           "minLength": 1
         },
-        "origin": { "$ref": "#/definitions/AssetOrigin" },
+        "origin": {
+          "$ref": "#/definitions/AssetOrigin"
+        },
         "generatedPng": {
           "type": "string"
         },
@@ -1518,6 +1556,10 @@
         "overlayRevision": {
           "type": "string",
           "pattern": "^[a-f0-9]{64}$"
+        },
+        "posesRevision": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
         }
       },
       "required": [
@@ -1552,6 +1594,10 @@
           "pattern": "^[a-f0-9]{32}$"
         },
         "overlayRevision": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "posesRevision": {
           "type": "string",
           "pattern": "^[a-f0-9]{64}$"
         }
@@ -1731,6 +1777,190 @@
         "overlayRevision"
       ],
       "additionalProperties": false
+    },
+    "ParameterRange": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "min": {
+          "type": "number"
+        },
+        "max": {
+          "type": "number"
+        },
+        "default": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "min",
+        "max",
+        "default"
+      ],
+      "additionalProperties": false
+    },
+    "PoseValues": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 256,
+      "propertyNames": {
+        "minLength": 1,
+        "maxLength": 128
+      },
+      "additionalProperties": {
+        "type": "number"
+      }
+    },
+    "SavedPose": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{32}$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "values": {
+          "$ref": "#/definitions/PoseValues"
+        },
+        "modelSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "values",
+        "modelSha256"
+      ],
+      "additionalProperties": false
+    },
+    "PoseLibrary": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "items": {
+          "type": "array",
+          "maxItems": 100,
+          "items": {
+            "$ref": "#/definitions/SavedPose"
+          }
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "items"
+      ],
+      "additionalProperties": false
+    },
+    "PoseState": {
+      "type": "object",
+      "properties": {
+        "revision": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "library": {
+          "$ref": "#/definitions/PoseLibrary"
+        }
+      },
+      "required": [
+        "revision",
+        "library"
+      ],
+      "additionalProperties": false
+    },
+    "PoseRequest": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "schemaVersion": {
+              "const": 1
+            },
+            "posesRevision": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "operation": {
+              "const": "save"
+            },
+            "revision": {
+              "type": "string",
+              "minLength": 1
+            },
+            "settingsRevision": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "overlayRevision": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "buildId": {
+              "type": "string",
+              "pattern": "^builds/[a-f0-9]{32}$"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "values": {
+              "$ref": "#/definitions/PoseValues"
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "posesRevision",
+            "operation",
+            "revision",
+            "settingsRevision",
+            "overlayRevision",
+            "buildId",
+            "name",
+            "values"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schemaVersion": {
+              "const": 1
+            },
+            "posesRevision": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "operation": {
+              "const": "delete"
+            },
+            "id": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{32}$"
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "posesRevision",
+            "operation",
+            "id"
+          ],
+          "additionalProperties": false
+        }
+      ]
     }
   }
 }

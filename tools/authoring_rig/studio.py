@@ -196,6 +196,8 @@ def snapshot(root):
         result["project"] = {"id": state["projectId"], "name": metadata["name"], "updatedAt": metadata["updatedAt"],
                              "parts": len(data["parts"]), "head": metadata["head"]}
     from .delivery import overlay_revision
+    from .poses import pose_state
+    result["poses"] = pose_state(root)
     result["overlayRevision"] = overlay_revision(root, state)
     result["export"] = None
     if state.get("latestExport"):
@@ -420,7 +422,7 @@ def rebuild_workspace(root):
             raise ValueError("Label audit failed; previous build retained")
         report = {"status": "ok", **context, "modelFile": model.relative_to(build).as_posix(),
                   "warnings": result.get("warnings", []), "labelCount": len(layers), "unknownCount": 0,
-                  "classifications": layers,
+                  "classifications": layers, "parameters": result["parameters"],
                   "modelBounds": composite_ir(data, root).getchannel("A").getbbox(),
                   "modelSha256": hashlib.sha256(model.with_suffix("").with_suffix(".moc3").read_bytes()).hexdigest()}
         write(build / "build-report.json", report)

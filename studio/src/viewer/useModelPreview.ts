@@ -38,6 +38,10 @@ export function useModelPreview(modelUrl: string | undefined, modelBounds: Bound
     const parameters = adapter.current?.reset();
     if (parameters && modelUrl) setConnection({ modelUrl, state: { status: 'ready', parameters } });
   }
+  function applyPose(values: Record<string, number>) {
+    const parameters = adapter.current?.applyPose(values);
+    if (parameters && modelUrl) setConnection({ modelUrl, state: { status: 'ready', parameters } });
+  }
 
-  return { attachFrame, onLoad, parameters, previewStatus, setParameter, reset };
+  return { attachFrame, onLoad, parameters, previewStatus, setParameter, reset, applyPose };
 }
