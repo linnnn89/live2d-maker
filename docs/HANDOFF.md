@@ -218,3 +218,13 @@ CLI 响应先转为 JSON wire value 再校验，兼容 Pillow 返回的 tuple bo
 Windows Node 24.19.0 构建、51 项回归通过（新增三项：恢复/冲突、写入合并/失败、真实旧工作区迁移），既有 Python Studio 5 项通过。实际 Edge 154 使用真实 Python 24 层工作区和持久浏览器配置，关闭重启后恢复/一次撤销、保存清理本页、确认删除旧记录、外部 CLI 修改后仅重放兼容 landmark/保留 opacity 冲突、JSON 导出保留原记录、三个独立标签页、过期删除 RECOVERY_CONFLICT、注入配额错误后内存/旧备份保持与重试成功均通过。恢复不写活动 IR，完整 PNG 对照 Python 逐像素一致；桌面/窄屏无溢出或页面/控制台错误。证据与浏览器配置在忽略目录 `out/e4-evidence/`。
 
 浏览器清理/隐私模式可能删除备份；最近 200 ms、未完成手势、强制进程中断不保证恢复，pagehide 仅尽力提交。重要修改仍需保存/导出。未修改 Kotlin、原生建模/Overlay/DLL/安装器，接续 E5/E6 和剩余 R2–R8。
+
+## 28. Studio E5：用例与桥接提取（2026-10-07）
+
+基于 E4 PR #12，main@174547b。页面提取 ArtworkWorkspace、LayerList、PointInspector、DraftDiff；useWorkspaceActions 统一打开/重试、保存/重建/QA、导入与历史操作。WorkspaceProvider 持有唯一草稿控制器/像素客户端和 Agent bridge，组件直接读取工作区用例；画布手势/来源/聚焦/坐标编辑独立在 useArtworkEditing。切换图层或安装新草稿基线后清除旧点选择，避免编辑失效句柄。页面壳保留预览与状态布局，不声称已实现细粒度 React 订阅或减少所有重渲染。
+
+Node 桥接拆成 transport、runner、resources；Vite 只组合配置/插件。runner 注入启动器并保留命令白名单、shell:false、windowsHide、固定工作区和 UTF-8；transport 注入 runner，保留方法/来源/schema/body 限制及排他门禁；资源仍核对 realpath 与类型白名单。保持同步请求协议，snapshot 在原生任务中仍返回 BACKEND_BUSY；本切片未创建后台队列/常驻服务或修改取消语义。
+
+新增三个契约测试覆盖 HTTP 校验/并发与失败释放、真实文件和 junction 越界/HEAD、CLI 参数/响应失败及实际 Windows Python snapshot。构建与 54 项回归通过。真实 Edge 154 验证图层搜索/显示/撤销重做/放弃、真实拖点一次历史、坐标编辑/差异/显示来源锁、保存和 PNG 与 Python 逐像素一致、导入期间 Agent BUSY/取消解锁、预检不写 IR/确认增加至 25 层。实际 Kotlin 重建成功，导出审计 30 层、保留 17 条既有原生偏差等警告；Cubism 就绪后键盘调整 ParamAngleX，实际 Pose QA 16 姿态成功并展示结果。桌面/窄屏无溢出，结束验收无页面/控制台错误；证据在 out/e5-evidence/。首次参数验收脚本填充值不符合 range 步长，改用实际键盘操作，仅续验未完成流程。
+
+未加依赖或改生产 Python/Kotlin。Vite 8.3.2 现有 loader 构建/启动正常，未来 native loader 扩展名提示仍保留；后续切换 loader 时按版本处理。E6/R2–R8 继续推进。
