@@ -18,7 +18,16 @@ import math
 
 def _canonical_hash(obj) -> str:
     """Compute deterministic SHA-256 hash of a JSON-serializable object."""
-    encoded = json.dumps(obj, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    def normalize(value):
+        # Browser JSON writes 484.0 as 484; these values describe identical inputs.
+        if isinstance(value, float) and math.isfinite(value) and value.is_integer():
+            return int(value)
+        if isinstance(value, dict):
+            return {key: normalize(item) for key, item in value.items()}
+        if isinstance(value, list):
+            return [normalize(item) for item in value]
+        return value
+    encoded = json.dumps(normalize(obj), sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
 
 
@@ -26,8 +35,9 @@ def compute_signatures(ir_data: dict) -> dict:
     """Computes categorized signatures for an IR dictionary.
 
     Groups:
-        - psd: canvas dimensions, layer names, z-order, asset details, geometry.
+        - psd: canvas dimensions, layer names, z-order, asset details, pixel geometry.
         - semantic: semantic tags and sides per part.
+        - annotation: landmarks, which never drive current rasterization or native binding.
         - view_meta: metadata and provenance (does not affect model output).
     """
     canvas = ir_data.get("canvas", {})
@@ -41,7 +51,7 @@ def compute_signatures(ir_data: dict) -> dict:
                 "name": p["name"],
                 "z": p["z"],
                 "asset": p["asset"],
-                "geometry": p["geometry"],
+                "geometry": {key: value for key, value in p["geometry"].items() if key != "landmarks"},
                 "appearance": p.get("appearance", {"visible": True, "opacity": 255}),
             }
             for p in sorted(parts, key=lambda x: x.get("z", 0))
@@ -64,11 +74,19 @@ def compute_signatures(ir_data: dict) -> dict:
     }
 
     return {
+        "version": 2,
         "source": _canonical_hash(ir_data.get("sourceImageHash")),
         "psd": _canonical_hash(psd_payload),
         "semantic": _canonical_hash(semantic_payload),
         "view_meta": _canonical_hash(view_meta_payload),
+        "annotation": _canonical_hash([{ "id": p["id"], "landmarks": p["geometry"].get("landmarks", {}) }
+                                       for p in sorted(parts, key=lambda p: p["id"])]),
     }
+
+
+def model_input_signature(ir_data: dict) -> str:
+    signatures = compute_signatures(ir_data)
+    return _canonical_hash({key: signatures[key] for key in ("version", "source", "psd", "semantic")})
 
 
 def evaluate_dag_stale(old_ir: dict, new_ir: dict) -> dict:
@@ -119,7 +137,8 @@ def evaluate_dag_stale(old_ir: dict, new_ir: dict) -> dict:
             reasons["psd"].append(f"Part '{pid}' z-order changed: {op.get('z')} -> {np_.get('z')}")
         if op.get("asset") != np_.get("asset"):
             reasons["psd"].append(f"Part '{pid}' asset changed")
-        if op.get("geometry") != np_.get("geometry"):
+        if ({key: value for key, value in op.get("geometry", {}).items() if key != "landmarks"}
+                != {key: value for key, value in np_.get("geometry", {}).items() if key != "landmarks"}):
             reasons["psd"].append(f"Part '{pid}' geometry/polygon changed")
         if op.get("appearance") != np_.get("appearance"):
             reasons["psd"].append(f"Part '{pid}' visibility or opacity changed")

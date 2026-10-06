@@ -100,3 +100,5 @@ R1c 的 PNG 解码、像素中心 even-odd 裁切、透明度及普通 alpha 叠
 `npm run build` 进行 TypeScript 检查和前端打包；`dist` 不是可以独立执行 CLI 的发布包，操作功能需要 dev server。当前没有产品发布、打包安装器、Agent 自动生成几何、ImageGen 按钮、物理实时预览或 Cubism Editor 美术验收。默认 QA 是静态姿态检查。
 
 E5 将打开/保存/导入/原生任务编排放在 `src/workspace/useWorkspaceActions.ts`，画布、图层、点属性和差异在同目录。`bridge/transport.ts`、`runner.ts`、`resources.ts` 分别负责 HTTP、Python CLI 和资源白名单；Vite 配置只组合它们。交互、命令和单工作区排他请求语义保持，尚无后台任务队列。
+
+保存关键点注记后，不再将已有 PSD/模型/Pose QA 标记为待更新；关键点仍不驱动绑定。轮廓、显示、素材或绑定输入变化仍需更新。模型和 QA 保留原始生成 revision，以版本化模型输入签名核对；旧/未知报告不能证明对应关系时仍要求重建/检查。手动 Rebuild 仍执行重建。

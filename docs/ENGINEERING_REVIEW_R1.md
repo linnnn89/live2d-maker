@@ -188,3 +188,13 @@ AuthoringPipelineFacade 是无 UI 依赖的 inspect/buildPreview/run 入口；Au
 使用同一 ds PSD，对照旧包/旧配置与新门面：完整模型签名、66 个对象、warnings 一致，所有模型/纹理/分类导出文件逐字节一致。实际 Edge Cubism 中 neutral/X+30 像素一致，geometry/channels/physics Overlay 重放成功，指定 X+30 opacity 改动产生 3571 个变化像素；physics3 仅含一条指定规则，不声称已验收实时物理播放。Studio 实际 Rebuild/模型就绪通过。证据在 out/e6-evidence/；Python 全套 19 项通过，包含实际默认随仓 JAR 的 native-base/replay、拒绝非法 Overlay、Cubism 图像和临时 PSD 往返。
 
 E6 仍有注记与构建签名分层、WorkspaceService 提取等内容，R2 的 ID/语义映射和后续产品迭代未完成。
+
+### E6b：注记与模型输入签名（2026-10-07）
+
+签名版本 2 将 landmark 注记与像素/绑定输入分开；PSD 签名保留画布、源/素材身份、图层名称/顺序、轮廓及显示设置，绑定签名仍保守包含 semantic。整数与等值浮点统一，避免浏览器 JSON 将 484.0 转为 484 时误判。完整 IR revision 仍随注记变化，保存并发、草稿恢复 token 和旧导入授权不放宽。
+
+新增构建/失败报告记录 signatureVersion/modelInputSignature，QA 记录同一签名和 buildId。旧报告只在保存的 build IR 与原 revision 能核对时推导等价，不改写旧报告或原生 baseline；未知版本/不匹配签名关闭模型/QA 门禁。注记保存后保留成功模型及 QA 原始 revision，不伪造为新的完整 IR revision。Overlay 仍须匹配输入哈希，失败记录仍保留门禁；旧失败缺 captured IR 时，原有精确 revision 判定也保留。
+
+新增三个 Python 回归覆盖签名/数字、旧与新构建/QA 记录、Overlay 成功/失败及旧失败缺 IR。全套 22 项通过；最后保留精确失败判定的兼容补充后，三个新回归和既有 Overlay gate 回归再次通过。实际 Edge/Python/Kotlin：旧成功构建运行 16 姿态 QA，只保存注记时 PSD/模型/QA 仍有效且构建/QA ID 和模型字节不变；裁切后门禁关闭，恢复轮廓后重新有效。实际 Overlay 重建/16 姿态 QA 生成版本 2 报告，注记保存仍保持应用证据；缺失目标原生重建失败后再保存注记，broken 门禁仍在，上次成功模型/QA 保留。验收脚本首次在错误提示出现、失败刷新仍进行时写命令，得到正确 BUSY，随后等待 idle 续验成功；未改操作门禁。证据在 out/e6-signature-evidence/。
+
+Kotlin/JAR/素材及 IR 持久化格式未改，本轮未重跑未变的前端/Kotlin全套。手动 Rebuild 仍执行明确请求的重建；本轮消除注记造成的失效，不声称实现阶段产物缓存。尚未把产品构建设置纳入项目签名，当前原生预览配置仍固定。接续 E6 的 WorkspaceService 提取与 R2–R8。
