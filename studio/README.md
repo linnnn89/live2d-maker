@@ -34,7 +34,7 @@ npm ci
 npm run dev
 ```
 
-打开 `http://127.0.0.1:5173/`。默认第一次打开把 ds 示例 PSD 导入 `out/studio/`，保留 source.psd、原始 IR、完整 PNG 素材和原合成图。点击 Rebuild 生成预览；已有工作区再次启动会恢复保存的 IR 和上一份成功产物。
+打开 `http://127.0.0.1:5173/`，项目页可导入自己的 PSD、新建隔离工程、打开 Studio 归档及选择最近工程。日常使用无需设置启动变量。“打开开发工作区”（`?legacy=1`）保留原入口：首次将 ds 示例导入 `out/studio/`，或使用下述变量；已有工作区不会被重新导入。
 
 首次打开遇到 `409` 工作区忙时，间隔 1 秒、2 秒自动重试，最多尝试 3 次。仍失败或遇到其他错误时，显示“重新打开工作区”，可等待当前命令结束或修正错误后重试，无须刷新页面。工作区未加载时，底部显示 IR 未加载、各产物状态未知，不显示已保存/已更新。打开请求在页面卸载时取消；写操作不自动重试。
 
@@ -46,7 +46,7 @@ $env:STUDIO_WORKSPACE = 'out/studio-mouth'
 npm run dev
 ```
 
-`STUDIO_PSD` 与 `STUDIO_IR` 二选一。相对路径均相对于仓库根。更换源模型要换新的 `STUDIO_WORKSPACE`；已有工作区不会被环境变量重新导入。输入 IR 的 PNG 会复制并用哈希文件名归档，源目录不写入。源 PSD 和源 IR 从不就地保存。
+开发工作区的 `STUDIO_PSD` 与 `STUDIO_IR` 二选一，相对路径均相对于仓库根；更换源模型要换新的 `STUDIO_WORKSPACE`。项目页工程存入 `out/studio-projects/<id>/`，各工程 API/资源路径和页面身份独立。输入 PNG 复制归档，源 PSD 和源 IR 从不就地保存。
 
 ## 操作与几何语义
 
@@ -95,7 +95,7 @@ R1c 的 PNG 解码、像素中心 even-odd 裁切、透明度及普通 alpha 叠
 
 存在 `psd2live/build/libs/psd2live-0.7.1.jar` 时，使用该源码应用 JAR 和原便携 JVM/依赖；否则用便携版。Overlay baseline 必须来自相同运行时。UI 已实测源码 JAR 的无 Overlay 闭环，以及附带 ArtMesh geometry/opacity Overlay 的成功应用、IR 轮廓变化拒绝、目标缺失拒绝、刷新保留与恢复；固定镜位像素对照确认指定 X+30 姿态生效，并运行 16 姿态 QA。其他 Overlay owner/channel、journal、physics 组合尚未在 Studio 逐项视觉验收。
 
-仅监听 127.0.0.1:5173，固定端口；API 检查 Host/Origin，写入串行化，Python 工作区也有排他锁，子进程不经 shell。仅服务工作区内的 PNG/JSON/moc3 与既有 viewer/vendor 白名单资源，不暴露整个仓库。若异常退出留下 `.studio.lock`，先确认该工作区没有运行中的命令，再移除这个锁文件。
+仅监听 127.0.0.1:5173，固定端口；API 检查 Host/Origin，每个工程写入串行化，Python 工作区也有排他锁，子进程不经 shell。仅服务工作区内白名单 PNG/JSON/moc3、指定下载归档与既有 viewer/vendor 资源，不暴露整个仓库。若异常退出留下 `.studio.lock`，先确认该工作区没有运行中的命令，再移除这个锁文件；保留 `.project-transaction.json`，下一次 CLI 打开会继续未完成的恢复事务。
 
 `npm run build` 进行 TypeScript 检查和前端打包；`dist` 不是可以独立执行 CLI 的发布包，操作功能需要 dev server。当前没有产品发布、打包安装器、Agent 自动生成几何、ImageGen 按钮、物理实时预览或 Cubism Editor 美术验收。默认 QA 是静态姿态检查。
 
@@ -112,3 +112,15 @@ E5 将打开/保存/导入/原生任务编排放在 `src/workspace/useWorkspaceA
 设置保存在工作区独立 `build-settings.json`，不进入美术 IR；旧工作区缺该文件时读取默认值且不自动写入。CLI `studio-build-settings --workspace <目录>` 从 stdin 接收 `{ "schemaVersion":1, "revision":"<IR revision>", "settingsRevision":"<快照 buildSettings.revision>", "settings":{ "schemaVersion":1, "atlasSize":2048, "meshInteriorDensity":40, "headTurnStrength":1 } }`。IR 或设置版本冲突拒绝写入；`SETTINGS_CONFLICT` 对应 HTTP 409，界面保留本页输入，用户明确重新读取后再提交。
 
 构建、失败和 QA 报告同时记录模型输入与设置签名，构建目录保存设置副本。设置变更使模型/QA 失效，美术 PSD/PNG 不变；旧无设置签名报告仅能对应原默认值。改变设置不会把另一组设置下的原生失败结论误认成当前结果，但目标不存在等自身非法 Overlay 仍拒绝。物理及交付文件选项随后续迭代开放。
+
+## 工程保存、修订与归档
+
+项目页直接上传 PSD 或 `.studio-project.zip`，上限 128 MiB。PSD 的分组、蒙版、非普通混合、效果、clipping 和缺失像素会统一列出位置和原因；受限文件不创建工程，不做隐式栅格化。原文件完整复制为 source.psd。工程名独立于导入的图层/美术名称。最近工程列表读取本机持久目录，重新启动仍可打开。
+
+“保存 IR”提交美术修改；右侧“保存项目修订”会先保存当前美术草稿，再捕获已保存美术、构建设置、Overlay/原始基线和构建/检查引用，生成不可变修订。未保存的设置输入须先保存或放弃。修订含 parent，可恢复旧分支点后继续保存；不是复制浏览器撤销栈。保存核对 IR、设置及保存修订 head，外部变化会返回 BASE_CONFLICT / SETTINGS_CONFLICT / PROJECT_CONFLICT，保留输入供明确重新读取。
+
+恢复只开放给无美术/设置草稿的状态，先保存当前状态为“恢复前自动保存”，再恢复选中修订。原始素材、其他修订和成功产物都保留。恢复事务有持久记录；正常失败释放锁后下一次 CLI 会继续完成。强制进程结束仍可能留下原排他锁，按上述说明确认进程结束后释放锁再打开，不能删除恢复事务。
+
+“下载 Studio 工程”归档当前已保存内容、源 PSD/原图、素材/导入来源、全部修订及已有构建/QA，不包含未保存草稿、锁或其他下载包。归档带版本 1 类型及逐文件 SHA-256/长度清单；打开时逐项核对并验证所有修订/资源，成功后才注册为新工程，原工程不覆盖。新副本有独立 workspaceId，避免复用旧页草稿身份。只接受白名单相对路径，拒绝重复/大小写冲突、外部链接、清单或哈希不符、未知格式/版本；最多 10000 个资源、展开 1 GiB、单项 256 MiB。Studio 工程与桌面 `.psd2live` 不兼容，不能改扩展名互换。
+
+CLI `studio-catalog --workspace <目录>` 从 stdin 接收 `{ "schemaVersion":1, "operation":"list" }`，或 `{ "schemaVersion":1, "operation":"create", "input":{ "schemaVersion":1, "kind":"psd或archive", "name":"工程名", "data":"base64文件" } }`；返回工程列表或完整受限报告/创建结果。`studio-project-revisions` 读取修订；`studio-project-save` 接收 `{ "schemaVersion":1, "revision":"IR版本", "settingsRevision":"设置版本", "head":"保存修订ID", "message":"说明" }`；`studio-project-restore` 同时核对这三种版本，省略 message 并增加目标 `id`。`studio-project-archive` 返回下载 URL/文件名/资源数量。后三类命令的 workspace 须是项目页建立的工程目录；原开发工作区保持原美术流程。本批交付工程归档，明确的 cmo3/可播放模型导出面板接续 R4b。

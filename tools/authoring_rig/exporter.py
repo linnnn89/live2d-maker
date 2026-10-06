@@ -17,19 +17,38 @@ VERSION = "0.1.0"
 TOOL_VERSION = "authoring_rig_exporter_0.1.0"
 
 
+def inspect_psd(psd_path):
+    """Report every unsupported layer before creating an output workspace."""
+    psd = PSDImage.open(psd_path)
+    issues = []
+    def visit(layers, parent=""):
+        for index, layer in enumerate(layers):
+            location = f"{parent}/{index}:{layer.name}"
+            reasons = []
+            if layer.kind != "pixel": reasons.append(f"layer kind: {layer.kind}")
+            if layer.has_mask(): reasons.append("raster mask")
+            if layer.has_vector_mask(): reasons.append("vector mask")
+            if layer.has_effects(): reasons.append("layer effects")
+            if layer.clipping: reasons.append("clipping")
+            if layer.blend_mode != BlendMode.NORMAL: reasons.append("non-normal blend")
+            if layer.kind == "pixel" and layer.topil() is None: reasons.append("missing raster pixels")
+            if reasons: issues.append({"location": location, "name": layer.name, "reasons": reasons})
+            if layer.is_group(): visit(layer, location)
+    if psd.width * psd.height > 16777216:
+        issues.append({"location": "/", "name": "canvas", "reasons": ["canvas exceeds 16777216 pixels"]})
+    visit(psd)
+    return {"canvas": {"width": psd.width, "height": psd.height}, "layers": len(list(psd.descendants())), "issues": issues}
+
+
 def export_psd(psd_path: str | Path, out_dir: str | Path) -> dict:
     psd_path = Path(psd_path).resolve()
     out_dir = Path(out_dir).resolve()
     psd = PSDImage.open(psd_path)
     w, h = psd.size
-    # v0 supports flat raster PSDs. Never silently drop groups or change blending.
-    for layer in psd:
-        if (layer.kind != "pixel" or layer.has_mask() or layer.has_vector_mask()
-                or layer.has_effects() or layer.clipping or layer.blend_mode != BlendMode.NORMAL):
-            raise ValueError(f"Unsupported PSD layer '{layer.name}': v0 requires flat, normal-blend "
-                             "pixel layers without masks, effects or clipping")
-        if layer.topil() is None:
-            raise ValueError(f"Layer '{layer.name}' has no raster pixels")
+    report = inspect_psd(psd_path)
+    if report["issues"]:
+        details = "; ".join(f"{item['location']}: {', '.join(item['reasons'])}" for item in report["issues"])
+        raise ValueError(f"Unsupported PSD layers: v0 requires flat, normal-blend pixel layers without masks, effects or clipping; {details}")
     mapping = read_identities(psd)
     native_ids = [layer.layer_id for layer in psd if layer.layer_id >= 0]
     if len(set(native_ids)) != len(native_ids):

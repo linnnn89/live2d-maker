@@ -74,7 +74,9 @@ def locked(root):
 
 
 def file_url(root, file):
-    return "/studio-files/" + Path(file).relative_to(root).as_posix()
+    state = read(Path(root) / "studio-state.json")
+    prefix = f"/projects/{state['projectId']}" if state.get("projectId") else ""
+    return prefix + "/studio-files/" + Path(file).relative_to(root).as_posix()
 
 
 def open_workspace(root, source_ir=None, source_psd=None, overlay=None, overlay_baseline=None):
@@ -186,9 +188,13 @@ def snapshot(root):
     with Image.open(root / "source.png") as image:
         bounds = image.getchannel("A").getbbox()
     result = {"schemaVersion": 1, "workspaceId": state["workspaceId"], "status": "ok", "ir": data, "revision": revision(data), "stale": stale,
-              "overlay": overlay, "sourceImage": "/studio-files/source.png", "sourceBounds": bounds,
+              "overlay": overlay, "sourceImage": file_url(root, root / "source.png"), "sourceBounds": bounds,
               "artworkBounds": bounds, "build": None, "qa": None,
               "buildSettings": {"settings": settings, "revision": settings_signature(settings)}}
+    if state.get("projectId"):
+        metadata = read(root / "project.json")
+        result["project"] = {"id": state["projectId"], "name": metadata["name"], "updatedAt": metadata["updatedAt"],
+                             "parts": len(data["parts"]), "head": metadata["head"]}
     if state.get("latestImport"):
         artwork = root / state["latestImport"] / "after.png"
         result["artworkImage"] = file_url(root, artwork)

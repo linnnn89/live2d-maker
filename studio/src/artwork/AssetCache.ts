@@ -51,10 +51,10 @@ export class AssetCache {
   };
 }
 
-export async function fetchAsset(part: Part, signal?: AbortSignal): Promise<Uint8Array> {
+export async function fetchAsset(part: Part, signal?: AbortSignal, prefix = ''): Promise<Uint8Array> {
   const path = part.asset.path;
   if (path.includes('\\') || path.split('/').some(segment => !segment || segment === '.' || segment === '..')) throw new ArtworkError('ASSET_PATH', '素材路径必须是工作区内相对路径', part.id);
-  const response = await fetch('/studio-files/' + path.split('/').map(encodeURIComponent).join('/'), { signal });
+  const response = await fetch(prefix+'/studio-files/'+path.split('/').map(encodeURIComponent).join('/'), { signal });
   if (!response.ok) throw new ArtworkError('ASSET_LOAD', `素材读取失败（${response.status}）：${part.name}`, part.id);
   if (Number(response.headers.get('content-length')) > MAX_ASSET_BYTES) { await response.body?.cancel(); throw new ArtworkError('ASSET_FORMAT', 'PNG 超过 16 MiB', part.id); }
   const reader = response.body?.getReader();

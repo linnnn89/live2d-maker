@@ -791,6 +791,9 @@
         },
         "buildSettings": {
           "$ref": "#/definitions/BuildSettingsState"
+        },
+        "project": {
+          "$ref": "#/definitions/ProjectSummary"
         }
       },
       "required": [
@@ -1190,6 +1193,341 @@
         "revision",
         "settingsRevision",
         "settings"
+      ],
+      "additionalProperties": false
+    },
+    "ProjectSummary": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{32}$"
+        },
+        "name": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        },
+        "parts": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "head": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{32}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "updatedAt",
+        "parts",
+        "head"
+      ],
+      "additionalProperties": false
+    },
+    "ProjectCatalog": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "projects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ProjectSummary"
+          }
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "projects"
+      ],
+      "additionalProperties": false
+    },
+    "ProjectCreateRequest": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "kind": {
+          "enum": [
+            "psd",
+            "archive"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "\\S"
+        },
+        "data": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 178956972
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "kind",
+        "name",
+        "data"
+      ],
+      "additionalProperties": false
+    },
+    "ProjectCatalogRequest": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "schemaVersion": {
+              "const": 1
+            },
+            "operation": {
+              "const": "list"
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "operation"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schemaVersion": {
+              "const": 1
+            },
+            "operation": {
+              "const": "create"
+            },
+            "input": {
+              "$ref": "#/definitions/ProjectCreateRequest"
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "operation",
+            "input"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "ProjectIssue": {
+      "type": "object",
+      "properties": {
+        "location": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "reasons": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "location",
+        "name",
+        "reasons"
+      ],
+      "additionalProperties": false
+    },
+    "ProjectCreateResult": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "status": {
+          "enum": [
+            "ok",
+            "unsupported"
+          ]
+        },
+        "project": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ProjectSummary"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ProjectIssue"
+          }
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "status",
+        "project",
+        "issues"
+      ],
+      "additionalProperties": false
+    },
+    "ProjectRevision": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{32}$"
+        },
+        "parent": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-f0-9]{32}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "parent",
+        "createdAt",
+        "message"
+      ],
+      "additionalProperties": false
+    },
+    "ProjectRevisions": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "head": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{32}$"
+        },
+        "revisions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ProjectRevision"
+          }
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "head",
+        "revisions"
+      ],
+      "additionalProperties": false
+    },
+    "ProjectSaveRequest": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "settingsRevision": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "head": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{32}$"
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 1000
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "revision",
+        "settingsRevision",
+        "head",
+        "message"
+      ],
+      "additionalProperties": false
+    },
+    "ProjectRestoreRequest": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "settingsRevision": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "head": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{32}$"
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{32}$"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "revision",
+        "settingsRevision",
+        "head",
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "ProjectDownload": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "url": {
+          "type": "string"
+        },
+        "filename": {
+          "type": "string"
+        },
+        "files": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "url",
+        "filename",
+        "files"
       ],
       "additionalProperties": false
     }
