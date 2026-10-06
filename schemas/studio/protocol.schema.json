@@ -1,0 +1,872 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://live2d-maker.local/schemas/studio/v1",
+  "title": "StudioProtocol",
+  "description": "Studio envelope version 1. ArtworkIR here is the transport subset; persistence validates the complete authoring-rig schema.",
+  "definitions": {
+    "Point": {
+      "type": "array",
+      "items": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        }
+      ],
+      "minItems": 2,
+      "maxItems": 2,
+      "additionalItems": false
+    },
+    "Bounds": {
+      "type": "array",
+      "items": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        }
+      ],
+      "minItems": 4,
+      "maxItems": 4,
+      "additionalItems": false
+    },
+    "Part": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string"
+        },
+        "z": {
+          "type": "number"
+        },
+        "asset": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "offset": {
+              "type": "object",
+              "properties": {
+                "left": {
+                  "type": "number"
+                },
+                "top": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "left",
+                "top"
+              ],
+              "additionalProperties": false
+            },
+            "size": {
+              "type": "object",
+              "properties": {
+                "width": {
+                  "type": "number"
+                },
+                "height": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "width",
+                "height"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "path",
+            "offset",
+            "size"
+          ],
+          "additionalProperties": true
+        },
+        "geometry": {
+          "type": "object",
+          "properties": {
+            "bbox": {
+              "$ref": "#/definitions/Bounds"
+            },
+            "polygon": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Point"
+              }
+            },
+            "landmarks": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/Point"
+              }
+            }
+          },
+          "required": [
+            "bbox"
+          ],
+          "additionalProperties": true
+        },
+        "appearance": {
+          "type": "object",
+          "properties": {
+            "visible": {
+              "type": "boolean"
+            },
+            "opacity": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 255
+            }
+          },
+          "required": [
+            "visible",
+            "opacity"
+          ],
+          "additionalProperties": false
+        },
+        "semantic": {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "type": "string"
+            },
+            "side": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "tag",
+            "side"
+          ],
+          "additionalProperties": true
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "z",
+        "asset",
+        "geometry",
+        "semantic"
+      ],
+      "additionalProperties": true
+    },
+    "ArtworkIR": {
+      "type": "object",
+      "properties": {
+        "canvas": {
+          "type": "object",
+          "properties": {
+            "width": {
+              "type": "number"
+            },
+            "height": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "width",
+            "height"
+          ],
+          "additionalProperties": false
+        },
+        "parts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Part"
+          }
+        },
+        "metadata": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [],
+          "additionalProperties": true
+        }
+      },
+      "required": [
+        "canvas",
+        "parts"
+      ],
+      "additionalProperties": true
+    },
+    "DraftToken": {
+      "type": "object",
+      "properties": {
+        "draftId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "draftId",
+        "revision"
+      ],
+      "additionalProperties": true
+    },
+    "EditCommand": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "set_visibility"
+            },
+            "partId": {
+              "type": "string"
+            },
+            "visible": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "type",
+            "partId",
+            "visible"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "set_opacity"
+            },
+            "partId": {
+              "type": "string"
+            },
+            "opacity": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 255
+            }
+          },
+          "required": [
+            "type",
+            "partId",
+            "opacity"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "set_polygon"
+            },
+            "partId": {
+              "type": "string"
+            },
+            "points": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Point"
+              },
+              "minItems": 3
+            }
+          },
+          "required": [
+            "type",
+            "partId",
+            "points"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "set_landmark"
+            },
+            "partId": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "point": {
+              "$ref": "#/definitions/Point"
+            }
+          },
+          "required": [
+            "type",
+            "partId",
+            "name",
+            "point"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "remove_landmark"
+            },
+            "partId": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "partId",
+            "name"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "CommandBatch": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/EditCommand"
+      },
+      "minItems": 1
+    },
+    "DraftRequest": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "schemaVersion": {
+              "const": 1
+            },
+            "operation": {
+              "enum": [
+                "inspect",
+                "diff"
+              ]
+            },
+            "response": {
+              "enum": [
+                "full",
+                "summary",
+                "parts"
+              ]
+            },
+            "partIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "operation"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schemaVersion": {
+              "const": 1
+            },
+            "operation": {
+              "const": "apply"
+            },
+            "state": {
+              "$ref": "#/definitions/DraftToken"
+            },
+            "commands": {
+              "$ref": "#/definitions/CommandBatch"
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "operation",
+            "state",
+            "commands"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schemaVersion": {
+              "const": 1
+            },
+            "operation": {
+              "enum": [
+                "undo",
+                "redo",
+                "discard",
+                "commit"
+              ]
+            },
+            "state": {
+              "$ref": "#/definitions/DraftToken"
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "operation",
+            "state"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "CaptureRequest": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "state": {
+          "$ref": "#/definitions/DraftToken"
+        },
+        "source": {
+          "enum": [
+            "draft",
+            "saved"
+          ]
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "state"
+      ],
+      "additionalProperties": false
+    },
+    "OfflineRequest": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "baseRevision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ir": {
+          "$ref": "#/definitions/ArtworkIR"
+        },
+        "commands": {
+          "$ref": "#/definitions/CommandBatch"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "baseRevision",
+        "ir",
+        "commands"
+      ],
+      "additionalProperties": false
+    },
+    "StudioError": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stage": {
+          "type": "string",
+          "minLength": 1
+        },
+        "message": {
+          "type": "string"
+        },
+        "retryable": {
+          "type": "boolean"
+        },
+        "partId": {
+          "type": "string"
+        },
+        "field": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "stage",
+        "message",
+        "retryable"
+      ],
+      "additionalProperties": false
+    },
+    "Snapshot": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "status": {
+          "const": "ok"
+        },
+        "ir": {
+          "$ref": "#/definitions/ArtworkIR"
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sourceImage": {
+          "type": "string"
+        },
+        "artworkImage": {
+          "type": "string"
+        },
+        "sourceBounds": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Bounds"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "artworkBounds": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Bounds"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "stale": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "boolean"
+          }
+        },
+        "overlay": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string"
+            },
+            "reasons": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "status",
+            "reasons"
+          ],
+          "additionalProperties": true
+        },
+        "build": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "modelUrl": {
+                  "type": "string"
+                },
+                "modelBounds": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/definitions/Bounds"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "revision": {
+                  "type": "string"
+                },
+                "modelSha256": {
+                  "type": "string"
+                },
+                "labelCount": {
+                  "type": "number"
+                },
+                "warnings": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "modelUrl",
+                "modelBounds",
+                "revision"
+              ],
+              "additionalProperties": true
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "qa": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string"
+                },
+                "contactSheet": {
+                  "type": "string"
+                },
+                "reviewUrl": {
+                  "type": "string"
+                },
+                "revision": {
+                  "type": "string"
+                },
+                "poses": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "status",
+                "contactSheet",
+                "reviewUrl",
+                "revision",
+                "poses"
+              ],
+              "additionalProperties": true
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "status",
+        "ir",
+        "revision",
+        "sourceImage",
+        "sourceBounds",
+        "artworkBounds",
+        "stale",
+        "overlay",
+        "build",
+        "qa"
+      ],
+      "additionalProperties": true
+    },
+    "SaveRequest": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ir": {
+          "$ref": "#/definitions/ArtworkIR"
+        }
+      },
+      "required": [
+        "revision",
+        "ir"
+      ],
+      "additionalProperties": false
+    },
+    "ImportPreviewRequest": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "generatedPng": {
+          "type": "string"
+        },
+        "maskPng": {
+          "type": "string"
+        },
+        "bounds": {
+          "$ref": "#/definitions/Bounds"
+        },
+        "name": {
+          "type": "string"
+        },
+        "prompt": {
+          "type": "string"
+        },
+        "replacePart": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "fit": {
+          "type": "boolean"
+        },
+        "spriteBounds": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Bounds"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "revision",
+        "generatedPng",
+        "maskPng",
+        "bounds",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "ImportCommitRequest": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{32}$"
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "id",
+        "revision"
+      ],
+      "additionalProperties": false
+    },
+    "ImportPreview": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "id": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "string"
+        },
+        "partId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "semantic": {
+          "type": "object",
+          "properties": {
+            "tag": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "tag"
+          ],
+          "additionalProperties": true
+        },
+        "beforeImage": {
+          "type": "string"
+        },
+        "afterImage": {
+          "type": "string"
+        },
+        "report": {
+          "type": "object",
+          "properties": {
+            "bounds": {
+              "$ref": "#/definitions/Bounds"
+            },
+            "changed_pixels": {
+              "type": "number"
+            },
+            "outside_visible_pixels": {
+              "type": "number"
+            },
+            "outside_changed_pixels": {
+              "type": "number"
+            },
+            "outside_max_diff": {
+              "type": "number"
+            },
+            "registration": {
+              "type": "object",
+              "properties": {
+                "input_size": {
+                  "$ref": "#/definitions/Point"
+                },
+                "fitted_size": {
+                  "$ref": "#/definitions/Point"
+                },
+                "excluded_visible_pixels": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "input_size"
+              ],
+              "additionalProperties": true
+            }
+          },
+          "required": [
+            "bounds",
+            "changed_pixels",
+            "outside_visible_pixels",
+            "outside_changed_pixels",
+            "outside_max_diff",
+            "registration"
+          ],
+          "additionalProperties": true
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "id",
+        "revision",
+        "partId",
+        "name",
+        "semantic",
+        "beforeImage",
+        "afterImage",
+        "report"
+      ],
+      "additionalProperties": true
+    }
+  }
+}

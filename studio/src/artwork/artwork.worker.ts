@@ -5,14 +5,13 @@ import type { ArtworkIR } from '../editor/contracts';
 import { ArtworkError } from './contracts';
 import { MemoryBudget } from './MemoryBudget';
 import { checkCancelled } from './content';
+import { errorDetail } from '../protocol';
 
 type Job = { id: number; kind: 'render' | 'capture' | 'cancel' | 'ack'; ir: ArtworkIR };
 const memory=new MemoryBudget(), renderer=new ArtworkRenderer(new AssetCache(fetchAsset,memory).acquire,memory);
 let active: {id:number;controller:AbortController}|null=null;
 const outbound=new Map<number,()=>void>();
-const sendError=(id:number,error:unknown)=>postMessage({id,ok:false,metrics:renderer.stats,error:{
-  code:error instanceof ArtworkError?error.code:'RENDER_FAILED',message:error instanceof Error?error.message:String(error),partId:error instanceof ArtworkError?error.partId:undefined,
-}});
+const sendError=(id:number,error:unknown)=>postMessage({id,ok:false,metrics:renderer.stats,error:errorDetail(error,'RENDER_FAILED','artwork')});
 
 onmessage=(event:MessageEvent<Job>)=>{
   const job=event.data;

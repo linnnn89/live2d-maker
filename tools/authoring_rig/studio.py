@@ -17,6 +17,7 @@ from .exporter import export_psd
 from .generated import composite_ir, import_generated
 from .stale import evaluate_dag_stale, check_overlay_compatibility
 from .validator import validate_authoring_rig
+from .studio_protocol import StudioError, validate_protocol
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -49,7 +50,7 @@ def locked(root):
     try:
         fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
     except FileExistsError as error:
-        raise ValueError("Studio workspace is busy; wait for the current command") from error
+        raise StudioError("BACKEND_BUSY", "Studio workspace is busy; wait for the current command", retryable=True) from error
     try:
         os.close(fd)
         yield
@@ -155,7 +156,7 @@ def snapshot(root):
                        "native_apply_required": True, "applied": False}
     with Image.open(root / "source.png") as image:
         bounds = image.getchannel("A").getbbox()
-    result = {"status": "ok", "ir": data, "revision": revision(data), "stale": stale,
+    result = {"schemaVersion": 1, "status": "ok", "ir": data, "revision": revision(data), "stale": stale,
               "overlay": overlay, "sourceImage": "/studio-files/source.png", "sourceBounds": bounds,
               "artworkBounds": bounds, "build": None, "qa": None}
     if state.get("latestImport"):
@@ -180,11 +181,12 @@ def snapshot(root):
 
 
 def save_workspace(root, payload):
+    validate_protocol("SaveRequest", payload)
     root = Path(root).resolve(strict=True)
     with locked(root):
         current = read(root / "authoring-rig.json")
         if payload.get("revision") != revision(current):
-            raise ValueError("IR changed in another editor; reload before saving")
+            raise StudioError("BASE_CONFLICT", "IR changed in another editor; reload before saving", "save")
         candidate = payload["ir"]
         validate_authoring_rig(candidate, root)
         # This editing surface owns geometry and appearance; paths, IDs and source are immutable.
@@ -195,21 +197,22 @@ def save_workspace(root, payload):
                 part.pop("geometry", None)
                 part.pop("appearance", None)
         if old != new:
-            raise ValueError("Studio may edit only geometry and appearance")
+            raise StudioError("EDIT_SCOPE", "Studio may edit only geometry and appearance", "save")
         for part, previous in zip(candidate["parts"], current["parts"]):
             if part["geometry"]["bbox"] != previous["geometry"]["bbox"]:
-                raise ValueError("Raster bbox is fixed; edit polygon or landmarks")
+                raise StudioError("EDIT_SCOPE", "Raster bbox is fixed; edit polygon or landmarks", "save", part_id=part["id"], field="geometry.bbox")
         write(root / "authoring-rig.json", candidate)
     return snapshot(root)
 
 
 def preview_generated(root, payload):
     """Run the existing import contract in isolation; the active IR stays untouched."""
+    validate_protocol("ImportPreviewRequest", payload)
     root = Path(root).resolve(strict=True)
     with locked(root):
         current = read(root / "authoring-rig.json")
         if payload.get("revision") != revision(current):
-            raise ValueError("IR changed in another editor; reload before importing")
+            raise StudioError("BASE_CONFLICT", "IR changed in another editor; reload before importing", "import-preview")
         name, prompt = payload.get("name"), payload.get("prompt", "")
         if not isinstance(name, str) or not name.strip() or len(name) > 128:
             raise ValueError("Layer name must contain 1–128 characters")
@@ -252,7 +255,7 @@ def preview_generated(root, payload):
         write(archive / "candidate-ir.json", candidate)
         report["ir_file"] = str(archive / "authoring-rig.json")
         write(archive / "generation-report.json", report)
-        preview = {"id": token, "revision": revision(current), "candidateRevision": revision(candidate),
+        preview = {"schemaVersion": 1, "id": token, "revision": revision(current), "candidateRevision": revision(candidate),
                    "partId": part["id"], "name": part["name"], "semantic": part["semantic"],
                    "report": report, "beforeImage": file_url(root, archive / "before.png"),
                    "afterImage": file_url(root, archive / "after.png")}
@@ -261,19 +264,18 @@ def preview_generated(root, payload):
 
 
 def commit_generated(root, payload):
+    validate_protocol("ImportCommitRequest", payload)
     root = Path(root).resolve(strict=True)
     token = payload.get("id")
-    if not isinstance(token, str) or len(token) != 32 or any(c not in "0123456789abcdef" for c in token):
-        raise ValueError("Invalid import preview ID")
     with locked(root):
         archive = root / "imports" / token
         preview = read(archive / "preview.json")
         current = read(root / "authoring-rig.json")
         if payload.get("revision") != revision(current) or preview["revision"] != revision(current):
-            raise ValueError("IR changed in another editor; reload and run import preflight again")
+            raise StudioError("BASE_CONFLICT", "IR changed in another editor; reload and run import preflight again", "import-commit")
         candidate = read(archive / "candidate-ir.json")
         if revision(candidate) != preview["candidateRevision"]:
-            raise ValueError("Import candidate changed; run preflight again")
+            raise StudioError("IMPORT_CONFLICT", "Import candidate changed; run preflight again", "import-commit")
         validate_authoring_rig(candidate, root)
         state = read(root / "studio-state.json")
         changed_state = {**state, "latestImport": archive.relative_to(root).as_posix()}

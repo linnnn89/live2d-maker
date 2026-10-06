@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test, after } from 'node:test';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -9,15 +9,16 @@ import { spawnSync } from 'node:child_process';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const output = mkdtempSync(path.join(tmpdir(), 'studio-draft-test-'));
+symlinkSync(path.join(root, 'node_modules'), path.join(output, 'node_modules'), 'junction');
 after(() => rmSync(output, { recursive: true, force: true }));
 const compile = spawnSync(process.execPath, [path.join(root, 'node_modules/typescript/bin/tsc'),
   '--target', 'ES2022', '--module', 'commonjs', '--lib', 'ES2022,DOM', '--strict', '--skipLibCheck',
   '--outDir', output, 'src/editor/DraftController.ts'], { cwd: root, encoding: 'utf8' });
 assert.equal(compile.status, 0, compile.stdout + compile.stderr);
 const require = createRequire(import.meta.url);
-const { DraftSession } = require(path.join(output, 'DraftSession.js'));
-const { DraftController } = require(path.join(output, 'DraftController.js'));
-const { applyCommands } = require(path.join(output, 'commands.js'));
+const { DraftSession } = require(path.join(output, 'editor/DraftSession.js'));
+const { DraftController } = require(path.join(output, 'editor/DraftController.js'));
+const { applyCommands } = require(path.join(output, 'editor/commands.js'));
 const fixture = () => ({ canvas: { width: 100, height: 100 }, metadata: { name: 'keep' },
   parts: ['face', 'hair'].map((id, z) => ({ id, name: id, z,
     asset: { path: `${id}.png`, offset: { left: 0, top: 0 }, size: { width: 100, height: 100 } },
@@ -187,7 +188,7 @@ test('indexed thousand-layer sequences preserve ID targeting, order and atomic h
   await request(c, 'discard'); assert.deepEqual(c.getSnapshot().ir, ir);
   assert.equal(c.getSnapshot().canUndo, false); assert.equal(c.getSnapshot().canRedo, false);
   const reordered = { ...ir, parts: [...ir.parts].reverse() };
-  assert.deepEqual(require(path.join(output, 'commands.js')).diffArtwork(ir, reordered), []);
+  assert.deepEqual(require(path.join(output, 'editor/commands.js')).diffArtwork(ir, reordered), []);
 });
 
 test('part patches restore exact optional fields across mixed batches without mutating caller data', () => {

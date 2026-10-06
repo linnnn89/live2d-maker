@@ -161,6 +161,11 @@ def cmd_studio(args):
         result = commit_generated(args.workspace, json.load(sys.stdin))
     else:
         result = qa_workspace(args.workspace, args.port)
+    from authoring_rig.studio_protocol import validate_protocol
+    result["schemaVersion"] = 1
+    # Validate the JSON wire value: Pillow returns tuple bounds, serialized as arrays.
+    result = json.loads(json.dumps(result, ensure_ascii=False, allow_nan=False))
+    validate_protocol("ImportPreview" if args.command == "studio-import-preview" else "Snapshot", result)
     print(json.dumps(result, indent=2, ensure_ascii=False, allow_nan=False))
     return 0
 
@@ -248,7 +253,11 @@ def main():
         return args.func(args)
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
-        print(json.dumps({"status": "error", "error": str(e)}, indent=2, ensure_ascii=False))
+        result = {"status": "error", "error": str(e)}
+        if args.command.startswith("studio-"):
+            from authoring_rig.studio_protocol import error_detail
+            result.update({"schemaVersion": 1, "detail": error_detail(e, args.command)})
+        print(json.dumps(result, indent=2, ensure_ascii=False))
         return 1
 
 

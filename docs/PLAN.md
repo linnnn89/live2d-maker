@@ -97,6 +97,8 @@ CLI 默认使用随仓应用 JAR；warps、physics、structure、authoringJourna
 
 2026-10-07 的 PC 迭代已完成 E1a/E1b 和 E2：索引/稳定快照、有界图层历史，以及独立像素身份、完整成图复用、串行解码、共享工作量预算和过期显示取消。E2 Windows 构建、45 项回归及实际 Edge/Python 工作区验收通过；注记不触发显示任务，PNG 与 Python 完整 RGBA 一致，超预算/队列请求失败后恢复正常。详细预算和边界见 [工程审阅](ENGINEERING_REVIEW_R1.md)；后续按 E3 协议统一、E4 恢复、E5 用例提取、E6/R2–R8 推进。
 
+同日 E3 已完成共享协议/生成 DTO、结构化错误和可选轻量 Agent 读取；真实 Python/HTTP/Edge 的保存冲突与导入闭环通过，构建与 48 项前端回归、5 项 Python Studio 回归通过。默认 v1 完整响应和持久化 IR 格式保持，后续接续 E4 恢复、E5/E6 与 R2–R8。
+
 ### P6 素材导入
 
 已提供 `import-generated` 和 Studio 的预检/确认入口。输入透明 RGBA PNG、画布大小二值 mask、放置矩形和生成说明；允许新增或按稳定 ID 替换。保护区内有像素变化即拒绝，不能裁掉违规像素来通过检查。
