@@ -250,3 +250,11 @@ E6 仍有注记与构建签名分层、WorkspaceService 提取等内容，R2 的
 新增三个 Python 回归覆盖签名/数字、旧与新构建/QA 记录、Overlay 成功/失败及旧失败缺 IR。全套 22 项通过；最后保留精确失败判定的兼容补充后，三个新回归和既有 Overlay gate 回归再次通过。实际 Edge/Python/Kotlin：旧成功构建运行 16 姿态 QA，只保存注记时 PSD/模型/QA 仍有效且构建/QA ID 和模型字节不变；裁切后门禁关闭，恢复轮廓后重新有效。实际 Overlay 重建/16 姿态 QA 生成版本 2 报告，注记保存仍保持应用证据；缺失目标原生重建失败后再保存注记，broken 门禁仍在，上次成功模型/QA 保留。验收脚本首次在错误提示出现、失败刷新仍进行时写命令，得到正确 BUSY，随后等待 idle 续验成功；未改操作门禁。证据在 out/e6-signature-evidence/。
 
 Kotlin/JAR/素材及 IR 持久化格式未改，本轮未重跑未变的前端/Kotlin全套。手动 Rebuild 仍执行明确请求的重建；本轮消除注记造成的失效，不声称实现阶段产物缓存。尚未把产品构建设置纳入项目签名，当前原生预览配置仍固定。接续 E6 的 WorkspaceService 提取与 R2–R8。
+
+## 31. E6c：工程归档 WorkspaceService（2026-10-07）
+
+基于 E6b PR #15，main@1bd3cab。UI 无关 application/WorkspaceService 接收捕获的历史、任务、空间引用、原 PSD 和不解释的 presentation JSON，负责资源整理、日志图片外置、版本 1 归档读写；ProjectSession 保留 UI codec、互斥、提示与安装。桌面/现有 Agent 保存入口共用；不声称整个编辑事务已脱离 ViewModel。打开解压目录显式归属与移交，失败/调度返回取消清理；保存服务 finally 清理，沿用既有原子替换/哈希清单。
+
+三个真实临时工程测试通过，覆盖删除原始外部资源后往返、原 PSD/栅格/历史/设置/任务/辅助 PNG/日志/空间引用完整、保存失败保留旧归档、非法图片引用拒绝及临时目录清理。Kotlin 全套 208 项，0 失败/错误、1 跳过。源码 JAR 与随仓 JAR/manifest 同步，安装器 DryRun 通过。真实 Windows 桌面启动和 PrintWindow 截图正常，日志无启动错误；Compose UIA 仅暴露容器，未完成桌面保存/打开的 UI 自动化。首次手工启动漏了已有便携 skiko.library.path，补齐参数后成功，未修改源代码。证据在 out/e6-workspace-evidence/。
+
+E6 原生门面、签名分层和项目归档服务已落地，完整编辑用例服务化、RigBuilder 领域拆分/阶段复用继续随 R7 推进。下一批按规划推进 R2/R3 的 ID/分类映射、人工语义修正和实际构建设置。未重跑未变化的前端/Python全套。
