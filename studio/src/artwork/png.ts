@@ -1,5 +1,48 @@
 import { decode, encode, convertIndexedToRgb } from 'fast-png';
+import { Unzlib } from 'fflate';
 import { ArtworkError, dimensions, type PixelFrame, type RasterAsset } from './contracts';
+import { MAX_ASSET_BYTES } from './MemoryBudget';
+
+/** Bound IDAT expansion before fast-png collects inflated chunks; ignore non-pixel metadata. */
+function checkedPng(bytes: Uint8Array): Uint8Array {
+  if (bytes.length < 33 || bytes.length > MAX_ASSET_BYTES) throw new ArtworkError('ASSET_FORMAT', 'PNG 数据不完整或超过 16 MiB');
+  const header = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  if (header.getUint32(0) !== 0x89504e47 || header.getUint32(4) !== 0x0d0a1a0a || header.getUint32(8) !== 13 || header.getUint32(12) !== 0x49484452) throw new ArtworkError('ASSET_FORMAT', 'PNG 文件头无效');
+  const width = header.getUint32(16), height = header.getUint32(20), depth = bytes[24], color = bytes[25], interlace = bytes[28];
+  dimensions(width, height);
+  const channels = ({ 0: 1, 2: 3, 3: 1, 4: 2, 6: 4 } as Record<number, number>)[color];
+  if (!channels || ![1, 2, 4, 8].includes(depth) || ((color === 2 || color === 4 || color === 6) && depth !== 8) || interlace > 1) throw new ArtworkError('ASSET_FORMAT', '暂不支持该 PNG 像素格式（包括 16 位素材）');
+  const passes = interlace ? [[0,0,8,8],[4,0,8,8],[0,4,4,8],[2,0,4,4],[0,2,2,4],[1,0,2,2],[0,1,1,2]] : [[0,0,1,1]];
+  let expected = 0;
+  for (const [x,y,dx,dy] of passes) {
+    const w = Math.max(0, Math.ceil((width-x)/dx)), h = Math.max(0, Math.ceil((height-y)/dy));
+    if (w && h) expected += (Math.ceil(w*channels*depth/8)+1)*h;
+  }
+  let inflated = 0, ended = false;
+  const unique = new Set<string>();
+  const inflator = new Unzlib(chunk => { inflated += chunk.length; if (inflated > expected) throw new ArtworkError('ASSET_FORMAT', 'PNG 解压数据超过声明的像素尺寸'); });
+  const chunks = [bytes.subarray(0,8)];
+  for (let offset = 8; offset < bytes.length;) {
+    if (offset + 12 > bytes.length) throw new ArtworkError('ASSET_FORMAT', 'PNG 数据块不完整');
+    const length = header.getUint32(offset), end = offset + length + 12;
+    if (end > bytes.length) throw new ArtworkError('ASSET_FORMAT', 'PNG 数据块长度无效');
+    const name = String.fromCharCode(...bytes.subarray(offset+4,offset+8));
+    if (['IHDR','PLTE','tRNS','IEND'].includes(name)) {
+      if (unique.has(name) || (name === 'IHDR' && offset !== 8) || (name === 'PLTE' && length > 768) || (name === 'tRNS' && length > 256) || (name === 'IEND' && length !== 0)) throw new ArtworkError('ASSET_FORMAT', 'PNG 数据块结构无效');
+      unique.add(name);
+    }
+    if (name === 'IDAT') for (let start = offset+8; start < end-4; start += 256) inflator.push(bytes.subarray(start,Math.min(start+256,end-4)),false);
+    if (['IHDR','PLTE','tRNS','IDAT','IEND'].includes(name)) chunks.push(bytes.subarray(offset,end));
+    else if (/^[A-Z]/.test(name)) throw new ArtworkError('ASSET_FORMAT', 'PNG 含不支持的必要数据块');
+    offset = end;
+    if (name === 'IEND') { ended = true; break; }
+  }
+  inflator.push(new Uint8Array(),true);
+  if (!ended || inflated !== expected) throw new ArtworkError('ASSET_FORMAT', 'PNG 解压数据与声明尺寸不一致');
+  const result = new Uint8Array(chunks.reduce((total,chunk)=>total+chunk.length,0));
+  let position=0; for (const chunk of chunks) { result.set(chunk,position); position+=chunk.length; }
+  return result;
+}
 
 /** Decode unpremultiplied samples rather than reading rounded colors back from Canvas. */
 export function decodeAsset(bytes: Uint8Array): RasterAsset {
@@ -7,7 +50,7 @@ export function decodeAsset(bytes: Uint8Array): RasterAsset {
   if (bytes.byteLength < 33) throw new ArtworkError('ASSET_FORMAT', 'PNG 数据不完整');
   const header = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   dimensions(header.getUint32(16), header.getUint32(20));
-  const png = decode(bytes, { checkCrc: true });
+  const png = decode(checkedPng(bytes), { checkCrc: true });
   dimensions(png.width, png.height);
   // Working PNGs exported by Studio are 8-bit. Do not silently reinterpret 16-bit data.
   if (png.depth === 16) throw new ArtworkError('ASSET_FORMAT', '暂不支持 16 位 PNG 预览，请使用 8 位素材');

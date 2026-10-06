@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ArtworkIR } from '../editor/contracts';
 import type { ArtworkClient } from './ArtworkClient';
+import { artworkKey } from './content';
 
 export type ArtworkSource = 'draft' | 'saved' | 'reference';
-type Props = { ir: ArtworkIR; client: ArtworkClient; identity: string; source: ArtworkSource };
+type Props = { ir: ArtworkIR; client: ArtworkClient; source: ArtworkSource };
 
 /** Pixels fit the same SVG coordinates as edit handles; no PNG encoding per drag. */
-export function ArtworkCanvas({ ir, client, identity, source }: Props) {
+export function ArtworkCanvas({ ir, client, source }: Props) {
+  const identity=artworkKey(ir);
   const canvas = useRef<HTMLCanvasElement>(null);
   const [result, setResult] = useState<{ identity: string; message: string; failed: boolean } | null>(null);
   useEffect(() => {
@@ -28,7 +30,8 @@ export function ArtworkCanvas({ ir, client, identity, source }: Props) {
       });
     });
     return () => { cancelled = true; cancelAnimationFrame(scheduled); };
-  }, [client, ir, identity]);
+  // A new editor token or annotation does not alter pixels; captures still validate their token separately.
+  }, [client, identity]);
   const current = result?.identity === identity ? result : null;
   return <foreignObject x="0" y="0" width={ir.canvas.width} height={ir.canvas.height} pointerEvents="none">
     <div className="artwork-raster" data-source={source} data-render-state={current ? current.failed ? 'error' : 'ready' : 'loading'}>
