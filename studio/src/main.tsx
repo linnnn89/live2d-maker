@@ -11,6 +11,7 @@ import { Icon } from './workspace/Icon';
 import { BuildSettingsPanel } from './workspace/BuildSettingsPanel';
 import { ProjectStart } from './project/ProjectStart';
 import { ProjectPanel } from './project/ProjectPanel';
+import { ModelExportPanel } from './project/ModelExportPanel';
 function App(){
   const {saved,editor,draft,ir,dirty,selected,busy,message,error,editingLocked,showQa,setShowQa,showImport,
     openImport,closeImport,commitImport,retryOpen,action,history}=useWorkspace();
@@ -48,6 +49,7 @@ function App(){
       <section className="panel parameters-panel"><div className="panel-heading"><h2>参数</h2><button className="text-button" disabled={!parameters.length} onClick={reset}>重置</button></div><div className="parameters">{visibleParams.map(p => <label className="parameter" key={p.id}><span>{p.id}</span><div><input aria-label={p.id} type="range" min={p.min} max={p.max} step={(p.max - p.min) / 200 || 0.01} value={p.value} onChange={e => setParameter(p.id, Number(e.target.value))}/><output>{p.value.toFixed(2)}</output></div></label>)}{!parameters.length && <p className="empty">模型就绪后显示原生参数</p>}</div></section>
       <BuildSettingsPanel/>
       <ProjectPanel/>
+      <ModelExportPanel/>
       {saved?.qa && <button className="qa-result" onClick={() => setShowQa(true)}>查看 Pose QA · {saved.qa.poses} 个姿态</button>}
       {saved?.build && <details className="build-notes"><summary>导出审计 · {saved.build.labelCount ?? '未知'} 层 · {(saved.build.warnings ?? []).length} 条警告</summary><p>原生导出审计与警告保留供复核。</p><ul>{(saved.build.warnings ?? []).map((warning, i) => <li key={i}>{warning}</li>)}</ul></details>}
       </aside>

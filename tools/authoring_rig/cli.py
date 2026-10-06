@@ -148,6 +148,7 @@ def cmd_studio(args):
     from authoring_rig.studio import (open_workspace, snapshot, save_workspace, rebuild_workspace,
                                      qa_workspace, preview_generated, commit_generated, save_build_settings)
     from authoring_rig.projects import recover_project, save_project, restore_project, revision_list, pack_archive, create_project, list_projects
+    from authoring_rig.delivery import export_model
     if args.command == "studio-catalog":
         request = json.load(sys.stdin)
         from authoring_rig.studio_protocol import validate_protocol
@@ -172,6 +173,8 @@ def cmd_studio(args):
         result = revision_list(args.workspace)
     elif args.command == "studio-project-archive":
         result = pack_archive(args.workspace)
+    elif args.command == "studio-model-export":
+        result = export_model(args.workspace, json.load(sys.stdin))
     elif args.command == "studio-rebuild":
         result = rebuild_workspace(args.workspace)
     elif args.command == "studio-import-preview":
@@ -185,7 +188,8 @@ def cmd_studio(args):
     # Validate the JSON wire value: Pillow returns tuple bounds, serialized as arrays.
     result = json.loads(json.dumps(result, ensure_ascii=False, allow_nan=False))
     response_type = {"studio-import-preview": "ImportPreview", "studio-project-save": "ProjectRevisions",
-                     "studio-project-revisions": "ProjectRevisions", "studio-project-archive": "ProjectDownload"}.get(args.command, "Snapshot")
+                     "studio-project-revisions": "ProjectRevisions", "studio-project-archive": "ProjectDownload",
+                     "studio-model-export":"ModelExportResult"}.get(args.command, "Snapshot")
     validate_protocol(response_type, result)
     print(json.dumps(result, indent=2, ensure_ascii=False, allow_nan=False))
     return 0
@@ -256,7 +260,7 @@ def main():
 
     for command in ("studio-open", "studio-snapshot", "studio-save", "studio-rebuild", "studio-qa",
                       "studio-import-preview", "studio-import-commit", "studio-build-settings", "studio-catalog",
-                      "studio-project-save", "studio-project-restore", "studio-project-revisions", "studio-project-archive"):
+                      "studio-project-save", "studio-project-restore", "studio-project-revisions", "studio-project-archive", "studio-model-export"):
         studio = sub.add_parser(command, help="Local Studio workspace operation")
         studio.add_argument("--workspace", required=True)
         if command == "studio-open":

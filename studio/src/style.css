@@ -762,3 +762,6 @@ footer>div{
 .project-panel ul { max-height:240px; overflow-y:auto; padding-left:18px; }
 .project-panel li { margin:10px 0; overflow-wrap:anywhere; }
 .preview-panel { min-height:220px; flex-shrink:0; }
+.project-panel fieldset { margin:0; padding:0; border:0; display:flex; flex-direction:column; gap:10px; }
+.project-panel fieldset label { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
+.project-panel select { max-width:100%; }

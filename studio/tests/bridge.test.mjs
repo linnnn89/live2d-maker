@@ -129,3 +129,26 @@ test('project transport pins independent page roots and resources and rejects un
     const denied=await fetch(url+`/projects/${ids[0]}/api/open`,{method:'POST',headers:{Origin:'https://example.test'}});assert.equal(denied.status,403);
   }finally{await new Promise(resolve=>server.close(resolve));}
 });
+
+test('model export transport validates selection and input identities and releases the operation gate after native failure',async()=>{
+  const {ProtocolError}=require(path.join(output,'src/protocol/index.js'));const calls=[];let fail=false;
+  const service=await serverFor(config(),async(command,input)=>{
+    if(command==='studio-snapshot')return snapshot;
+    calls.push([command,JSON.parse(input)]);
+    if(fail)throw new ProtocolError('EXPORT_FAILED','Overlay incompatible; previous delivery retained','export');
+    return {schemaVersion:1,target:'playable',url:'/studio-files/downloads/'+('a'.repeat(32))+'.model.zip',filename:'test.model.zip',
+      files:[{name:'artwork.moc3',bytes:1,sha256:'1'.repeat(64)}],warnings:['native warning'],cacheId:'a'.repeat(32),reused:false,
+      buildSettings:{schemaVersion:1,atlasSize:2048,meshInteriorDensity:40,headTurnStrength:1},physics:false,motions:0,
+      modelSha256:'2'.repeat(64),modelInputSignature:'3'.repeat(64),overlayRevision:'4'.repeat(64)};
+  });
+  const request={schemaVersion:1,revision:'base',settingsRevision:'1'.repeat(64),overlayRevision:'4'.repeat(64),target:'playable',exportMotions:false,generatePhysics:false};
+  try{
+    for(const invalid of [{...request,target:'unknown'},{...request,generatePhysics:'false'},{...request,overlayRevision:'old'},{...request,unexpected:1}]){
+      const response=await fetch(service.url+'/api/model-export',{method:'POST',body:JSON.stringify(invalid)});assert.equal(response.status,400);assert.equal((await response.json()).detail.code,'INVALID_REQUEST');
+    }
+    assert.equal(calls.length,0);
+    const response=await fetch(service.url+'/api/model-export',{method:'POST',body:JSON.stringify(request)});assert.equal(response.status,200);assert.equal((await response.json()).files[0].name,'artwork.moc3');assert.deepEqual(calls,[['studio-model-export',request]]);
+    fail=true;const denied=await fetch(service.url+'/api/model-export',{method:'POST',body:JSON.stringify(request)});assert.equal(denied.status,400);assert.equal((await denied.json()).detail.code,'EXPORT_FAILED');
+    assert.equal((await fetch(service.url+'/api/snapshot')).status,200);
+  }finally{await service.close();}
+});

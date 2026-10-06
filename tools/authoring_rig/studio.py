@@ -195,6 +195,14 @@ def snapshot(root):
         metadata = read(root / "project.json")
         result["project"] = {"id": state["projectId"], "name": metadata["name"], "updatedAt": metadata["updatedAt"],
                              "parts": len(data["parts"]), "head": metadata["head"]}
+    from .delivery import overlay_revision
+    result["overlayRevision"] = overlay_revision(root, state)
+    result["export"] = None
+    if state.get("latestExport"):
+        delivery = read(root / state["latestExport"] / "export-report.json")
+        delivery["url"] = file_url(root, root / "downloads" / (Path(state["latestExport"]).name + ".model.zip"))
+        result["export"] = {"result": delivery, "current": delivery["modelInputSignature"] == model_input_signature(data)
+                            and delivery["buildSettings"] == settings and delivery["overlayRevision"] == result["overlayRevision"]}
     if state.get("latestImport"):
         artwork = root / state["latestImport"] / "after.png"
         result["artworkImage"] = file_url(root, artwork)
