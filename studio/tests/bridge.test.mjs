@@ -43,6 +43,29 @@ async function serverFor(config,runner){
   return {url:`http://127.0.0.1:${config.port}`,close:()=>new Promise(resolve=>server.close(resolve))};
 }
 
+test('limited native keyform requests reject geometry and unrelated changes before running, and preserve input conflicts',async()=>{
+  const {ProtocolError,validateProtocol}=require(path.join(output,'src/protocol/index.js'));
+  const neutral={...snapshot,qa:{status:'ok',revision:'base',poses:1,contactSheet:'/sheet.png',reviewUrl:'/review.json',shots:[{name:'neutral',values:{},image:'/neutral.png'}]}};
+  validateProtocol('Snapshot',neutral);
+  assert.throws(()=>validateProtocol('Snapshot',{...neutral,qa:{...neutral.qa,shots:[{name:'bad',values:{ParamAngleX:'30'},image:'/bad.png'}]}}));
+  let conflict=false;const calls=[];const server=await serverFor(config(),async(command,input)=>{
+    if(conflict)throw new ProtocolError('BASE_CONFLICT','Overlay changed','rig-edit');
+    if(input)calls.push([command,JSON.parse(input)]);return snapshot;
+  });
+  const base={schemaVersion:1,revision:'a'.repeat(64),settingsRevision:'b'.repeat(64),overlayRevision:'c'.repeat(64)};
+  const payload={...base,operation:'set-opacity',edit:{targetId:'ArtMeshFace',parameterId:'ParamAngleX',value:30,opacity:.4}};
+  try{
+    assert.equal((await fetch(server.url+'/api/rig-edit',{method:'POST',body:JSON.stringify(payload)})).status,200);assert.equal(calls[0][0],'studio-rig-edit');
+    for(const edit of [{...payload.edit,opacity:1.1},{...payload.edit,value:'30'},{...payload.edit,geometry:{positionDeltas:[1,2]}},{...payload.edit,created:true}]){
+      const response=await fetch(server.url+'/api/rig-edit',{method:'POST',body:JSON.stringify({...payload,edit})});assert.equal(response.status,400);assert.equal((await response.json()).detail.code,'INVALID_REQUEST');
+    }
+    assert.equal(calls.length,1);
+    assert.equal((await fetch(server.url+'/api/rig-edit',{method:'POST',body:JSON.stringify({...base,operation:'remove',index:0})})).status,200);
+    conflict=true;const response=await fetch(server.url+'/api/rig-edit',{method:'POST',body:JSON.stringify(payload)});assert.equal(response.status,409);assert.equal((await response.json()).detail.code,'BASE_CONFLICT');
+    conflict=false;assert.equal((await fetch(server.url+'/api/snapshot')).status,200);
+  }finally{await server.close();}
+});
+
 test('preview pose HTTP contract validates saved library versions and preserves conflict identity',async()=>{
   const {ProtocolError}=require(path.join(output,'src/protocol/index.js'));
   const calls=[];let conflict=false;const server=await serverFor(config(),async(command,input)=>{

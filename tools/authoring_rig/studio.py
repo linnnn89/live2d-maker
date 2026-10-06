@@ -222,7 +222,12 @@ def snapshot(root):
         review = read(root / qa / "review.json")
         result["qa"] = {"status": review["status"], "revision": review["studioRevision"],
                         "contactSheet": file_url(root, root / qa / "contact-sheet.png"),
-                        "reviewUrl": file_url(root, root / qa / "review.json"), "poses": len(review["shots"])}
+                        "reviewUrl": file_url(root, root / qa / "review.json"), "poses": len(review["shots"]),
+                        "shots": [{"name": shot["name"], "values": shot["params"], "image": file_url(root, root / qa / shot["full"])} for shot in review["shots"] if all(key in shot for key in ("name", "params", "full"))]}
+    from .rig_edits import edit_state
+    from .issues import model_issues
+    result["rigEdits"] = edit_state(root, state)
+    result["issues"] = model_issues(result, root, state)
     return result
 
 
@@ -419,6 +424,7 @@ def rebuild_workspace(root):
                  "fresh": labels_path.stat().st_mtime >= (build / "artwork.psd").stat().st_mtime}
         write(build / "label-audit.json", audit)
         if unknown or not audit["fresh"]:
+            failed({"status": "broken", "applied": False, "reasons": ["Unknown classification or stale label audit"], "unknown": unknown})
             raise ValueError("Label audit failed; previous build retained")
         report = {"status": "ok", **context, "modelFile": model.relative_to(build).as_posix(),
                   "warnings": result.get("warnings", []), "labelCount": len(layers), "unknownCount": 0,

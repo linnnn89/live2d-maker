@@ -147,3 +147,13 @@ CLI `studio-catalog --workspace <目录>` 从 stdin 接收 `{ "schemaVersion":1,
 保存前须提交美术和构建设置，并完成当前模型重建。旧模型报告没有参数范围时，重建后才可保存。项目内 poses.json 独立记录最多 100 份姿态；项目修订与完整工程归档包含姿态库，旧修订按空库恢复。多窗口保存冲突会保留名称输入，点击“读取姿态库”后可再保存。当前模型缺少某参数或范围不兼容时，应用整体拒绝，保留当前全部参数并说明原因。
 
 `studio-poses --workspace <目录>` 从 stdin 接收 v1 JSON：保存为 `{ "schemaVersion":1, "operation":"save", "revision":"IR版本", "settingsRevision":"设置版本", "overlayRevision":"Overlay版本", "buildId":"builds/<32位ID>", "posesRevision":"姿态库版本", "name":"姿态名称", "values":{ "ParamAngleX":20 } }`，删除为 `{ "schemaVersion":1, "operation":"delete", "posesRevision":"姿态库版本", "id":"姿态ID" }`。版本来自 snapshot；未知参数、越界或非有限值拒绝写入。项目保存/恢复还可传 posesRevision，当前界面总是核对。此入口不提供关键形编辑。
+
+## 受限模型编辑与问题
+
+选中图层，展开“模型关键形编辑”，选择该图层上次成功构建的真实对象、原生参数及姿态值，输入 0–1 透明度，点击“保存透明度关键形”。提交持久 Overlay 前自动保存完整工程修订；然后 Rebuild 更新模型。它与参数滑块的临时预览不同。已有独立透明度 set 可“定位图层”或“撤回此修改”，撤回后也须更新模型。其他通道/几何/journal 保留；本界面只支持这批独立透明度编辑和最多 100 条 flat set。
+
+先保存美术与设置、更新当前模型；旧构建缺少实际参数范围时也须更新。首次 Overlay 基线来自未编辑成功构建，核对完整模型/引擎身份。后续基线保持原样，拓扑、模型输入、设置或运行时改变后须通过原生重放；不兼容时旧模型保留，面板可查看原 Overlay/基线、失败证据与变化字段。可恢复兼容工程修订或撤回独立修改；需要全新基线时在独立工程建立新编辑，不自动把旧编辑迁到新拓扑。
+
+“模型问题”首批列出未知分类、无效参数和 Overlay/构建阻断项，提供定位部件设置或修改证据的操作。完整导出警告仍在审计详情，未自动判断美术质量。QA 联系表保留，新增可点击的单姿态缩略图；当前 QA 可载入相应预览值，过期 QA 只供查看。
+
+`studio-rig-edit --workspace <工程目录>` 从 stdin 接收 v1 JSON。共同字段为 schemaVersion、revision、settingsRevision、overlayRevision（从 snapshot 读取）。`operation:"set-opacity"` 增加 `edit:{targetId:"ArtMeshFace",parameterId:"ParamAngleX",value:30,opacity:0.4}`；`operation:"remove"` 增加整数 index（来自 snapshot.rigEdits.edits）。接口拒绝任意几何/通道/对象创建；参数/目标和版本不符合时不写 Overlay。只开放 managed Studio 工程，完整工程归档携带修订与基线证据。

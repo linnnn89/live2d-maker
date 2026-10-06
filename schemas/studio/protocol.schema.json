@@ -775,6 +775,12 @@
                 },
                 "poses": {
                   "type": "number"
+                },
+                "shots": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/QaPose"
+                  }
                 }
               },
               "required": [
@@ -830,6 +836,15 @@
         },
         "poses": {
           "$ref": "#/definitions/PoseState"
+        },
+        "rigEdits": {
+          "$ref": "#/definitions/RigEditState"
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ModelIssue"
+          }
         }
       },
       "required": [
@@ -1961,6 +1976,237 @@
           "additionalProperties": false
         }
       ]
+    },
+    "KeyformOpacity": {
+      "type": "object",
+      "properties": {
+        "targetId": {
+          "type": "string"
+        },
+        "parameterId": {
+          "type": "string"
+        },
+        "value": {
+          "type": "number"
+        },
+        "opacity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "required": [
+        "targetId",
+        "parameterId",
+        "value",
+        "opacity"
+      ],
+      "additionalProperties": false
+    },
+    "RigEditRequest": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "schemaVersion": {
+              "const": 1
+            },
+            "revision": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "settingsRevision": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "overlayRevision": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "operation": {
+              "const": "set-opacity"
+            },
+            "edit": {
+              "$ref": "#/definitions/KeyformOpacity"
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "revision",
+            "settingsRevision",
+            "overlayRevision",
+            "operation",
+            "edit"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "schemaVersion": {
+              "const": 1
+            },
+            "revision": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "settingsRevision": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "overlayRevision": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "operation": {
+              "const": "remove"
+            },
+            "index": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "schemaVersion",
+            "revision",
+            "settingsRevision",
+            "overlayRevision",
+            "operation",
+            "index"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "RigEditState": {
+      "type": "object",
+      "properties": {
+        "edits": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "index": {
+                "type": "integer"
+              },
+              "targetId": {
+                "type": "string"
+              },
+              "coordinate": {
+                "$ref": "#/definitions/PoseValues"
+              },
+              "opacity": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "index",
+              "targetId",
+              "coordinate",
+              "opacity"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "baselineModelSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "overlayUrl": {
+          "type": "string"
+        },
+        "baselineUrl": {
+          "type": "string"
+        },
+        "failureUrl": {
+          "type": "string"
+        },
+        "changedModelFields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "edits",
+        "changedModelFields"
+      ],
+      "additionalProperties": false
+    },
+    "ModelIssue": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "severity": {
+          "enum": [
+            "error",
+            "warning",
+            "info"
+          ]
+        },
+        "stage": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "partId": {
+          "type": "string"
+        },
+        "targetId": {
+          "type": "string"
+        },
+        "field": {
+          "type": "string"
+        },
+        "action": {
+          "enum": [
+            "select-part",
+            "show-overlay",
+            "rebuild"
+          ]
+        }
+      },
+      "required": [
+        "code",
+        "severity",
+        "stage",
+        "message",
+        "action"
+      ],
+      "additionalProperties": false
+    },
+    "QaPose": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "values": {
+          "type": "object",
+          "minProperties": 0,
+          "maxProperties": 256,
+          "propertyNames": {
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "additionalProperties": {
+            "type": "number"
+          }
+        },
+        "image": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "values",
+        "image"
+      ],
+      "additionalProperties": false
     }
   }
 }
