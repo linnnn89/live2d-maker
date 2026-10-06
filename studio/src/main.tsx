@@ -3,6 +3,8 @@ import { createRoot } from 'react-dom/client';
 import './style.css';
 import { api, ApiError } from './api';
 import { ImportGenerated } from './ImportGenerated';
+import { useModelPreview } from './viewer/useModelPreview';
+import type { Parameter } from './viewer/ViewerAdapter';
 
 type Point = [number, number];
 type Bounds = [number, number, number, number];
@@ -20,8 +22,6 @@ type Snapshot = {
   build: null | { modelUrl: string; modelBounds: Bounds | null; revision: string; modelSha256: string; labelCount: number; warnings: string[] };
   qa: null | { status: string; contactSheet: string; reviewUrl: string; revision: string; poses: number };
 };
-type Parameter = { id: string; min: number; max: number; default: number; value: number };
-type Viewer = { ready: boolean; errors: string[]; params(): Parameter[]; reset(): void; focus(bounds: number[]): void; setParams(values: Record<string, number>): void; snapshot(crop?: null, scale?: number): string };
 type Handle = { kind: 'polygon'; index: number } | { kind: 'landmark'; name: string };
 
 function Icon({ name }: { name: 'save' | 'rebuild' | 'play' | 'search' | 'eye' | 'full' | 'focus' }) {
@@ -46,19 +46,17 @@ function App() {
   const [busy, setBusy] = useState('正在打开工作区…');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  const [parameters, setParameters] = useState<Parameter[]>([]);
-  const [previewStatus, setPreviewStatus] = useState('等待重建');
   const [landmarkName, setLandmarkName] = useState('');
   const [showQa, setShowQa] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [openAttempt, setOpenAttempt] = useState(0);
-  const frame = useRef<HTMLIFrameElement>(null);
   const drawing = useRef<SVGSVGElement>(null);
   const drag = useRef<Handle | null>(null);
   const dirty = !!(saved && ir && JSON.stringify(ir) !== JSON.stringify(saved.ir));
   const part = ir?.parts.find(p => p.id === selected);
   const polygon = part?.geometry.polygon || (part ? [[part.geometry.bbox[0], part.geometry.bbox[1]], [part.geometry.bbox[2], part.geometry.bbox[1]], [part.geometry.bbox[2], part.geometry.bbox[3]], [part.geometry.bbox[0], part.geometry.bbox[3]]] as Point[] : []);
-  const viewer = () => (frame.current?.contentWindow as (Window & { viewer?: Viewer }) | null)?.viewer;
+  const modelUrl = saved?.build?.modelUrl;
+  const { attachFrame, onLoad, parameters, previewStatus, setParameter, reset } = useModelPreview(modelUrl, saved?.build?.modelBounds, !!saved);
   const apply = (snapshot: Snapshot) => { setSaved(snapshot); setIr(snapshot.ir); };
 
   useEffect(() => {
@@ -89,29 +87,6 @@ function App() {
     void open();
     return () => { cancelled = true; controller.abort(); window.clearTimeout(timer); };
   }, [openAttempt]);
-
-  const modelUrl = saved?.build?.modelUrl;
-  const workspaceReady = !!saved;
-  useEffect(() => {
-    setParameters([]);
-    setPreviewStatus(modelUrl ? '正在加载 Cubism…' : workspaceReady ? '等待重建' : '未加载工作区');
-    if (!modelUrl) return;
-    const started = Date.now();
-    const timer = window.setInterval(() => {
-      const current = viewer();
-      if (current?.errors.length) { setPreviewStatus('预览失败：' + current.errors.join('; ')); clearInterval(timer); }
-      else if (current?.ready) {
-        if (saved?.build?.modelBounds) {
-          const [l, t, r, b] = saved.build.modelBounds;
-          const pad = Math.max(r - l, b - t) * 0.04;
-          current.focus([l - pad, t - pad, r + pad, b + pad]); current.snapshot();
-        }
-        setParameters(current.params()); setPreviewStatus('Cubism 已就绪'); clearInterval(timer);
-      }
-      else if (Date.now() - started > 60000) { setPreviewStatus('预览加载超时'); clearInterval(timer); }
-    }, 100);
-    return () => clearInterval(timer);
-  }, [modelUrl, workspaceReady]);
 
   useEffect(() => {
     const listener = (event: BeforeUnloadEvent) => { if (dirty) event.preventDefault(); };
@@ -178,6 +153,10 @@ function App() {
   }
   const stale = (stage: string) => dirty || saved?.stale[stage];
   const overlayStatus = dirty && saved?.overlay.status !== 'not-loaded' ? 'needs-review' : saved?.overlay.status;
+  const previewSource = !saved?.build ? '尚未生成模型'
+    : dirty ? '上次生成模型 · 当前有未保存修改'
+    : saved.stale.moc3 ? '上次生成模型 · 已保存修改尚未更新'
+    : '当前已保存版本的模型';
   const orderedParts = ir ? [...ir.parts].sort((a, b) => b.z - a.z).filter(p => p.name.toLowerCase().includes(search.toLowerCase())) : [];
   const visibleParams = [...parameters].sort((a, b) => {
     const preferred = ['ParamAngleX', 'ParamAngleY', 'ParamMouthOpenY', 'ParamEyeLOpen', 'ParamEyeROpen'];
@@ -223,18 +202,10 @@ function App() {
           changePoint({ kind: 'landmark', name }, [(l + r) / 2, (t + b) / 2]); setActive({ kind: 'landmark', name }); setLandmarkName('');
         }}>添加关键点</button></div></details>
       </section>
-      <aside className="preview-column"><section className="panel preview-panel"><div className="panel-heading"><h2>Cubism 预览</h2><span className="preview-status">{previewStatus}</span></div><div className="preview checker">
-        {modelUrl && ir ? <iframe key={modelUrl} ref={frame} title="Cubism 实时预览" onLoad={() => {
-          const document = frame.current?.contentDocument;
-          if (!document) return;
-          const style = document.createElement('style');
-          style.textContent = 'html,body{width:100%;height:100%;background:transparent;overflow:hidden}#bar{display:none}canvas{width:100%;height:100%;object-fit:contain}';
-          document.head.append(style);
-        }} src={'/live2d-viewer/index.html?' + new URLSearchParams({ model: modelUrl, vendor: '/public/vendor/cubism/', canvaspx: `${ir.canvas.width},${ir.canvas.height}`, w: '640', h: '760' })}/> : <div className="empty">点击 Rebuild 生成预览</div>}
+      <aside className="preview-column"><section className="panel preview-panel"><div className="panel-heading"><h2>Cubism 预览</h2><span className="preview-status">{previewStatus}</span></div><p className="canvas-reference" role="status">{previewSource}</p><div className="preview checker">
+        {modelUrl && ir ? <iframe key={modelUrl} ref={attachFrame} title="Cubism 实时预览" onLoad={onLoad} src={'/live2d-viewer/index.html?' + new URLSearchParams({ model: modelUrl, vendor: '/public/vendor/cubism/', canvaspx: `${ir.canvas.width},${ir.canvas.height}`, w: '640', h: '760', embed: '1' })}/> : <div className="empty">点击 Rebuild 生成预览</div>}
       </div></section>
-      <section className="panel parameters-panel"><div className="panel-heading"><h2>参数</h2><button className="text-button" disabled={!parameters.length} onClick={() => { viewer()?.reset(); viewer()?.snapshot(); setParameters(viewer()?.params() || []); }}>重置</button></div><div className="parameters">{visibleParams.map(p => <label className="parameter" key={p.id}><span>{p.id}</span><div><input aria-label={p.id} type="range" min={p.min} max={p.max} step={(p.max - p.min) / 200 || 0.01} value={p.value} onChange={e => {
-        const value = Number(e.target.value); viewer()?.setParams({ [p.id]: value }); viewer()?.snapshot(); setParameters(current => current.map(v => v.id === p.id ? { ...v, value } : v));
-      }}/><output>{p.value.toFixed(2)}</output></div></label>)}{!parameters.length && <p className="empty">模型就绪后显示原生参数</p>}</div></section>
+      <section className="panel parameters-panel"><div className="panel-heading"><h2>参数</h2><button className="text-button" disabled={!parameters.length} onClick={reset}>重置</button></div><div className="parameters">{visibleParams.map(p => <label className="parameter" key={p.id}><span>{p.id}</span><div><input aria-label={p.id} type="range" min={p.min} max={p.max} step={(p.max - p.min) / 200 || 0.01} value={p.value} onChange={e => setParameter(p.id, Number(e.target.value))}/><output>{p.value.toFixed(2)}</output></div></label>)}{!parameters.length && <p className="empty">模型就绪后显示原生参数</p>}</div></section>
       {saved?.qa && <button className="qa-result" onClick={() => setShowQa(true)}>查看 Pose QA · {saved.qa.poses} 个姿态</button>}
       {saved?.build && <details className="build-notes"><summary>导出审计 · {saved.build.labelCount} 层 · {saved.build.warnings.length} 条警告</summary><p>未知标签 0；原生警告保留供复核。</p><ul>{saved.build.warnings.map((warning, i) => <li key={i}>{warning}</li>)}</ul></details>}
       </aside>

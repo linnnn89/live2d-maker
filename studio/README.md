@@ -4,6 +4,10 @@
 
 工具开发以编辑、导入、重建和 QA 工作流为验收目标。现有 mouth_open、tongue、upper teeth 用于回归验证；无需为了完成软件开发逐类制作一套角色素材。
 
+预览由独立 ViewerAdapter 管理加载、错误、取景及重绘。参数滑块和重置按动画帧合并重绘，不编码 PNG；需要截图时才调用截图接口。预览区标明当前已保存模型，或提示未保存/已保存但尚未更新的修改。独立 viewer 支持 `embed=1`，由自身控制嵌入布局。
+
+前端检查：`npm run build`；预览适配器回归：`npm test`。适配器用例不依赖 Python、JVM、Edge 或 Windows。
+
 ## 启动
 
 需要仓库已有 `python/Scripts/python.exe`、`requirements-tools.txt` 中的依赖、`portable/PSD2Live` 与已核对的 Cubism runtime。前端使用 Node `^20.19.0 || >=22.12.0`，本轮实测 Node 24.19.0。只安装项目内依赖：
