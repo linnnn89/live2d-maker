@@ -19,6 +19,46 @@ from check_runtime import check_runtime
 
 
 class TestViewer(unittest.TestCase):
+    def test_dynamic_sdk_motion_physics_fixed_steps_reset_and_resource_failure(self):
+        with socket.socket() as sock:
+            sock.bind(('127.0.0.1',0));port=sock.getsockname()[1]
+        output=ROOT/'out';output.mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix='r8-viewer-',dir=output) as temporary, local_server(port), sync_playwright() as playwright:
+            root=Path(temporary)
+            model=json.loads((ROOT/'live2d-viewer/public/models/yelan/yelan.model3.json').read_text(encoding='utf8'))
+            refs=model['FileReferences']
+            for key in ('Moc','Physics','DisplayInfo'):refs[key]='/live2d-viewer/public/models/yelan/'+refs[key]
+            refs['Textures']=['/live2d-viewer/public/models/yelan/'+name for name in refs['Textures']]
+            refs['Motions']={'Test':[{'File':'linear.motion3.json'}]}
+            (root/'model.model3.json').write_text(json.dumps(model),encoding='utf8')
+            motion={'Version':3,'Meta':{'Duration':1,'Fps':60,'Loop':False,'CurveCount':1,'TotalSegmentCount':1,'TotalPointCount':2,'UserDataCount':0,'TotalUserDataSize':0,'FadeInTime':0,'FadeOutTime':0},
+                    'Curves':[{'Target':'Parameter','Id':'ParamAngleX','Segments':[0,0,0,1,30]}]}
+            (root/'linear.motion3.json').write_text(json.dumps(motion),encoding='utf8')
+            url=f'http://127.0.0.1:{port}/live2d-viewer/index.html?dynamics=1&model=/{root.relative_to(ROOT).as_posix()}/model.model3.json'
+            browser=playwright.chromium.launch(channel='msedge',headless=True,args=['--use-angle=swiftshader'])
+            page=browser.new_page();errors=[];page.on('pageerror',lambda error:errors.append(str(error)))
+            page.goto(url);page.wait_for_function('viewer.ready || viewer.errors.length')
+            self.assertEqual(page.evaluate('viewer.errors'),[])
+            self.assertTrue(page.evaluate('viewer.dynamics().physicsAvailable'))
+            self.assertEqual(page.evaluate('viewer.dynamics().elapsed'),0)
+            page.evaluate("viewer.setPhysics(false);viewer.selectMotion('Test:0');for(let i=0;i<31;i++)viewer.step(1/60);viewer.render()")
+            self.assertAlmostEqual(page.evaluate("viewer.params().find(p=>p.id==='ParamAngleX').value"),15,places=4)
+            page.evaluate('for(let i=0;i<40;i++)viewer.step(1/60)')
+            self.assertTrue(page.evaluate('viewer.dynamics().finished'))
+            with self.assertRaisesRegex(Exception,'fixed 1/60'):page.evaluate('viewer.step(.1)')
+            def physics(enabled):
+                return page.evaluate('''enabled=>{viewer.selectMotion(null);viewer.setPhysics(enabled);viewer.setParams({ParamAngleX:25});
+                  for(let i=0;i<120;i++)viewer.step(1/60);viewer.render();return {params:viewer.params(),png:viewer.snapshot(),time:viewer.dynamics().elapsed};}''',enabled)
+            off=physics(False);on=physics(True);again=physics(True)
+            self.assertEqual(on,again);self.assertEqual(on['time'],2)
+            self.assertNotEqual(on['params'],off['params']);self.assertNotEqual(on['png'],off['png'])
+            self.assertTrue(all(p['min']<=p['value']<=p['max'] for p in on['params']))
+            page.evaluate('viewer.reset();viewer.render()');self.assertEqual(page.evaluate('viewer.dynamics().elapsed'),0)
+            self.assertTrue(page.evaluate('viewer.params().every(p=>p.value===p.default)'));self.assertEqual(errors,[])
+            refs['Motions']['Test'][0]['File']='missing.motion3.json';(root/'broken.model3.json').write_text(json.dumps(model),encoding='utf8')
+            page.goto(url.replace('/model.model3.json','/broken.model3.json'));page.wait_for_function('viewer.errors.length')
+            self.assertFalse(page.evaluate('viewer.ready'));self.assertIn('fetch 404',page.evaluate('viewer.errors[0]'));browser.close()
+
     def test_real_renderer_mapping_pose_qa_and_failure_contract(self):
         check_runtime()
         with socket.socket() as sock:

@@ -96,13 +96,13 @@ mask 默认全图保护。使用“矩形可编辑区”或连续画笔开放局
 - `studio-rebuild --workspace <目录>`
 - `studio-qa --workspace <目录> --port 5173`：须有正在运行的 Studio dev server，负责本地资源路径。
 
-默认无 Overlay，界面明确显示“未载入”。可同时设置 `STUDIO_OVERLAY` 与 `STUDIO_OVERLAY_BASELINE`，在新工作区归档既有 Overlay 及其原始 native-base.json。重建调用 `native-replay` 比较完整原生签名，`needs-review`/`broken` 明确失败并保留旧模型，绝不自动忽略 Overlay 或批准其应用。只有成功构建匹配当前 IR、Overlay 和 baseline 文件哈希时，快照才显示原生应用后的 `ok`；否则使用保守预检或对应的失败报告。失败原因在刷新后保留，QA 入口关闭；编辑后恢复数值相等的原 IR，可重新对应原成功模型/QA，JSON 的整数与等值浮点写法不会单独造成失效。旧的附带 Overlay 构建报告没有输入哈希时，须重新 Rebuild 一次。Studio 中尚无手工解决 Overlay 冲突的界面。
+默认无 Overlay，界面明确显示“未载入”。可同时设置 `STUDIO_OVERLAY` 与 `STUDIO_OVERLAY_BASELINE`，在新工作区归档既有 Overlay 及其原始 native-base.json。重建调用 `native-replay` 比较完整原生签名，`needs-review`/`broken` 明确失败并保留旧模型，绝不自动忽略 Overlay 或批准其应用。只有成功构建匹配当前 IR、Overlay 和 baseline 文件哈希时，快照才显示原生应用后的 `ok`；否则使用保守预检或对应的失败报告。失败原因在刷新后保留，QA 入口关闭；编辑后恢复数值相等的原 IR，可重新对应原成功模型/QA，JSON 的整数与等值浮点写法不会单独造成失效。旧的附带 Overlay 构建报告没有输入哈希时，须重新 Rebuild 一次。模型关键形与问题面板提供原基线/失败证据查看、定位和受限编辑撤回，不提供绕过兼容检查。
 
 存在 `psd2live/build/libs/psd2live-0.7.1.jar` 时，使用该源码应用 JAR 和原便携 JVM/依赖；否则用便携版。Overlay baseline 必须来自相同运行时。UI 已实测源码 JAR 的无 Overlay 闭环，以及附带 ArtMesh geometry/opacity Overlay 的成功应用、IR 轮廓变化拒绝、目标缺失拒绝、刷新保留与恢复；固定镜位像素对照确认指定 X+30 姿态生效，并运行 16 姿态 QA。其他 Overlay owner/channel、journal、physics 组合尚未在 Studio 逐项视觉验收。
 
 仅监听 127.0.0.1:5173，固定端口；API 检查 Host/Origin，每个工程写入串行化，Python 工作区也有排他锁，子进程不经 shell。仅服务工作区内白名单 PNG/JSON/moc3、指定下载归档与既有 viewer/vendor 资源，不暴露整个仓库。若异常退出留下 `.studio.lock`，先确认该工作区没有运行中的命令，再移除这个锁文件；保留 `.project-transaction.json`，下一次 CLI 打开会继续未完成的恢复事务。
 
-`npm run build` 进行 TypeScript 检查和前端打包；`dist` 不是可以独立执行 CLI 的发布包，操作功能需要 dev server。当前没有产品发布、打包安装器、Agent 自动生成几何、ImageGen 按钮、物理实时预览或 Cubism Editor 美术验收。默认 QA 是静态姿态检查。
+`npm run build` 进行 TypeScript 检查和前端打包；`dist` 不是可以独立执行 CLI 的发布包，操作功能需要 dev server。当前没有产品发布、打包安装器、Agent 自动生成几何、ImageGen 按钮或 Cubism Editor 美术验收。交付包动态预览见下文。默认 QA 是静态姿态检查。
 
 E5 将打开/保存/导入/原生任务编排放在 `src/workspace/useWorkspaceActions.ts`，画布、图层、点属性和差异在同目录。`bridge/transport.ts`、`runner.ts`、`resources.ts` 分别负责 HTTP、Python CLI 和资源白名单；Vite 配置只组合它们。交互、命令和单工作区排他请求语义保持，尚无后台任务队列。
 
@@ -116,7 +116,7 @@ E5 将打开/保存/导入/原生任务编排放在 `src/workspace/useWorkspaceA
 
 设置保存在工作区独立 `build-settings.json`，不进入美术 IR；旧工作区缺该文件时读取默认值且不自动写入。CLI `studio-build-settings --workspace <目录>` 从 stdin 接收 `{ "schemaVersion":1, "revision":"<IR revision>", "settingsRevision":"<快照 buildSettings.revision>", "settings":{ "schemaVersion":1, "atlasSize":2048, "meshInteriorDensity":40, "headTurnStrength":1 } }`。IR 或设置版本冲突拒绝写入；`SETTINGS_CONFLICT` 对应 HTTP 409，界面保留本页输入，用户明确重新读取后再提交。
 
-构建、失败和 QA 报告同时记录模型输入与设置签名，构建目录保存设置副本。设置变更使模型/QA 失效，美术 PSD/PNG 不变；旧无设置签名报告仅能对应原默认值。改变设置不会把另一组设置下的原生失败结论误认成当前结果，但目标不存在等自身非法 Overlay 仍拒绝。物理及交付文件选项随后续迭代开放。
+构建、失败和 QA 报告同时记录模型输入与设置签名，构建目录保存设置副本。设置变更使模型/QA 失效，美术 PSD/PNG 不变；旧无设置签名报告仅能对应原默认值。改变设置不会把另一组设置下的原生失败结论误认成当前结果，但目标不存在等自身非法 Overlay 仍拒绝。物理及动作文件选项在“导出模型”中明确选择。
 
 ## 工程保存、修订与归档
 
@@ -134,7 +134,7 @@ CLI `studio-catalog --workspace <目录>` 从 stdin 接收 `{ "schemaVersion":1,
 
 先保存美术及构建设置，展开“导出模型”，选择 cmo3 工程或可播放模型包，以及是否包含动作示例、生成默认物理。显式 Overlay 物理规则仍保留。“生成交付包”使用已保存输入独立生成，完成后列出实际文件与全部原生警告；失败保留此前成功的交付、预览和 QA。页面刷新仍可下载最近交付；输入变化后显示历史交付标识。
 
-可播放包包含 model3、moc3、纹理和实际引用的配置/动作/物理文件；关闭动作时同时移除 model3 引用及动作文件。cmo3 包另含重建 PSD 和 cmo3。cmo3 的可编辑纹理图层由纹理页重建，原 PSD 的编辑链不在 cmo3 中保留；原始 PSD 保存在 Studio 工程，交付包里的 artwork.psd 对应当前保存美术。每包附来源、设置、引擎身份和文件长度/SHA-256 报告。原生回读和静态模型加载不能代替 Cubism Editor 窗口验收或实时物理播放。
+可播放包包含 model3、moc3、纹理和实际引用的配置/动作/物理文件；关闭动作时同时移除 model3 引用及动作文件。cmo3 包另含重建 PSD 和 cmo3。cmo3 的可编辑纹理图层由纹理页重建，原 PSD 的编辑链不在 cmo3 中保留；原始 PSD 保存在 Studio 工程，交付包里的 artwork.psd 对应当前保存美术。每包附来源、设置、引擎身份和文件长度/SHA-256 报告。交付包可直接动态预览；原生回读和浏览器加载不能代替 Cubism Editor 窗口验收。
 
 首次导出同时准备 cmo3 和动作，随后只切换目标或动作文件选择时复用同一验证模型。缓存键包含像素/绑定输入、构建设置、Overlay/基线、实际 JAR/JVM 身份和默认物理选择；注记变化可以复用，模型输入或设置变化须重新生成。复用前核对完整原生产物哈希，缺失或损坏会创建新产物，保留旧证据。首次准备两个格式的开销仍存在，不声称实现常驻建模服务。完整 Studio 工程归档现包含导出缓存、交付报告和模型 ZIP，仍受上述归档容量限制。
 
@@ -161,3 +161,14 @@ CLI `studio-catalog --workspace <目录>` 从 stdin 接收 `{ "schemaVersion":1,
 ### 原生准备模型复用
 
 Overlay 重放通过完整基线和引擎检查后，可直接导出同一配置的基础预览，避免重复读取/分类/打包/绑定。全部其他配置必须一致；自定义物理等设置改变会完整构建。报告 `native-replay.json.reused_prepared_model` 可核对选择结果。原生检查、回读和新增警告门禁保持；引擎升级后的旧 Overlay 基线不会自动重置。
+
+
+## 交付包动态预览
+
+在“导出模型”中选择“包含动作示例”和/或“生成默认物理”，生成后点击“预览交付包动态”。预览读取该 ZIP 的实际文件选择，不使用包含额外文件的导出缓存。默认暂停；可选择 Idle/Blink/Nod/Shake 等实际包内动作，播放、暂停、前进一帧或重置到开头。循环遵循动作文件标记；非循环动作结束且未启用物理时自动暂停。仅物理模式可展开预览参数，手动改变头部等输入，观察包内物理响应。
+
+调度固定每步 1/60 秒；页面长时间挂起后每次绘制最多补六步，丢弃超出的墙钟时间，不快进整个后台时段。暂停保持当前画面/时间，重置重新准备默认参数、选中动作及物理状态。普通播放直接渲染，不编码 PNG。资源加载或运行失败显示预览错误，停止调度。关闭/替换 iframe 停止播放，重新打开默认暂停、未选择动作。
+
+此预览不修改参数姿态库、Overlay、构建设置或静态 QA，标明当前输入/历史交付来源。缺少动作或物理时说明实际缺项，不生成替代资源。旧交付报告仍可下载，重新生成后才有动态入口。CLI ModelExportResult v1 新增可选 modelUrl；快照按本工程重新生成资源 URL，工程归档导入后的副本保持独立路径。
+
+此批只观察已有预设与物理，不包含动作时间轴编辑、音频/事件触发或自动生成素材调用。既有外部/AI PNG 仍按素材预检与确认契约导入。

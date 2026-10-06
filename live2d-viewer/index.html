@@ -24,6 +24,7 @@
 //   vendor=/live2d-viewer/public/vendor/cubism/      (defaults to files beside this page)
 //   w=1024 h=1024                                   (canvas pixels)
 //   embed=1                                        (transparent iframe layout, hides toolbar)
+//   dynamics=1                                     (load referenced motions/physics; paused until step)
 // API (window.viewer):
 //   ready                     -> boolean
 //   params()                  -> [{id, value, min, max, default}]
@@ -116,6 +117,23 @@ function loadTexture(gl, buffer) {
     viewer.mocVersion = core.Version.csmGetMocVersion(mocBytes);
     const moc = sdk.CubismMoc.create(mocBytes, true);
     const model = moc.createModel();
+    // Static authoring/QA never loads or advances dynamic resources.
+    const dynamic = q.get('dynamics') === '1';
+    const motions = [];
+    let physicsBytes, physics, motionManager, motionId = null, ticks = 0;
+    let physicsEnabled = false;
+    if (dynamic) {
+      if (doc.FileReferences.Physics) physicsBytes = await fetchRef(doc.FileReferences.Physics);
+      for (const [group, entries] of Object.entries(doc.FileReferences.Motions || {})) {
+        for (const [index, entry] of entries.entries()) {
+          const bytes = await fetchRef(entry.File);
+          const meta = parseJson(bytes).Meta;
+          motions.push({ id: `${group}:${index}`, name: `${group} · ${entry.File.split('/').pop().replace('.motion3.json', '')}`,
+            duration: meta.Duration, loop: !!meta.Loop, bytes, entry });
+        }
+      }
+      physicsEnabled = !!physicsBytes;
+    }
     const parameterList = [];
     const byId = new Map();
     for (let i = 0; i < model.getParameterCount(); i += 1) {
@@ -217,6 +235,52 @@ function loadTexture(gl, buffer) {
       });
     }
 
+    function resetDynamics() {
+      motionManager?.stopAllMotions();
+      motionManager = new sdk.CubismMotionManager();
+      // Motion events have no side effects in this inspection viewer.
+      motionManager.setEventCallback(() => {});
+      if (physics) sdk.CubismPhysics.delete(physics);
+      physics = physicsBytes ? sdk.CubismPhysics.create(physicsBytes, physicsBytes.byteLength) : null;
+      ticks = 0;
+      for (const p of parameterList) { p.value = p.default; model.setParameterValueByIndex(p.index, p.value); }
+      if (motionId !== null) {
+        const selected = motions.find(m => m.id === motionId);
+        const motion = sdk.CubismMotion.create(selected.bytes, selected.bytes.byteLength);
+        const effectIds = name => (doc.Groups?.find(group => group.Target === 'Parameter' && group.Name === name)?.Ids || [])
+          .map(id => sdk.CubismFramework.getIdManager().getId(id));
+        motion.setEffectIds(effectIds('EyeBlink'), effectIds('LipSync'));
+        motion.setLoop(selected.loop);
+        if (selected.entry.FadeInTime !== undefined) motion.setFadeInTime(selected.entry.FadeInTime);
+        if (selected.entry.FadeOutTime !== undefined) motion.setFadeOutTime(selected.entry.FadeOutTime);
+        motionManager.startMotionPriority(motion, true, 2);
+      }
+    }
+    function dynamics() {
+      return { motions: motions.map(({id, name, duration, loop}) => ({id, name, duration, loop})), motionId,
+        physicsAvailable: !!physicsBytes, physicsEnabled, elapsed: ticks / 60,
+        finished: motionId !== null && motionManager.isFinished() };
+    }
+    if (dynamic) {
+      resetDynamics();
+      Object.assign(viewer, {
+        dynamics,
+        selectMotion(id) {
+          if (id !== null && !motions.some(m => m.id === id)) throw new Error('Unknown motion: ' + id);
+          motionId = id; resetDynamics();
+        },
+        setPhysics(enabled) { physicsEnabled = !!enabled && !!physicsBytes; },
+        step(seconds) {
+          if (seconds !== 1 / 60) throw new Error('Dynamic preview requires a fixed 1/60 second step');
+          // Restore manual inputs before motion/physics; physics outputs never feed back into authored inputs.
+          for (const p of parameterList) model.setParameterValueByIndex(p.index, p.value);
+          motionManager.updateMotion(model, seconds);
+          if (physicsEnabled) physics.evaluate(model, seconds);
+          ticks++;
+        },
+      });
+    }
+
     Object.assign(viewer, {
       canvas: { width: canvasW, height: canvasH },
       parameters: parameterList,
@@ -231,8 +295,11 @@ function loadTexture(gl, buffer) {
         }
         return applied;
       },
-      reset() { for (const p of parameterList) { p.value = p.default; model.setParameterValueByIndex(p.index, p.value); } },
-      params: () => parameterList.map((p) => ({ ...p })),
+      reset() {
+        if (dynamic) resetDynamics();
+        else for (const p of parameterList) { p.value = p.default; model.setParameterValueByIndex(p.index, p.value); }
+      },
+      params: () => parameterList.map((p) => ({ ...p, value: dynamic ? model.getParameterValueByIndex(p.index) : p.value })),
       drawables,
       focus(rect) {
         const [x0, y0, x1, y1] = rect;

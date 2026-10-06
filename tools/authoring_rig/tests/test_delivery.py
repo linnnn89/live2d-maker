@@ -41,12 +41,19 @@ class NativeDelivery(unittest.TestCase):
             with zipfile.ZipFile(editor_file) as archive:
                 self.assertTrue(any(name.endswith('.cmo3') for name in archive.namelist()));self.assertIn('artwork.psd',archive.namelist())
                 for item in editor['files']:self.assertEqual(hashlib.sha256(archive.read(item['name'])).hexdigest(),item['sha256'])
+                preview=work/'deliveries'/read(work/'studio-state.json')['latestExport'].split('/')[-1]/'model'
+                self.assertEqual({p.relative_to(preview).as_posix():p.read_bytes() for p in preview.rglob('*') if p.is_file()},
+                                 {name:archive.read(name) for name in archive.namelist()})
+                self.assertEqual(Path(editor['modelUrl']).name,next(name for name in archive.namelist() if name.endswith('.model3.json')))
             playable=command('studio-model-export',request(view,target='playable',exportMotions=False))
             self.assertTrue(playable['reused']);self.assertEqual(playable['cacheId'],editor['cacheId']);self.assertEqual(playable['modelSha256'],editor['modelSha256']);self.assertEqual(playable['motions'],0)
             with zipfile.ZipFile(work/'downloads'/Path(playable['url']).name) as archive:
                 self.assertFalse(any(name.endswith(('.cmo3','.psd','.motion3.json')) for name in archive.namelist()))
                 manifest=json.loads(archive.read(next(name for name in archive.namelist() if name.endswith('.model3.json'))))
                 self.assertNotIn('Motions',manifest['FileReferences']);self.assertIn(manifest['FileReferences']['Moc'],archive.namelist())
+                preview=work/read(work/'studio-state.json')['latestExport']/'model'
+                self.assertEqual({p.relative_to(preview).as_posix():p.read_bytes() for p in preview.rglob('*') if p.is_file()},
+                                 {name:archive.read(name) for name in archive.namelist()})
             note=copy.deepcopy(view['ir']);note['parts'][0]['geometry']['landmarks']={'note':[20,20]}
             current=save_workspace(work,{'revision':view['revision'],'ir':note})
             annotated=command('studio-model-export',request(current,target='playable',exportMotions=False));self.assertTrue(annotated['reused'])
@@ -54,6 +61,8 @@ class NativeDelivery(unittest.TestCase):
             imported=create_project(catalog,{'schemaVersion':1,'kind':'archive','name':'Delivery copy','data':base64.b64encode(data).decode()})
             clone=project_root(catalog,imported['project']['id']);cloned=snapshot(clone)
             self.assertTrue(cloned['export']['current']);self.assertTrue(cloned['export']['result']['url'].startswith('/projects/'+clone.name+'/'))
+            self.assertTrue(cloned['export']['result']['modelUrl'].startswith('/projects/'+clone.name+'/'))
+            self.assertNotIn('/projects/'+work.name+'/',cloned['export']['result']['modelUrl'])
             self.assertEqual((clone/'downloads'/Path(cloned['export']['result']['url']).name).read_bytes(),(work/'downloads'/Path(annotated['url']).name).read_bytes())
             latest=read(work/'studio-state.json')['latestExport']
             write(work/'overlay.json',{'keyformSets':[{'target':{'kind':'art_mesh','id':'missing'},'coordinate':{'ParamAngleX':30},'channels':{'opacity':0.7}}]})

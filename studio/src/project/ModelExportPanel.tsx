@@ -2,10 +2,12 @@ import { useState } from 'react';
 import { api } from '../api';
 import type { ModelExportResult, Snapshot } from '../protocol/generated';
 import { useWorkspace } from '../workspace/WorkspaceContext';
+import { DynamicPreview } from '../viewer/DynamicPreview';
 
 export function ModelExportPanel() {
   const {saved,dirty,settingsPending,editingLocked,editor,applySnapshot,setError,setMessage,setBusy}=useWorkspace();
   const [target,setTarget]=useState<'playable'|'editor'>('playable'),[motions,setMotions]=useState(true),[physics,setPhysics]=useState(false);
+  const [previewUrl,setPreviewUrl]=useState<string>();
   const locked=editingLocked||dirty||settingsPending;
   async function run(){
     if(!saved||locked||!saved.buildSettings||!saved.overlayRevision)return;
@@ -24,8 +26,10 @@ export function ModelExportPanel() {
     </fieldset><p>显式物理编辑仍保留。cmo3 包含重建 PSD 和运行时参考；实际美术及动态效果仍需检查。</p>
     {delivery&&<section aria-label="交付结果"><p>{delivery.current?'对应当前已保存输入':'历史交付包 · 当前输入已改变'} · {delivery.result.target==='editor'?'cmo3 工程':'可播放模型'} · {delivery.result.motions} 个动作 · {delivery.result.physics?'含物理':'无物理'}</p>
       <a href={delivery.result.url} download={delivery.result.filename}>下载模型交付包</a>
+      {delivery.result.modelUrl ? <button disabled={editingLocked} onClick={()=>setPreviewUrl(delivery.result.modelUrl)}>预览交付包动态</button> : <p>此旧交付包无动态预览入口；重新生成可添加入口，原下载仍可用。</p>}
       <details><summary>文件清单 · {delivery.result.files.length} 项</summary><ul>{delivery.result.files.map(file=><li key={file.name}>{file.name} · {file.bytes.toLocaleString()} bytes</li>)}</ul></details>
       <details><summary>原生警告 · {delivery.result.warnings.length} 项</summary><ul>{delivery.result.warnings.map((warning,index)=><li key={index}>{warning}</li>)}</ul></details>
     </section>}
+    {previewUrl&&saved&&<DynamicPreview modelUrl={previewUrl} canvas={saved.ir.canvas} current={!!delivery?.current&&delivery.result.modelUrl===previewUrl} onClose={()=>setPreviewUrl(undefined)}/>}
   </details>;
 }

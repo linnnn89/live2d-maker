@@ -372,3 +372,18 @@ R6 首批范围完成：参数/姿态、受限透明度关键形、结构化阻�
 源码/随仓 JAR 6309327 字节，SHA 58576bca75c95c31a76695c39a9ee832232175c23002cae73d726914da9a5f4e，manifest 同步，安装 DryRun 哈希校验通过。实际 Windows 使用已有 JDK21、当前 JAR、便携依赖和 skiko 路径启动，PID 4920/HWND 0x570C14 窗口正常；WinCode 只读 PrintWindow 图像正常，stderr 空。便携裁剪 runtime 本身不带 java.exe，首次启动路径不存在；改用已验证的现有 JDK，没有安装运行时。Compose UIA 仍只暴露两个容器，没有声称实测桌面图层修改/项目保存操作；模型编辑行为由真实原生及历史集成验收。本次自建空白桌面进程已关闭，证据 out/r7-workspace-evidence/ 和本会话 WinCode 截图。
 
 R7 规划首批完成：工程及共享编辑准备/提交服务、领域建模模块、原生准备模型导出复用；仅注记不触发模型失效已在 E6b/R4b 实测。持久化后台 job、任意局部增量绑定和进一步 UI 适配拆分没有被引入。接续 R8 物理/动作播放，可选智能辅助仍需明确需求和环境决策。
+
+
+## 42. R8：交付包动态预览与固定步长（2026-10-07）
+
+基于 R7c PR #26，main@5e8e524。既有独立交付生成动作/物理，但静态预览不加载这些资源。本批在交付结果提供独立动态弹窗，默认暂停，使用同一 ZIP 的实际文件选择；delivery/model 保存对应字节，报告 v1 新增可选 modelUrl。关闭动作的包不暴露缓存里额外准备的动作。快照按本工程重建 URL，完整归档打开的新副本路径独立；旧交付报告可下载，重新生成才有动态入口。
+
+viewer 的 dynamics=1 入口显式加载既有 Cubism Web Framework 5-r.5（198a376）CubismMotion/CubismMotionManager/CubismPhysics，不更换 SDK 或下载资产。设置 model3 眨眼/口型组、fade 与 motion3 Loop；顺序为手动输入、动作、物理、渲染。静态入口不加载/推进动态。ViewerAdapter 使用 RAF 累积固定 1/60 秒步，单次最多六步，后台挂起的额外墙钟时间丢弃；状态显示节流到约 10 Hz。暂停保持帧/时间，逐帧只推进一次，重置重新准备默认值/选中动作/物理，关闭/替换清除调度。普通播放无 PNG 编码；选预设/逐帧和循环中的错误进入错误状态，停止运行。独立预览参数不改姿态库、Overlay 或静态 QA。
+
+新增三项测试：确定性步长/长间隔补帧上限/暂停续播/逐帧/动作结束与物理开关；关闭和播放/手动操作错误终止；实际随仓 SDK 的固定线性动作数值、物理输出、重置重复一致及缺资源拒绝。既有原生交付回归增加完整 ZIP/预览字节相等和工程归档副本 URL 断言。针对适配器 10 项和真实 SDK 回归通过，前端 65 项全套与生产构建通过；最后统一手动操作错误后重跑受影响的 10 项与生产构建通过。Python 33 项完整回归通过（231.504 秒）。Kotlin/随仓 JAR/依赖没有变化，沿用 R7c 实测版本；没有重复运行未变的 Kotlin 全套。
+
+实际 Edge 新 ds 工程 f0604c67245449c9bfa8fded070442e5：原生重建静态 MOC cf1694d8a967245228444856e89a155ad53c728233ca1c7bbe50dccb7f7186f7，含默认物理/四动作交付加载；Idle 循环、Blink/Nod/Shake 非循环均实际播放并检查有限范围，图像相对中立改变。暂停后时间和参数不变，逐帧差 1/60 秒，重置恢复原 PNG；手动 ParamAngleX=27 的物理模式产生 ParamHairFront/Back 非零响应。关闭移除 iframe、静态 PNG 不变，重开时间 0/未选择动作；390 px 与桌面布局截图检查通过。无动作/物理的实际交付说明缺项并禁用播放；最终 16 姿态 QA 和 neutral PNG 对照通过。页面/控制台异常均零。预览目录与实际 ZIP 所有文件逐字节相等；源 PSD 保留。证据 out/r8-dynamic-evidence/（browser.json、截图、脚本、全套日志）。
+
+首次 SDK 回归在 doUpdateParameters 报空数组 length，核对随仓压缩代码及官方 5-r.5 源码证实 setEffectIds 必须初始化，按 model3 Groups 补齐，第二轮通过。浏览器脚本首次 range.fill(25) 不符合该输入 0.45 的步距，改为合法值 27 后续验通过，未改生产参数范围。官方参考：https://github.com/Live2D/CubismWebFramework/blob/5-r.5/src/motion/cubismmotion.ts 和 https://github.com/Live2D/CubismWebFramework/blob/5-r.5/src/physics/cubismphysics.ts 。
+
+R1–R8 规划首批必选范围完成。可选单图拆层/自动生成仍按具体需求和环境选择，不新增模型下载、外部服务或生成 API；外部/AI 素材已有候选预检/确认流程。完整时间轴、音频/事件副作用、复杂 Overlay 全组合、持久后台 job、任意单层增量绑定、Cubism Editor GUI 和美术质量评审没有被本次声明为完成。
