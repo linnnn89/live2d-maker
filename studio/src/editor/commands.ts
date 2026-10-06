@@ -18,8 +18,12 @@ function landmarkName(value: unknown, partId: string): asserts value is string {
   }
 }
 
+export function indexArtwork(ir: ArtworkIR): ReadonlyMap<string, number> {
+  return new Map(ir.parts.map((part, index) => [part.id, index]));
+}
+
 /** Validates the entire batch on a private candidate; caller's IR is never mutated. */
-export function applyCommands(ir: ArtworkIR, input: unknown): ArtworkIR {
+export function applyCommands(ir: ArtworkIR, input: unknown, index = indexArtwork(ir)): ArtworkIR {
   if (!Array.isArray(input) || input.length === 0) throw new DraftError('INVALID_COMMAND', 'commands 必须是非空命令数组');
   const candidate = structuredClone(ir);
   for (const raw of input) {
@@ -30,7 +34,8 @@ export function applyCommands(ir: ArtworkIR, input: unknown): ArtworkIR {
     if (Object.keys(raw).some(key => !allowed.includes(key)) || typeof raw.partId !== 'string') {
       throw new DraftError('INVALID_COMMAND', '命令包含未知字段或缺少 partId');
     }
-    const part = candidate.parts.find(p => p.id === raw.partId);
+    const position = index.get(raw.partId);
+    const part = position === undefined ? undefined : candidate.parts[position];
     if (!part) throw new DraftError('PART_NOT_FOUND', '目标图层不存在', raw.partId);
     switch (raw.type) {
       case 'set_visibility':
@@ -72,10 +77,12 @@ export function same(a: unknown, b: unknown): boolean {
 }
 
 /** Reports only fields owned by artwork commands; names/assets/rig fields stay immutable. */
-export function diffArtwork(base: ArtworkIR, draft: ArtworkIR): DraftChange[] {
+export function diffArtwork(base: ArtworkIR, draft: ArtworkIR, index = indexArtwork(base)): DraftChange[] {
   const changes: DraftChange[] = [];
   for (const part of draft.parts) {
-    const previous = base.parts.find(p => p.id === part.id)!;
+    const position = index.get(part.id);
+    if (position === undefined) throw new DraftError('PART_NOT_FOUND', '目标图层不存在', part.id);
+    const previous = base.parts[position];
     const add = (field: string, before: unknown, after: unknown) => {
       if (!same(before, after)) changes.push({ partId: part.id, field, before: before ?? null, after: after ?? null });
     };

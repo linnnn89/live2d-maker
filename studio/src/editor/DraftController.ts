@@ -17,15 +17,15 @@ export class DraftController<T extends SavedArtwork = SavedArtwork> {
   getSnapshot = (): DraftState | null => this.snapshot;
   getBase = (): SavedArtwork | null => this.session?.inspectBase() ?? null;
   install(ir: ArtworkIR, revision: string): void {
-    if (this.session?.inspect().phase === 'saving') throw new DraftError('BUSY', '正在保存草稿');
+    if (this.session?.phase === 'saving') throw new DraftError('BUSY', '正在保存草稿');
     if (!this.session?.hasBase(ir, revision)) this.session = new DraftSession(ir, revision, this.id());
     this.publish();
   }
   setBlocked(blocked: boolean): void {
     if (this.blocked !== blocked) { this.blocked = blocked; this.session?.touch(); this.publish(); }
   }
-  edit(commands: EditCommand[]): void { const session = this.ready(); session.apply(session.inspect(), commands); this.publish(); }
-  beginGesture(): void { const session = this.ready(); session.beginGesture(session.inspect()); this.publish(); }
+  edit(commands: EditCommand[]): void { const session = this.ready(); session.apply(session.token(), commands); this.publish(); }
+  beginGesture(): void { const session = this.ready(); session.beginGesture(session.token()); this.publish(); }
   updateGesture(commands: EditCommand[]): void { this.ready().updateGesture(commands); this.publish(); }
   endGesture(cancel: boolean): void { this.session?.endGesture(cancel); this.publish(); }
 
@@ -48,7 +48,7 @@ export class DraftController<T extends SavedArtwork = SavedArtwork> {
         // Even a clean commit validates its token before returning.
         const proposal = session.prepareSave(request.state);
         this.publish();
-        if (!session.inspect().dirty) { session.releaseSave(); this.publish(); return this.result(); }
+        if (!session.dirty) { session.releaseSave(); this.publish(); return this.result(); }
         try {
           const saved = await this.persist(proposal);
           if (!same(saved.ir, proposal.ir)) throw new DraftError('SAVE_MISMATCH', '保存响应与提交的 IR 不一致，请重新打开工作区核对');
@@ -68,11 +68,12 @@ export class DraftController<T extends SavedArtwork = SavedArtwork> {
     if (this.blocked) throw new DraftError('BUSY', '工作区正在执行操作');
     return this.session;
   }
-  private read(): DraftState | null {
-    const state = this.session?.inspect() ?? null;
-    if (state && this.blocked) state.phase = 'operation';
-    return state;
-  }
+  private read(): DraftState | null { return this.snapshot ? structuredClone(this.snapshot) : null; }
   private result(): DraftResult<T> { return { ok: true, state: this.read()! }; }
-  private publish(): void { this.snapshot = this.read(); for (const listener of this.listeners) listener(); }
+  private publish(): void {
+    const state = this.session?.getSnapshot() ?? null;
+    if (state === this.snapshot) return;
+    this.snapshot = state && this.blocked ? Object.freeze({ ...state, phase: 'operation' }) : state;
+    for (const listener of this.listeners) listener();
+  }
 }

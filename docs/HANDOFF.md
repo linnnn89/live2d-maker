@@ -160,3 +160,15 @@ Browser plugin 不可用，使用已有 Python Playwright / Chromium 151，在 1
 边界：仅 2D 平面普通合成；16 位 PNG 暂不支持，单素材/画布最多 16777216 像素。解码缓存与当前裁切层缓存各有 128 MiB 限额，但尚不是整个 Worker 的总峰值内存预算；全图重合成和加载并发仍有优化空间。用户追加要求的工程审阅已写入 [ENGINEERING_REVIEW_R1.md](ENGINEERING_REVIEW_R1.md)，优先处理草稿全量复制、二次复杂度差异查询和历史增长，再扩展恢复与原生联动。
 
 本轮未修改 Python 生产代码、Kotlin、portable JVM、DLL/OpenGL、Overlay 或 Windows 进程路径；这些集成继续留待用户 PC 验证。新增 Python 文件仅生成图片测试样本。
+
+## 23. Studio E1a：索引、内部 token 和快照缓存（2026-10-07）
+
+先在 Windows 验收 R1c：Node 24.19.0 构建和 37 项回归通过；Edge 154.0.4258.53 使用真实 Python API 完成 ds 24 层工作区打开、隐藏/撤销/重做、Agent 裁切/透明度、保存/刷新与 PNG 下载，完整 RGBA 对照现有 Python 合成器一致。PR #7 已合并，合并提交 `d1fdf003566c81ac1d0b03be53053891a9a1fbff`。
+
+随后按 [工程审阅](ENGINEERING_REVIEW_R1.md) 完成 E1a。commands/session 以 ID Map 保持固定图层顺序，diff 改为线性匹配；内部 token/phase/dirty 读取不复制完整 IR，差异按 IR 身份缓存。每个版本只生成一次冻结的订阅快照；相同基线和等值编辑不发布新快照。公开 inspect/execute 返回隔离副本，Agent 修改响应不会影响当前草稿或后续历史。版本冲突、批次原子性、保存失败保留、手势取消和新基线规则保持兼容。
+
+验证：Windows `npm run build` 与 `npm test` 通过，39 项；只新增 2 项测试，覆盖快照隔离/稳定性/阶段变化，以及 1000 图层、特殊 ID、非 z 排序、失败批次和历史往返。实际 Edge/Python 流程再验通过，桌面/窄屏截图、导出 PNG、测量脚本和 JSON 保存在 `out/e1a-evidence/`（忽略，不推送）。本机虚拟环境补齐 requirements 已声明的 `jsonschema==4.26.0` 及依赖，无全局安装。
+
+同一 Windows/Node 环境每组 100 个样本：100/500/1000 图层编辑中位耗时分别由 2.167/12.009/27.774 ms 降至 1.570/7.910/15.620 ms；1000 图层 P95 由 32.220 ms 降至 20.300 ms。样本为合成小 IR，不含渲染或 UI 订阅成本；完整方法、尾部耗时和范围见工程审阅。
+
+边界：E1a 仍复制整份候选 IR，撤销历史仍未设预算；E1b/E2 和其余迭代未实施。未修改或重新验收原生建模、Overlay、DLL、安装器或模型 QA。本轮验证的真实流程覆盖美术编辑/保存/图像导出。
