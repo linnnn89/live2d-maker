@@ -273,8 +273,10 @@
           "properties": {
             "source": {
               "type": "string",
-              "enum": ["see-through", "manual", "vision", "imagegen", "psd-import"]
+              "enum": ["see-through", "manual", "vision", "imagegen", "psd-import", "external"]
             },
+            "description": { "type": "string", "minLength": 1, "maxLength": 16000 },
+            "prompt": { "type": "string", "minLength": 1, "maxLength": 16000 },
             "toolVersion": {
               "type": "string"
             },

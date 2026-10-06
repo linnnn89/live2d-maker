@@ -22,6 +22,20 @@ const {createProjectTransport}=require(path.join(output,'bridge/projects.js'));
 const snapshot={schemaVersion:1,workspaceId:'0'.repeat(32),status:'ok',revision:'base',ir:{canvas:{width:2,height:2},parts:[]},
   stale:{},overlay:{status:'not-loaded',reasons:[]},sourceImage:'/studio-files/source.png',sourceBounds:null,artworkBounds:null,build:null,qa:null};
 const config=()=>({repo,workspace:path.join(output,'workspace'),python:path.join(repo,'python/Scripts/python.exe'),port:0,env:{}});
+test('asset origin requests accept manual artwork without AI prompts and reject contradictory provenance before running',async()=>{
+  const calls=[];const server=await serverFor(config(),async(command,payload)=>{calls.push({command,payload:JSON.parse(payload)});return {schemaVersion:1,id:'a'.repeat(32),revision:'base',candidateRevision:'next',partId:'tongue',name:'tongue',semantic:{tag:'TONGUE'},beforeImage:'/before.png',afterImage:'/after.png',report:{bounds:[1,1,3,3],changed_pixels:1,outside_visible_pixels:0,outside_changed_pixels:0,outside_max_diff:0,registration:{input_size:[2,2]}}};});
+  const payload={revision:'base',generatedPng:'png',maskPng:'mask',bounds:[1,1,3,3],name:'tongue'};
+  try{
+    for(const origin of [{kind:'manual',description:'Hand drawn by author'},{kind:'external',description:'External PNG'},{kind:'ai',description:'Generated PNG',prompt:'isolated tongue'}]){
+      const response=await fetch(server.url+'/api/import-preview',{method:'POST',body:JSON.stringify({...payload,origin})});assert.equal(response.status,200);assert.deepEqual(calls.at(-1).payload.origin,origin);
+    }
+    for(const origin of [{kind:'ai',description:'missing prompt'},{kind:'manual',description:'hand drawn',prompt:'incorrect AI field'},{kind:'external',description:''},{kind:'unknown',description:'invalid'}]){
+      const response=await fetch(server.url+'/api/import-preview',{method:'POST',body:JSON.stringify({...payload,origin})});assert.equal(response.status,400);assert.equal((await response.json()).detail.code,'INVALID_REQUEST');
+    }
+    assert.equal(calls.length,3);
+    assert.equal((await fetch(server.url+'/api/import-preview',{method:'POST',body:JSON.stringify({...payload,prompt:'legacy AI prompt'})})).status,200);
+  }finally{await server.close();}
+});
 async function serverFor(config,runner){
   let handle;const server=createServer((req,res)=>void handle(req,res,()=>{res.writeHead(404);res.end();}));
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));config.port=server.address().port;

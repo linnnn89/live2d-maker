@@ -139,7 +139,8 @@ def cmd_native(args):
 def cmd_import_generated(args):
     from authoring_rig.generated import import_generated
     result = import_generated(args.ir, args.generated, args.mask, args.bounds, args.name,
-                              args.prompt_file, args.outdir, args.replace_part, args.fit, args.sprite_bounds)
+                              args.prompt_file, args.outdir, args.replace_part, args.fit, args.sprite_bounds,
+                              json.loads(Path(args.origin_file).read_text(encoding="utf-8")) if args.origin_file else None)
     print(json.dumps(result, indent=2, ensure_ascii=False, allow_nan=False))
     return 0
 
@@ -224,7 +225,8 @@ def main():
     p_gen.add_argument("--mask", required=True, help="Canvas-sized binary grayscale PNG; white editable, black protected")
     p_gen.add_argument("--bounds", nargs=4, type=int, required=True, metavar=("LEFT", "TOP", "RIGHT", "BOTTOM"))
     p_gen.add_argument("--name", required=True, help="PSD2Live-recognized layer name")
-    p_gen.add_argument("--prompt-file", required=True)
+    p_gen.add_argument("--prompt-file", help="Legacy AI prompt; required when --origin-file is absent")
+    p_gen.add_argument("--origin-file", help="AssetOrigin JSON for manual, external or AI artwork")
     p_gen.add_argument("--replace-part", help="Existing part ID to replace; otherwise add a new top layer")
     p_gen.add_argument("--fit", action="store_true", help="Explicitly alpha-crop and aspect-fit the sprite into bounds")
     p_gen.add_argument("--sprite-bounds", nargs=4, type=int, metavar=("LEFT", "TOP", "RIGHT", "BOTTOM"),

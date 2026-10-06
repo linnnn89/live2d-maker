@@ -859,6 +859,29 @@
       ],
       "additionalProperties": false
     },
+    "AssetOrigin": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": { "type": "string", "enum": ["manual", "external"] },
+            "description": { "type": "string", "minLength": 1, "maxLength": 16000 }
+          },
+          "required": ["kind", "description"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": { "const": "ai" },
+            "description": { "type": "string", "minLength": 1, "maxLength": 16000 },
+            "prompt": { "type": "string", "minLength": 1, "maxLength": 16000 }
+          },
+          "required": ["kind", "description", "prompt"],
+          "additionalProperties": false
+        }
+      ]
+    },
     "ImportPreviewRequest": {
       "type": "object",
       "properties": {
@@ -869,6 +892,7 @@
           "type": "string",
           "minLength": 1
         },
+        "origin": { "$ref": "#/definitions/AssetOrigin" },
         "generatedPng": {
           "type": "string"
         },

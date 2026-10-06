@@ -705,6 +705,17 @@ footer>div{
 .import-result dt{color:#647996}
 .import-result dd{margin:0;font-size:20px;font-weight:600}
 .import-actions{display:flex;justify-content:flex-end;gap:10px;border-top:1px solid var(--line);padding:14px 20px;flex-shrink:0}
+.import-stage{margin:12px 0}
+.import-stage p{font-size:12px;color:var(--muted);margin:8px 0}
+.import-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.import-tools label{display:flex;flex-direction:row;align-items:center;font-size:12px}
+.import-tools input{width:80px}
+.import-tools button[aria-pressed=true]{background:#e7efff;color:#0864ff;border-color:#0864ff}
+.import-artboard{height:340px;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.import-artboard>svg{width:100%;height:100%;touch-action:none;user-select:none}
+.mask-overlay{display:block;width:100%;height:100%;image-rendering:pixelated}
+.import-images.single{grid-template-columns:1fr}
+.asset-hash{overflow-wrap:anywhere}
 @media(max-width:560px){
   .actions{flex-wrap:wrap}
   .import-fields,.import-images{grid-template-columns:1fr}
