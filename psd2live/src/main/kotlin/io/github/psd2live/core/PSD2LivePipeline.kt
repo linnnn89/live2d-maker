@@ -115,6 +115,43 @@ class PSD2LivePipeline {
 		val atlas = AtlasPacker.pack(analysis.layers, config.atlasSize, config.texturePadding, config.textureUpscale, progress)
 		progress.update(tr("progress.atlas"), 0.38)
 		val rig = RigBuilder.build(analysis, atlas, config).withRigEdits(config.rigEdits)
+		return exportPrepared(analysis, atlas, rig, baseName, outputDirectory, config, progress)
+	}
+
+	/** Export the exact prepared model without reading, classifying, packing or rigging again. */
+	fun exportPreview(
+		current: RigPreviewModel,
+		sourceName: String,
+		outputDirectory: Path,
+		progress: ProgressListener = ProgressListener { _, _ -> },
+	): PipelineResult = exportPrepared(current.analysis, current.atlas, current.rig,
+		safeBaseName(sourceName.substringBeforeLast('.')), outputDirectory, current.config, progress)
+
+	/** A base preview may accept one Overlay only when every other captured setting matches. */
+	fun canReusePreview(base: RigPreviewModel, config: PipelineConfig): Boolean =
+		base.config.rigEdits == RigEditOverlay.Empty && base.config.copy(rigEdits = config.rigEdits) == config
+
+	fun exportReplayPreview(
+		base: RigPreviewModel,
+		sourceName: String,
+		outputDirectory: Path,
+		config: PipelineConfig,
+		progress: ProgressListener = ProgressListener { _, _ -> },
+	): PipelineResult {
+		require(canReusePreview(base, config)) { "Prepared model settings changed or Overlay was already applied" }
+		return exportPrepared(base.analysis, base.atlas, base.rig.withRigEdits(config.rigEdits),
+			safeBaseName(sourceName.substringBeforeLast('.')), outputDirectory, config, progress)
+	}
+
+	private fun exportPrepared(
+		analysis: PipelineAnalysis,
+		atlas: PackedAtlas,
+		rig: BuiltRig,
+		baseName: String,
+		outputDirectory: Path,
+		config: PipelineConfig,
+		progress: ProgressListener,
+	): PipelineResult {
 		val generatedLabel = tr("validation.generated")
 		val neutralRig = RigIntegrityValidator.validateNeutralPose(generatedLabel, rig.puppet, rig.sourceBoundsByDrawableId)
 		val generatedAngleWarnings = RigIntegrityValidator.validateHeadAnglePoses(generatedLabel, rig.puppet, neutralRig.boundsByDrawableId)

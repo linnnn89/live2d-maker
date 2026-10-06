@@ -9,6 +9,36 @@ import kotlin.test.assertTrue
 
 class AuthoringPipelineFacadeTest {
     @Test
+    fun preparedReplayKeepsArtifactsWarningsAndAtlasIdentityAndRejectsChangedInputs() {
+        val pipeline = PSD2LivePipeline()
+        val source = java.nio.file.Path.of("examples/ds/psd-input/ds.psd")
+        val config = AuthoringPipelineFacade.configuration("""{"atlasSize":1024,"exportMotions":true}""", RigEditOverlay.Empty)
+        val base = pipeline.buildPreview(source, config)
+        val overlay = RigEditOverlay(keyformSetEdits = listOf(RigKeyformSetEdit(
+            RigTargetRef(RigTargetKind.ART_MESH, "ArtMeshFace"), mapOf("ParamAngleX" to 30f),
+            channels = RigKeyformChannelsEdit(opacity = .4f))))
+        val edited = config.copy(rigEdits = overlay)
+        assertTrue(pipeline.canReusePreview(base, edited))
+        val temporary = java.nio.file.Files.createTempDirectory("psd2live-project-prepared-replay-")
+        try {
+            val cached = pipeline.exportReplayPreview(base, "ds.psd", temporary.resolve("cached"), edited)
+            val rebuilt = pipeline.run(source, temporary.resolve("rebuilt"), edited)
+            assertSame(base.analysis, cached.analysis)
+            assertSame(base.atlas, cached.previewModel.atlas)
+            assertEquals(rebuilt.warnings, cached.warnings)
+            fun files(result: PipelineResult) = result.exportedFiles.associateBy { it.path.fileName.toString() }
+            val first = files(cached); val second = files(rebuilt)
+            assertEquals(second.keys, first.keys)
+            for ((name, file) in first) kotlin.test.assertContentEquals(java.nio.file.Files.readAllBytes(second.getValue(name).path), java.nio.file.Files.readAllBytes(file.path), name)
+            assertFalse(pipeline.canReusePreview(cached.previewModel, edited))
+            for (changed in listOf(edited.copy(atlasSize = 2048), edited.copy(headTurnStrength = 0f), edited.copy(generatePhysics = true))) {
+                assertFalse(pipeline.canReusePreview(base, changed))
+                assertFailsWith<IllegalArgumentException> { pipeline.exportReplayPreview(base, "ds.psd", temporary.resolve("rejected"), changed) }
+            }
+            assertFalse(java.nio.file.Files.exists(temporary.resolve("rejected")))
+        } finally { io.github.psd2live.project.ProjectArchive.deleteTemporaryDirectory(temporary) }
+    }
+    @Test
     fun projectSettingsConfigureMeshSamplingAndHeadStrengthWithBounds() {
         val config = AuthoringPipelineFacade.configuration("""{"atlasSize":1024,"meshInteriorDensity":12,"headTurnStrength":0}""", RigEditOverlay.Empty)
         assertEquals(1024, config.atlasSize)
