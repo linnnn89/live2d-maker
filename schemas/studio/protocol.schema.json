@@ -147,6 +147,9 @@
             },
             "side": {
               "type": "string"
+            },
+            "override": {
+              "$ref": "#/definitions/SemanticOverride"
             }
           },
           "required": [
@@ -335,6 +338,84 @@
             "type",
             "partId",
             "name"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "set_semantic"
+            },
+            "partId": {
+              "type": "string"
+            },
+            "tag": {
+              "type": "string",
+              "enum": [
+                "BACK_HAIR",
+                "FRONT_HAIR",
+                "HEADWEAR",
+                "FACE",
+                "FACE_DETAIL",
+                "IRIDES",
+                "EYEBROW",
+                "EYEWHITE",
+                "EYELASH",
+                "EYE_CLOSE",
+                "EYEWEAR",
+                "EARS",
+                "EARWEAR",
+                "NOSE",
+                "MOUTH",
+                "MOUTH_OPEN",
+                "MOUTH_CLOSE",
+                "TOOTH_T",
+                "TOOTH_B",
+                "TONGUE",
+                "NECK",
+                "NECKWEAR",
+                "TOPWEAR",
+                "HANDWEAR",
+                "BOTTOMWEAR",
+                "LEGWEAR",
+                "FOOTWEAR",
+                "TAIL",
+                "WINGS",
+                "OBJECTS",
+                "UNKNOWN"
+              ]
+            },
+            "side": {
+              "type": "string",
+              "enum": [
+                "none",
+                "left",
+                "right"
+              ]
+            }
+          },
+          "required": [
+            "type",
+            "partId",
+            "tag",
+            "side"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "const": "reset_semantic"
+            },
+            "partId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "partId"
           ],
           "additionalProperties": false
         }
@@ -610,6 +691,47 @@
                   "type": "array",
                   "items": {
                     "type": "string"
+                  }
+                },
+                "classifications": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "partId": {
+                        "type": "string"
+                      },
+                      "componentId": {
+                        "type": "string"
+                      },
+                      "sourceLayerId": {
+                        "type": "string"
+                      },
+                      "automaticTag": {
+                        "type": "string"
+                      },
+                      "automaticSide": {
+                        "type": "string"
+                      },
+                      "semanticTag": {
+                        "type": "string"
+                      },
+                      "side": {
+                        "type": "string"
+                      },
+                      "drawable": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "partId",
+                      "componentId",
+                      "sourceLayerId",
+                      "semanticTag",
+                      "side",
+                      "drawable"
+                    ],
+                    "additionalProperties": true
                   }
                 }
               },
@@ -934,6 +1056,60 @@
           "type": "string"
         }
       }
+    },
+    "SemanticOverride": {
+      "type": "object",
+      "properties": {
+        "tag": {
+          "type": "string",
+          "enum": [
+            "BACK_HAIR",
+            "FRONT_HAIR",
+            "HEADWEAR",
+            "FACE",
+            "FACE_DETAIL",
+            "IRIDES",
+            "EYEBROW",
+            "EYEWHITE",
+            "EYELASH",
+            "EYE_CLOSE",
+            "EYEWEAR",
+            "EARS",
+            "EARWEAR",
+            "NOSE",
+            "MOUTH",
+            "MOUTH_OPEN",
+            "MOUTH_CLOSE",
+            "TOOTH_T",
+            "TOOTH_B",
+            "TONGUE",
+            "NECK",
+            "NECKWEAR",
+            "TOPWEAR",
+            "HANDWEAR",
+            "BOTTOMWEAR",
+            "LEGWEAR",
+            "FOOTWEAR",
+            "TAIL",
+            "WINGS",
+            "OBJECTS",
+            "UNKNOWN"
+          ]
+        },
+        "side": {
+          "type": "string",
+          "enum": [
+            "none",
+            "left",
+            "right"
+          ]
+        }
+      },
+      "required": [
+        "tag",
+        "side"
+      ],
+      "additionalProperties": false
     }
   }
 }

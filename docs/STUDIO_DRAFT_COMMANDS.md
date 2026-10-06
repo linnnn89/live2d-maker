@@ -2,7 +2,7 @@
 
 人和 Agent 共用 `studio/src/editor/` 的命令、版本、差异与历史规则。UI 的图层显示、轮廓坐标、关键点和拖拽都通过该领域层执行。Agent 可直接调用结构化接口，无须模拟点击或修改 React 状态。
 
-本轮限于美术 IR。命令不修改素材路径、图层 ID、层名、语义分类、bbox、绑定、物理或 Overlay。`commit` 复用已有 `save` API；完整 schema、素材与工作区版本仍由既有 Python 保存契约检查。重建与原生建模继续使用既有流程，未增加原生调用或 MCP 工具。
+命令编辑美术 IR 和显式语义覆盖，不修改素材路径、图层 ID、层名、导入识别值、bbox、绑定、物理或 Overlay。`commit` 复用已有 `save` API；完整 schema、素材与工作区版本仍由 Python 保存契约检查。语义覆盖由原生门面通过已重建 PSD 的标准 layer ID 传入分类配置，保存后重建才采用；未增加 MCP 工具。
 
 ## 状态和版本
 
@@ -37,8 +37,14 @@ E1a 保持 v1 返回结构；E1b 在状态中新增只读的 `history` 统计，
 | `set_polygon` | `points` | 至少三个 `[x,y]`，有限数值，画布坐标 |
 | `set_landmark` | `name`, `point` | 新增或更新一个关键点 |
 | `remove_landmark` | `name` | 必须已存在 |
+| `set_semantic` | `tag`, `side` | tag 为 schema 中的原生 SemanticTag 枚举；side 为 none/left/right，写入 semantic.override |
+| `reset_semantic` | 无 | 删除人工覆盖，恢复原生自动识别 |
 
 未知命令或字段被拒绝，图层按 ID 定位。关键点名称禁止空白及现有保留字段；关键点仍是注记，不驱动绑定。自由数值命令沿用现有编辑规则，不强制坐标落在 bbox 内；鼠标拖动继续按 bbox 限制位置。
+
+R3 的 `semantic.override` 是可选字段，保留导入时 tag/side/confidence，差异、撤销/重做、离线提案和草稿恢复均支持。未知枚举拒绝；恢复自动识别不改原始估计。当前 schema 接受旧无覆盖 IR；旧版严格 schema 的读者会拒绝含新字段的 IR，需要使用当前版本。类别与左右侧影响拆分及绑定，但不影响美术像素/PSD。原生拆分仍可为子组件保留左右侧。
+
+构建保存 native-configuration.json 和 classifications：partId → 标准 sourceLayerId → componentId → drawable，另含 automaticTag/automaticSide、requestedOverride、semanticTag/side 和 overridden。按身份查 drawable，不按名称；空图层可能无 drawable。部件设置展示上次构建实际结果，旧报告没有映射时要求重建，不从名称猜测对应关系。原生/runtime 或完整基线变化仍触发 Overlay 复核。
 
 ## 浏览器 Agent 入口
 
@@ -110,7 +116,7 @@ node studio/scripts/draft-cli.mjs < request.json > proposal.json
 
 历史限于当前标签页当前草稿，不持久化。保存或成功导入新版本开始新草稿，清空历史；放弃草稿恢复最后已保存 IR 并清空历史。返回同一保存版本的构建/QA 快照不重置草稿。导入弹窗及构建/QA 期间可读状态，禁止命令写入。Cubism 参数预览属于独立 viewer 状态，不进入 IR 历史。
 
-E1b 每步只保存受影响图层的 before/after 引用；不可编辑的素材/语义等内容在内部共享，命令只复制目标图层及被编辑字段。公开命令响应和独立 `applyCommands` 的输出仍完整隔离，修改返回值不会改变源 IR 或历史。
+E1b 每步只保存受影响图层的 before/after 引用；不可编辑的素材/导入识别等内容在内部共享，命令只复制目标图层及被编辑字段。公开命令响应和独立 `applyCommands` 的输出仍完整隔离，修改返回值不会改变源 IR 或历史。
 
 默认撤销与重做合计最多 100 步，并且历史负载最多 16 MiB。`retainedBytes` 是每一步 `[{index,before,after},...]` JSON 的 UTF-8 字节数之和，保守重复计算共享字段；它不是 JavaScript 堆或整个页面内存上限，不包括基线、当前快照、活动拖拽或渲染器。超出条数或字节预算时从最早撤销步骤淘汰，界面显示历史限制提示，`droppedSteps` 累计被预算淘汰的步骤。撤销/重做移动同一条记录，不重复占用预算；有效的新编辑清空重做，等值编辑或失败批次保留原历史。
 

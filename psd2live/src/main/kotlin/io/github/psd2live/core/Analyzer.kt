@@ -18,9 +18,11 @@ object CharacterAnalyzer {
 			.maxByOrNull { it.opaquePixels }
 			?.centroidX
 			?: source.widthPx * 0.5f
+		val sourceLayerIdByComponentId = linkedMapOf<String, String>()
 		val layers = initiallyClassified.flatMap { original ->
 			(if (original.source.id.raw in config.rigEdits.assetLayers) listOf(original) else ComponentSplitter.split(original, preliminaryFaceCenter, config.alphaThreshold, config.meshSpacing.toFloat())).map { component ->
 				val directOverride = config.layerOverrides[component.source.id.raw]
+				sourceLayerIdByComponentId[component.source.id.raw] = original.source.id.raw
 				val inheritedOverride = config.layerOverrides[original.source.id.raw]
 				when {
 					directOverride != null -> component.withOverride(directOverride)
@@ -84,7 +86,7 @@ object CharacterAnalyzer {
             require(baseline.layers.size == calibrationIds.size) { "Registration calibration source layers are missing" }
             analyze(baseline, config.copy(deletedLayerIds = emptySet(), rigEdits = config.rigEdits.copy(calibrationLayerIds = emptySet())))
         }
-        return PipelineAnalysis(source, layers, calibration?.anchors ?: anchors, warnings, PreviewRenderer.composite(source), calibration)
+        return PipelineAnalysis(source, layers, calibration?.anchors ?: anchors, warnings, PreviewRenderer.composite(source), calibration, sourceLayerIdByComponentId)
 	}
 
 	private fun union(bounds: List<Bounds>): Bounds = bounds.reduce(Bounds::union)

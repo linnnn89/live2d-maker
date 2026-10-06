@@ -232,6 +232,7 @@ data class PipelineAnalysis(
 	val warnings: List<String>,
 	val preview: BufferedImage,
     val calibration: PipelineAnalysis? = null,
+    val sourceLayerIdByComponentId: Map<String, String> = emptyMap(),
 )
 
 /** The exact atlas and rig shown by the workbench before export. */

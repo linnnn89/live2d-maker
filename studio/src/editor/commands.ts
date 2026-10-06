@@ -32,6 +32,13 @@ export function applyCommandBatch(ir: ArtworkIR, input: unknown, index = indexAr
     if (!touched.has(position)) { candidate.parts[position] = { ...candidate.parts[position] }; touched.add(position); }
     const part = candidate.parts[position];
     switch (raw.type) {
+      case 'set_semantic':
+        part.semantic = { ...part.semantic, override: { tag: raw.tag, side: raw.side } };
+        break;
+      case 'reset_semantic':
+        part.semantic = { ...part.semantic };
+        delete part.semantic.override;
+        break;
       case 'set_visibility':
         part.appearance = { visible: raw.visible, opacity: part.appearance?.opacity ?? 255 };
         break;
@@ -68,7 +75,8 @@ export function sameArtworkPart(left: Part, right: Part): boolean {
   return (left.appearance?.visible ?? true) === (right.appearance?.visible ?? true)
     && (left.appearance?.opacity ?? 255) === (right.appearance?.opacity ?? 255)
     && same(left.geometry.polygon, right.geometry.polygon)
-    && same(left.geometry.landmarks ?? {}, right.geometry.landmarks ?? {});
+    && same(left.geometry.landmarks ?? {}, right.geometry.landmarks ?? {})
+    && same(left.semantic.override, right.semantic.override);
 }
 
 export function replayPatches(ir: ArtworkIR, patches: LayerPatch[], direction: 'before' | 'after'): ArtworkIR {
@@ -99,6 +107,7 @@ export function diffArtwork(base: ArtworkIR, draft: ArtworkIR, index = indexArtw
     add('appearance.visible', previous.appearance?.visible ?? true, part.appearance?.visible ?? true);
     add('appearance.opacity', previous.appearance?.opacity ?? 255, part.appearance?.opacity ?? 255);
     add('geometry.polygon', previous.geometry.polygon, part.geometry.polygon);
+    add('semantic.override', previous.semantic.override, part.semantic.override);
     const before = previous.geometry.landmarks || {}, after = part.geometry.landmarks || {};
     for (const name of [...new Set([...Object.keys(before), ...Object.keys(after)])].sort()) add(`geometry.landmarks.${name}`, before[name], after[name]);
   }

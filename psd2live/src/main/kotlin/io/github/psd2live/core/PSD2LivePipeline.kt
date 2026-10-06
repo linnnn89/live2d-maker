@@ -355,8 +355,15 @@ class PSD2LivePipeline {
 			}
 			append('"')
 		}
+		val originalLayers = analysis.source.layers.associateBy { it.id.raw }
 		val layers = analysis.layers.joinToString(",\n") { layer ->
-			"    {\"source\":${quote(layer.source.name)},\"type\":${quote(layer.semantic.type.name.lowercase())},\"tag\":${quote(layer.semantic.tag.canonicalName)},\"side\":${quote(layer.semantic.side.name)},\"parameter\":${quote(layer.semantic.parameter)},\"switchId\":${layer.semantic.switchId},\"drawable\":${quote(rig.puppet.drawables.firstOrNull { it.name == layer.source.name }?.id?.raw ?: "")}}"
+            val componentId = layer.source.id.raw
+            val sourceId = analysis.sourceLayerIdByComponentId[componentId] ?: componentId
+            val original = originalLayers[sourceId] ?: layer.source
+            val automatic = LayerClassifier.classify(original, config.alphaThreshold).semantic
+            val overridden = componentId in config.layerOverrides || sourceId in config.layerOverrides
+            val drawable = rig.layerIdByDrawableId.entries.firstOrNull { it.value == componentId }?.key ?: ""
+			"    {\"source\":${quote(layer.source.name)},\"componentId\":${quote(componentId)},\"sourceLayerId\":${quote(sourceId)},\"automaticTag\":${quote(automatic.tag.name)},\"automaticSide\":${quote(automatic.side.name)},\"overridden\":$overridden,\"semanticTag\":${quote(layer.semantic.tag.name)},\"type\":${quote(layer.semantic.type.name.lowercase())},\"tag\":${quote(layer.semantic.tag.canonicalName)},\"side\":${quote(layer.semantic.side.name)},\"parameter\":${quote(layer.semantic.parameter)},\"switchId\":${layer.semantic.switchId},\"drawable\":${quote(drawable)}}"
 		}
 		val hasFrontHair = analysis.layers.any { it.semantic.tag == SemanticTag.FRONT_HAIR && it.opaquePixels > 0 }
 		val hasBackHair = analysis.layers.any { it.semantic.tag == SemanticTag.BACK_HAIR && it.opaquePixels > 0 }

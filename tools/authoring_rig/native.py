@@ -88,11 +88,12 @@ def plain(obj, jp):
     return values
 
 
-def config_for(jp, overlay=None):
+def config_for(jp, overlay=None, configuration=None):
     if overlay is None:
         overlay_class = jp.JClass("io.github.psd2live.core.RigEditOverlay")
         overlay = overlay_class.class_.getField("Companion").get(None).getEmpty()
-    return jp.JClass("io.github.psd2live.core.AuthoringPipelineFacade").configuration("{}", overlay)
+    return jp.JClass("io.github.psd2live.core.AuthoringPipelineFacade").configuration(
+        json.dumps(configuration or {}, allow_nan=False), overlay)
 
 
 def native_objects(model):
@@ -135,11 +136,11 @@ def export_native(pipeline, psd, out, config, jp):
     return pipeline.run(path.get(str(Path(psd).resolve())), path.get(str(out)), config, listener)
 
 
-def native_base(psd, out, native_jar=None):
+def native_base(psd, out, native_jar=None, configuration=None):
     out = empty_output(out)
     jp, runtime = start_native(native_jar)
     pipeline = jp.JClass("io.github.psd2live.core.AuthoringPipelineFacade")()
-    result = export_native(pipeline, psd, out, config_for(jp), jp)
+    result = export_native(pipeline, psd, out, config_for(jp, configuration=configuration), jp)
     evidence = snapshot(result.getPreviewModel(), runtime, jp)
     evidence["warnings"] = [str(v) for v in result.getWarnings()]
     evidence["inputPsdSha256"] = hashlib.sha256(Path(psd).read_bytes()).hexdigest()
@@ -437,7 +438,7 @@ def validated_journal(edits, model, jp):
     return journal
 
 
-def native_replay(psd, overlay_file, baseline_file, out, native_jar=None):
+def native_replay(psd, overlay_file, baseline_file, out, native_jar=None, configuration=None):
     out = empty_output(out)
     overlay = json.loads(Path(overlay_file).read_text(encoding="utf-8"))
     overlay = overlay.get("rigEdits", overlay)
@@ -457,7 +458,7 @@ def native_replay(psd, overlay_file, baseline_file, out, native_jar=None):
             return {"status": "needs-review", "action": "native-replay", "reasons": ["Selected application lacks source authoring capabilities"], "applied": False}
     pipeline = jp.JClass("io.github.psd2live.core.AuthoringPipelineFacade")()
     path = jp.JClass("java.nio.file.Paths").get(str(Path(psd).resolve()))
-    preview = pipeline.buildPreview(path, config_for(jp))
+    preview = pipeline.buildPreview(path, config_for(jp, configuration=configuration))
     current = snapshot(preview, runtime, jp)
     basic = {key: value for key, value in overlay.items() if key in SUPPORTED_SECTIONS}
     preflight = check_overlay_compatibility(basic if not any(overlay.get(key) for key in SOURCE_SECTIONS) else {}, {}, current["objects"])
@@ -504,7 +505,7 @@ def native_replay(psd, overlay_file, baseline_file, out, native_jar=None):
     introduced = sorted(set(map(str, warnings)) - set(map(str, base_warnings)))
     if introduced:
         return {"status": "needs-review", "action": "native-replay", "reasons": introduced, "applied": False}
-    result = export_native(pipeline, psd, out, config_for(jp, native), jp)
+    result = export_native(pipeline, psd, out, config_for(jp, native, configuration), jp)
     introduced = sorted(set(map(str, result.getWarnings())) - set(old["warnings"]))
     report = {"status": "needs-review" if introduced else "ok", "action": "native-replay",
               "applied": True, "baseline_sha256": current["modelSha256"],

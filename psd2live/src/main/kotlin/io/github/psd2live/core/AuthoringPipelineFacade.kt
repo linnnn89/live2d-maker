@@ -13,7 +13,11 @@ data class AuthoringBuildConfig(
     val generatePhysics: Boolean = false,
     val exportCmo3: Boolean = false,
     val exportMotions: Boolean = false,
+    val layerOverrides: Map<String, AuthoringLayerOverride> = emptyMap(),
 )
+
+@Serializable
+data class AuthoringLayerOverride(val tag: String, val side: String)
 
 /** UI-independent entry point for the Python authoring bridge. */
 class AuthoringPipelineFacade {
@@ -47,6 +51,10 @@ class AuthoringPipelineFacade {
                 physicsBackHair = !customPhysics,
                 physicsEyeJelly = !customPhysics,
                 rigEdits = overlay,
+                layerOverrides = settings.layerOverrides.mapValues { (id, value) ->
+                    require(id.isNotBlank()) { "Source layer ID must not be blank" }
+                    LayerClassificationOverride(SemanticTag.valueOf(value.tag), Side.valueOf(value.side))
+                },
             )
         }
     }

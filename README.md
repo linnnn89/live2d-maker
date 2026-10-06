@@ -94,3 +94,5 @@ python\Scripts\python.exe -m tools.authoring_rig --help
 本项目原创代码和文档采用 [GPL-3.0](LICENSE)。PSD2Live、See-through 和其他第三方组件保留各自的许可证。
 
 Live2D Cubism SDK、Core 和 Framework 受 Live2D 的许可条款约束，不适用本仓的 GPL。第三方来源与许可见 [docs/THIRD_PARTY.md](docs/THIRD_PARTY.md)。
+
+Studio 的“部件设置”可修正图层类别和左右侧，并恢复自动识别；保存 IR 后重建才更新模型。原始 PSD 图层名不变，面板显示原生实际采用的组件/drawable 与自动识别值。修正支持撤销/重做和草稿恢复；旧构建需重建才显示身份映射。契约见 [Studio 草稿命令](docs/STUDIO_DRAFT_COMMANDS.md)。

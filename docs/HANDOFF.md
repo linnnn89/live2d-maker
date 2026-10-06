@@ -258,3 +258,11 @@ Kotlin/JAR/素材及 IR 持久化格式未改，本轮未重跑未变的前端/K
 三个真实临时工程测试通过，覆盖删除原始外部资源后往返、原 PSD/栅格/历史/设置/任务/辅助 PNG/日志/空间引用完整、保存失败保留旧归档、非法图片引用拒绝及临时目录清理。Kotlin 全套 208 项，0 失败/错误、1 跳过。源码 JAR 与随仓 JAR/manifest 同步，安装器 DryRun 通过。真实 Windows 桌面启动和 PrintWindow 截图正常，日志无启动错误；Compose UIA 仅暴露容器，未完成桌面保存/打开的 UI 自动化。首次手工启动漏了已有便携 skiko.library.path，补齐参数后成功，未修改源代码。证据在 out/e6-workspace-evidence/。
 
 E6 原生门面、签名分层和项目归档服务已落地，完整编辑用例服务化、RigBuilder 领域拆分/阶段复用继续随 R7 推进。下一批按规划推进 R2/R3 的 ID/分类映射、人工语义修正和实际构建设置。未重跑未变化的前端/Python全套。
+
+## 32. R2/R3a：身份映射与语义修正（2026-10-07）
+
+基于 E6c PR #16，main@51fa4b5。新增部件设置、set_semantic/reset_semantic，保留导入识别，semantic.override 为可选人工修正；命令/差异/历史/恢复共用，保存仅放宽覆盖字段。旧无覆盖 IR 继续接受，含新字段的文件需当前严格 schema。builder 标准 PSD layer ID/XMP 映射 → binding 配置 → Analyzer 实际组件来源 → rig 的 drawable 身份报告，修复重名按名称误映射；派生口唇来源也保留。实际自动/覆盖/采用结果随构建记录，旧报告需重建、不推测对应关系。
+
+新增三个回归，前端 55 / Python 23 / Kotlin 209 全套通过（Kotlin 1 跳过）；JAR/manifest 更新、DryRun 校验通过。实际 Edge ds 24 层：nose psd_14→lyid:13→ArtMeshFaceDetailL，修正 FACE_DETAIL/LEFT，撤销/重做/保存/刷新/原生重建/Cubism/16 姿态 QA/恢复自动识别通过，复原模型哈希与起始一致。语义修改美术 PNG 不变，与 Python 逐像素一致，源 PSD 保留。窄屏滚动修复后实际结果可达，无页面/控制台错误。证据 out/r3-semantic-evidence/；验收脚本文案修正后只续验未完成部分。
+
+后续 R3b 开放项目构建设置，R4 项目/导出、R5 素材、R6 参数/受限模型编辑、R7 核心模块及复用、R8 动态仍未全部完成。UNKNOWN 仍遵循既有未知分类审计门禁，不绕过原生警告或 Overlay/runtime 基线核对。

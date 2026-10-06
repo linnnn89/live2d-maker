@@ -9,6 +9,23 @@ import kotlin.test.assertTrue
 
 class AuthoringPipelineFacadeTest {
     @Test
+    fun explicitClassificationContractUsesNativeEnumsAndStableSourceIds() {
+        val config = AuthoringPipelineFacade.configuration("""{"layerOverrides":{"lyid:2":{"tag":"TAIL","side":"LEFT"}}}""", RigEditOverlay.Empty)
+        assertEquals(mapOf("lyid:2" to LayerClassificationOverride(SemanticTag.TAIL, Side.LEFT)), config.layerOverrides)
+        for (input in listOf("""{"layerOverrides":{"lyid:2":{"tag":"TYPO","side":"LEFT"}}}""",
+            """{"layerOverrides":{"lyid:2":{"tag":"TAIL","side":"left"}}}""",
+            """{"layerOverrides":{"":{"tag":"TAIL","side":"LEFT"}}}""")) {
+            assertFailsWith<IllegalArgumentException> { AuthoringPipelineFacade.configuration(input, RigEditOverlay.Empty) }
+        }
+        val schema = kotlinx.serialization.json.Json.parseToJsonElement(java.nio.file.Files.readString(
+            java.nio.file.Path.of("../schemas/studio/protocol.schema.json"))) as kotlinx.serialization.json.JsonObject
+        val definitions = schema.getValue("definitions") as kotlinx.serialization.json.JsonObject
+        val properties = (definitions.getValue("SemanticOverride") as kotlinx.serialization.json.JsonObject).getValue("properties") as kotlinx.serialization.json.JsonObject
+        val tags = ((properties.getValue("tag") as kotlinx.serialization.json.JsonObject).getValue("enum") as kotlinx.serialization.json.JsonArray)
+            .map { (it as kotlinx.serialization.json.JsonPrimitive).content }.toSet()
+        assertEquals(SemanticTag.entries.map { it.name }.toSet(), tags)
+    }
+    @Test
     fun configurationPreservesAuthoringDefaultsAndExplicitFields() {
         val expected = PipelineConfig(atlasSize = 2048, meshSpacing = 24, generatePhysics = false,
             exportCmo3 = false, exportMotions = false)
