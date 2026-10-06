@@ -20,7 +20,7 @@ export async function api<T>(route: string, payload?: unknown, signal?: AbortSig
   const responseType = route === 'catalog' ? ((payload as {operation:string}).operation === 'list' ? 'ProjectCatalog' : 'ProjectCreateResult')
     : route === 'import-preview' ? 'ImportPreview'
     : ['project-save','project-revisions'].includes(route) ? 'ProjectRevisions'
-    : route === 'project-archive' ? 'ProjectDownload' : 'Snapshot';
+    : route === 'project-archive' ? 'ProjectDownload' : route === 'model-export' ? 'ModelExportResult' : 'Snapshot';
   validateProtocol(responseType, data, 'PROTOCOL_ERROR', route);
   return data as T;
 }

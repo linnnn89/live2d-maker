@@ -123,17 +123,17 @@ export function useWorkspaceActions() {
       let current=saved;
       if(dirty){const result=await editor.execute({schemaVersion:1,operation:'commit',state:draft!});if(!result.ok)throw new Error(result.error.message);current=result.saved||current;}
       editor.setBlocked(true);
-      const result=await api<ProjectRevisions>('project-save',{schemaVersion:1,revision:current.revision,settingsRevision:current.buildSettings!.revision,head,message});
+      const result=await api<ProjectRevisions>('project-save',{schemaVersion:1,revision:current.revision,settingsRevision:current.buildSettings!.revision,overlayRevision:current.overlayRevision,head,message});
       setMessage('工程修订已保存');return result;
     }catch(e){setError(e instanceof Error?e.message:String(e));return null;}finally{editor.setBlocked(false);setBusy('');}
   }
   async function restoreProject(head:string,id:string):Promise<boolean> {
     if(!saved||editingLocked||dirty||settingsPending)return false;
     editor.setBlocked(true);setBusy('正在恢复工程修订…');setError('');
-    try{apply(await api<Snapshot>('project-restore',{schemaVersion:1,revision:saved.revision,settingsRevision:saved.buildSettings!.revision,head,id}));setMessage('已恢复修订；恢复前状态保留为新修订');return true;}
+    try{apply(await api<Snapshot>('project-restore',{schemaVersion:1,revision:saved.revision,settingsRevision:saved.buildSettings!.revision,overlayRevision:saved.overlayRevision,head,id}));setMessage('已恢复修订；恢复前状态保留为新修订');return true;}
     catch(e){setError(e instanceof Error?e.message:String(e));return false;}finally{editor.setBlocked(false);setBusy('');}
   }
-  return {saved,editor,draft,ir,dirty,selected,setSelected,busy,message,error,setMessage,setError,editingLocked,
+  return {saved,applySnapshot:apply,editor,draft,ir,dirty,selected,setSelected,busy,message,error,setMessage,setError,editingLocked,
     showQa,setShowQa,showImport,openImport,closeImport,commitImport,retryOpen,action,edit,history,saveBuildSettings,readBuildSettings,
     settingsPending,setSettingsPending,setBusy,saveProject,restoreProject};
 }

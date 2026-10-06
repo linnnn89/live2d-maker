@@ -6,6 +6,7 @@ deformer chains and keyform grids. Equality is deliberately conservative after r
 import hashlib
 import json
 import math
+import tempfile
 from pathlib import Path
 
 from .stale import _target_key, check_overlay_compatibility
@@ -17,8 +18,7 @@ def digest(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()).hexdigest()
 
 
-def start_native(native_jar=None):
-    import jpype
+def runtime_files(native_jar=None):
     home = ROOT / "portable/PSD2Live"
     jars = sorted((home / "app").glob("*.jar"))
     jvm = home / "runtime/bin/server/jvm.dll"
@@ -41,13 +41,24 @@ def start_native(native_jar=None):
     resources = ROOT / "dependencies/native/cubism-runtime.jar"
     if resources.is_file():
         jars.append(resources)
+    return jvm, jars
+
+
+def runtime_identity(native_jar=None):
+    jvm, jars = runtime_files(native_jar)
+    runtime = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in jars}
+    runtime["jvm.dll"] = hashlib.sha256(jvm.read_bytes()).hexdigest()
+    return runtime
+
+
+def start_native(native_jar=None):
+    import jpype
+    jvm, jars = runtime_files(native_jar)
     if jpype.isJVMStarted():
         raise RuntimeError("Native CLI requires a fresh process to pin the bundled JVM/classpath")
     jpype.startJVM(str(jvm), "-Djava.awt.headless=true", classpath=[str(p) for p in jars], convertStrings=True)
     jpype.JClass("java.lang.System").setOut(jpype.JClass("java.lang.System").err)
-    runtime = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in jars}
-    runtime["jvm.dll"] = hashlib.sha256(jvm.read_bytes()).hexdigest()
-    return jpype, runtime
+    return jpype, runtime_identity(native_jar)
 
 
 def getter(obj, prefix):
@@ -506,7 +517,14 @@ def native_replay(psd, overlay_file, baseline_file, out, native_jar=None, config
     if introduced:
         return {"status": "needs-review", "action": "native-replay", "reasons": introduced, "applied": False}
     result = export_native(pipeline, psd, out, config_for(jp, native, configuration), jp)
-    introduced = sorted(set(map(str, result.getWarnings())) - set(old["warnings"]))
+    export_warnings = old["warnings"]
+    if configuration and any(configuration.get(key) for key in ("exportCmo3", "exportMotions", "generatePhysics")):
+        # The complete base fingerprint already matched. Compare conversion notices under the
+        # same output options, so enabling CMO3 cannot turn ordinary CMO3 notices into edit failures.
+        with tempfile.TemporaryDirectory(prefix=".native-export-baseline-", dir=Path(out).parent) as temporary:
+            unedited = export_native(pipeline, psd, Path(temporary), config_for(jp, configuration=configuration), jp)
+            export_warnings = list(map(str, unedited.getWarnings()))
+    introduced = sorted(set(map(str, result.getWarnings())) - set(export_warnings))
     report = {"status": "needs-review" if introduced else "ok", "action": "native-replay",
               "applied": True, "baseline_sha256": current["modelSha256"],
               "overlay_sha256": hashlib.sha256(Path(overlay_file).read_bytes()).hexdigest(),
@@ -519,6 +537,7 @@ def native_replay(psd, overlay_file, baseline_file, out, native_jar=None, config
               "native_structure_edits": len(native.getStructureEdits()),
               "native_journal_edits": len(native.getAuthoringJournal()) if native_jar else 0,
               "reasons": introduced, "warnings": list(map(str, result.getWarnings())),
+              "runtime": runtime,
               "exported_files": [str(v.getPath()) for v in result.getExportedFiles()],
               "visual_acceptance": "pending Pose QA; native validation alone is insufficient"}
     (out / "native-replay.json").write_text(json.dumps(report, indent=2), encoding="utf-8")

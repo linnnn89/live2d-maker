@@ -123,4 +123,14 @@ E5 将打开/保存/导入/原生任务编排放在 `src/workspace/useWorkspaceA
 
 “下载 Studio 工程”归档当前已保存内容、源 PSD/原图、素材/导入来源、全部修订及已有构建/QA，不包含未保存草稿、锁或其他下载包。归档带版本 1 类型及逐文件 SHA-256/长度清单；打开时逐项核对并验证所有修订/资源，成功后才注册为新工程，原工程不覆盖。新副本有独立 workspaceId，避免复用旧页草稿身份。只接受白名单相对路径，拒绝重复/大小写冲突、外部链接、清单或哈希不符、未知格式/版本；最多 10000 个资源、展开 1 GiB、单项 256 MiB。Studio 工程与桌面 `.psd2live` 不兼容，不能改扩展名互换。
 
-CLI `studio-catalog --workspace <目录>` 从 stdin 接收 `{ "schemaVersion":1, "operation":"list" }`，或 `{ "schemaVersion":1, "operation":"create", "input":{ "schemaVersion":1, "kind":"psd或archive", "name":"工程名", "data":"base64文件" } }`；返回工程列表或完整受限报告/创建结果。`studio-project-revisions` 读取修订；`studio-project-save` 接收 `{ "schemaVersion":1, "revision":"IR版本", "settingsRevision":"设置版本", "head":"保存修订ID", "message":"说明" }`；`studio-project-restore` 同时核对这三种版本，省略 message 并增加目标 `id`。`studio-project-archive` 返回下载 URL/文件名/资源数量。后三类命令的 workspace 须是项目页建立的工程目录；原开发工作区保持原美术流程。本批交付工程归档，明确的 cmo3/可播放模型导出面板接续 R4b。
+CLI `studio-catalog --workspace <目录>` 从 stdin 接收 `{ "schemaVersion":1, "operation":"list" }`，或 `{ "schemaVersion":1, "operation":"create", "input":{ "schemaVersion":1, "kind":"psd或archive", "name":"工程名", "data":"base64文件" } }`；返回工程列表或完整受限报告/创建结果。`studio-project-revisions` 读取修订；`studio-project-save` 接收 `{ "schemaVersion":1, "revision":"IR版本", "settingsRevision":"设置版本", "head":"保存修订ID", "message":"说明" }`；`studio-project-restore` 同时核对这三种版本，省略 message 并增加目标 `id`。两者可传 `overlayRevision`，当前界面总是核对 Overlay/基线版本。`studio-project-archive` 返回下载 URL/文件名/资源数量。后三类命令的 workspace 须是项目页建立的工程目录；原开发工作区保持原美术流程。
+
+## 模型交付
+
+先保存美术及构建设置，展开“导出模型”，选择 cmo3 工程或可播放模型包，以及是否包含动作示例、生成默认物理。显式 Overlay 物理规则仍保留。“生成交付包”使用已保存输入独立生成，完成后列出实际文件与全部原生警告；失败保留此前成功的交付、预览和 QA。页面刷新仍可下载最近交付；输入变化后显示历史交付标识。
+
+可播放包包含 model3、moc3、纹理和实际引用的配置/动作/物理文件；关闭动作时同时移除 model3 引用及动作文件。cmo3 包另含重建 PSD 和 cmo3。cmo3 的可编辑纹理图层由纹理页重建，原 PSD 的编辑链不在 cmo3 中保留；原始 PSD 保存在 Studio 工程，交付包里的 artwork.psd 对应当前保存美术。每包附来源、设置、引擎身份和文件长度/SHA-256 报告。原生回读和静态模型加载不能代替 Cubism Editor 窗口验收或实时物理播放。
+
+首次导出同时准备 cmo3 和动作，随后只切换目标或动作文件选择时复用同一验证模型。缓存键包含像素/绑定输入、构建设置、Overlay/基线、实际 JAR/JVM 身份和默认物理选择；注记变化可以复用，模型输入或设置变化须重新生成。复用前核对完整原生产物哈希，缺失或损坏会创建新产物，保留旧证据。首次准备两个格式的开销仍存在，不声称实现常驻建模服务。完整 Studio 工程归档现包含导出缓存、交付报告和模型 ZIP，仍受上述归档容量限制。
+
+`studio-model-export --workspace <目录>` 的 stdin 为 `{ "schemaVersion":1, "revision":"IR版本", "settingsRevision":"设置版本", "overlayRevision":"Overlay版本", "target":"playable或editor", "exportMotions":true, "generatePhysics":false }`。从 snapshot 获取三种版本，旧请求返回 `BASE_CONFLICT`，原生拒绝交付返回 `EXPORT_FAILED`；不修改 IR。返回下载 URL、逐文件长度/哈希、警告、缓存身份、模型哈希、实际动作数量及物理是否存在。

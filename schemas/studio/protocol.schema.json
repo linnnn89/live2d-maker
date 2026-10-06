@@ -794,6 +794,33 @@
         },
         "project": {
           "$ref": "#/definitions/ProjectSummary"
+        },
+        "overlayRevision": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "export": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "result": {
+                  "$ref": "#/definitions/ModelExportResult"
+                },
+                "current": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "result",
+                "current"
+              ],
+              "additionalProperties": false
+            }
+          ]
         }
       },
       "required": [
@@ -1463,6 +1490,10 @@
         "message": {
           "type": "string",
           "maxLength": 1000
+        },
+        "overlayRevision": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
         }
       },
       "required": [
@@ -1495,6 +1526,10 @@
         "id": {
           "type": "string",
           "pattern": "^[a-f0-9]{32}$"
+        },
+        "overlayRevision": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
         }
       },
       "required": [
@@ -1528,6 +1563,148 @@
         "url",
         "filename",
         "files"
+      ],
+      "additionalProperties": false
+    },
+    "ModelExportRequest": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "settingsRevision": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "overlayRevision": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "target": {
+          "enum": [
+            "playable",
+            "editor"
+          ]
+        },
+        "exportMotions": {
+          "type": "boolean"
+        },
+        "generatePhysics": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "revision",
+        "settingsRevision",
+        "overlayRevision",
+        "target",
+        "exportMotions",
+        "generatePhysics"
+      ],
+      "additionalProperties": false
+    },
+    "ModelExportFile": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "name",
+        "bytes",
+        "sha256"
+      ],
+      "additionalProperties": false
+    },
+    "ModelExportResult": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "target": {
+          "enum": [
+            "playable",
+            "editor"
+          ]
+        },
+        "url": {
+          "type": "string"
+        },
+        "filename": {
+          "type": "string"
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ModelExportFile"
+          }
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "cacheId": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{32}$"
+        },
+        "reused": {
+          "type": "boolean"
+        },
+        "buildSettings": {
+          "$ref": "#/definitions/BuildSettings"
+        },
+        "physics": {
+          "type": "boolean"
+        },
+        "motions": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "modelSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "modelInputSignature": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "overlayRevision": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "target",
+        "url",
+        "filename",
+        "files",
+        "warnings",
+        "cacheId",
+        "reused",
+        "buildSettings",
+        "physics",
+        "motions",
+        "modelSha256",
+        "modelInputSignature",
+        "overlayRevision"
       ],
       "additionalProperties": false
     }

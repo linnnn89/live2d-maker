@@ -99,7 +99,7 @@ def create_project(catalog, payload):
 
 
 def check_state_paths(state):
-    for key, folder in (("latestBuild", "builds"), ("latestQa", "reviews"), ("latestImport", "imports")):
+    for key, folder in (("latestBuild", "builds"), ("latestQa", "reviews"), ("latestImport", "imports"), ("latestExport", "deliveries")):
         value = state.get(key)
         if value is not None and not re.fullmatch(folder + r"/[a-f0-9]{32}", value):
             raise StudioError("INVALID_REQUEST", f"Invalid project reference: {key}", "project")
@@ -108,6 +108,9 @@ def check_state_paths(state):
     attempt = state.get("lastBuildAttempt")
     if attempt and not re.fullmatch(r"builds/[a-f0-9]{32}", attempt.get("directory", "")):
         raise StudioError("INVALID_REQUEST", "Invalid build attempt reference", "project")
+    for key, value in state.get("exportCache", {}).items():
+        if not re.fullmatch(r"[a-f0-9]{64}", key) or not re.fullmatch(r"export-builds/[a-f0-9]{32}", value):
+            raise StudioError("INVALID_REQUEST", "Invalid project export cache reference", "project")
 
 
 def capture(root):
@@ -127,6 +130,9 @@ def checkpoint(root, message, expected=None):
             raise StudioError("BASE_CONFLICT", "Artwork changed before project save", "project")
         if expected["settingsRevision"] != settings_signature(value["settings"]):
             raise StudioError("SETTINGS_CONFLICT", "Settings changed before project save", "project")
+        from .delivery import overlay_revision
+        if "overlayRevision" in expected and expected["overlayRevision"] != overlay_revision(root, value["state"]):
+            raise StudioError("BASE_CONFLICT", "Overlay changed before project save", "project")
     metadata = read(root / "project.json")
     if expected and expected["head"] != metadata["head"]:
         raise StudioError("PROJECT_CONFLICT", "Saved project head changed; read revisions before saving", "project")
@@ -164,7 +170,7 @@ def validate_capture(value, root):
     check_state_paths(value["state"])
     if value["state"]["overlay"] and (not isinstance(value["overlay"], dict) or not isinstance(value["baseline"], dict)):
         raise StudioError("INVALID_REQUEST", "Revision is missing its Overlay or baseline", "project")
-    for key in ("latestBuild", "latestQa", "latestImport"):
+    for key in ("latestBuild", "latestQa", "latestImport", "latestExport"):
         relative = value["state"].get(key)
         if relative and (not (root / relative).is_dir() or not (root / relative).resolve().is_relative_to(root)):
             raise StudioError("INVALID_REQUEST", f"Revision resource missing: {relative}", "project")
@@ -201,6 +207,9 @@ def restore_project(root, payload):
             raise StudioError("PROJECT_CONFLICT", "Saved project head changed before restore", "project")
         if payload["revision"] != revision(current["ir"]) or payload["settingsRevision"] != settings_signature(current["settings"]):
             raise StudioError("BASE_CONFLICT", "Project changed before restore; read the current project", "project")
+        from .delivery import overlay_revision
+        if "overlayRevision" in payload and payload["overlayRevision"] != overlay_revision(root, current["state"]):
+            raise StudioError("BASE_CONFLICT", "Overlay changed before restore", "project")
         record = read(root / "project-revisions" / payload["id"] / "revision.json")
         validate_capture(record, root)
         # Preserve the current working state before moving to an older branch point.
@@ -220,7 +229,8 @@ def archive_path_allowed(name):
         return False
     if len(path.parts) == 1: return name in ROOT_FILES
     if path.parts[0] == "assets": return len(path.parts) == 2 and path.suffix == ".png"
-    if path.parts[0] not in ("imports", "builds", "reviews", "project-revisions") or not ID.fullmatch(path.parts[1]): return False
+    if path.parts[0] == "downloads": return len(path.parts) == 2 and bool(re.fullmatch(r"[a-f0-9]{32}\.model\.zip", path.parts[1]))
+    if path.parts[0] not in ("imports", "builds", "reviews", "project-revisions", "export-builds", "deliveries") or not ID.fullmatch(path.parts[1]): return False
     return path.suffix.lower() in (".png", ".json", ".txt", ".psd", ".moc3", ".cmo3")
 
 

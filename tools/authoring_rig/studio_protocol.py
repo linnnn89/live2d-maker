@@ -43,6 +43,8 @@ def error_detail(error, command):
         code = "BUILD_FAILED"
     elif command == "studio-qa":
         code = "QA_FAILED"
+    elif command == "studio-model-export":
+        code = "EXPORT_FAILED"
     elif command.startswith("studio-import"):
         code = "IMPORT_FAILED"
     elif command == "studio-save":
