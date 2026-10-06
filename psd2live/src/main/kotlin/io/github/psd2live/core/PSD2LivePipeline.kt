@@ -379,7 +379,7 @@ class PSD2LivePipeline {
 		  "runtimeTarget": ${quote(rig.puppet.runtimeTarget.name)},
 		  "mocVersion": ${rig.puppet.runtimeTarget.mocVersion().byteValue},
 		  "canvas": {"width":${analysis.source.widthPx},"height":${analysis.source.heightPx}},
-		  "config": {"atlasSize":${config.atlasSize},"meshSpacing":${config.meshSpacing},"headTurnStrength":${config.headTurnStrength},"bodyStrength":${config.bodyStrength},"meshOnly":${config.meshOnly},"generateDeformers":${config.generateDeformers},"exportMotions":${config.exportMotions}},
+		  "config": {"atlasSize":${config.atlasSize},"meshSpacing":${config.meshSpacing},"meshInteriorDensity":${config.meshInteriorDensity},"headTurnStrength":${config.headTurnStrength},"bodyStrength":${config.bodyStrength},"meshOnly":${config.meshOnly},"generateDeformers":${config.generateDeformers},"exportMotions":${config.exportMotions}},
 		  "faceRig": {"algorithm":"perspective-parallelogram-nine-pose-v2","angleX":[-45,0,45],"angleY":[-30,0,30],"initialAngleZ":${rig.initialHeadAngleZ},"centerX":${rig.faceCenterX},"centerY":${rig.faceCenterY},"radiusX":${rig.faceRadiusX},"radiusY":${rig.faceRadiusY}},
 		  "deformerHierarchy": {"head":"DeformHeadContainer","face":"DeformFaceNinePose","frontHair":["DeformHairFrontFollow","DeformHairFrontPhysics"],"backHair":["DeformHairBackFollow","DeformHairBackPhysics"]},
 		  "physics": {"enabled":${config.generatePhysics && !config.meshOnly},"frontHair":$useFrontHair,"backHair":$useBackHair,"eyeJelly":$useEyeJelly,"preset":"hair-and-eye-pendulum"},

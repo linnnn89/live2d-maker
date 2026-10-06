@@ -19,6 +19,7 @@ from .stale import evaluate_dag_stale, check_overlay_compatibility, model_input_
 from .validator import validate_authoring_rig
 from .studio_protocol import StudioError, validate_protocol
 from .binding import build_configuration, classification_audit
+from .build_settings import load_settings, settings_signature, settings_record_matches
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -38,8 +39,12 @@ def revision(data):
     return hashlib.sha256(json.dumps(data, sort_keys=True, ensure_ascii=False, allow_nan=False).encode()).hexdigest()
 
 
-def model_record_matches(record, data, built_ir):
+def model_record_matches(record, data, built_ir, settings=None, built_settings=None):
     """Versioned reports bind exact model inputs; legacy reports require their captured build IR."""
+    from .build_settings import DEFAULT_SETTINGS
+    if not settings_record_matches(record, settings if settings is not None else DEFAULT_SETTINGS,
+                                   built_settings if built_settings is not None else DEFAULT_SETTINGS):
+        return False
     if record.get("signatureVersion") == 2:
         return record.get("modelInputSignature") == model_input_signature(built_ir) == model_input_signature(data)
     if "signatureVersion" in record:
@@ -127,12 +132,14 @@ def snapshot(root):
                 state["workspaceId"] = uuid.uuid4().hex
                 write(root / "studio-state.json", state)
     build = state["latestBuild"]
+    settings = load_settings(root)
+    built_settings = load_settings(root / build) if build else load_settings(root)
     previous = read(root / build / "build-ir.json") if build else read(root / "origin-ir.json")
     # Browser JSON serializes 484.0 as 484. Equal IR values still describe the same artwork.
     same_ir = data == previous
     stale = evaluate_dag_stale(previous, previous if same_ir else data)["stale"]
     report = read(root / build / "build-report.json") if build else None
-    model_matches = bool(report and model_record_matches(report, data, previous))
+    model_matches = bool(report and model_record_matches(report, data, previous, settings, built_settings))
     if report and not model_matches:
         for stage in ("base_rig", "overlay_apply", "moc3", "review"):
             stale[stage] = True
@@ -141,7 +148,7 @@ def snapshot(root):
             stale[stage] = True
     qa = state["latestQa"]
     review = read(root / qa / "review.json") if qa else None
-    qa_matches = bool(review and model_matches and (
+    qa_matches = bool(review and model_matches and settings_record_matches(review, settings, built_settings) and (
         (review.get("signatureVersion") == 2 and review.get("buildId") == build
          and review.get("modelInputSignature") == model_input_signature(data))
         or ("signatureVersion" not in review and review.get("studioRevision") == report.get("revision"))))
@@ -159,8 +166,10 @@ def snapshot(root):
             overlay = {"status": "needs-review", "reasons": ["Base rig changed; native replay must compare complete signatures"]}
         attempt = state.get("lastBuildAttempt")
         failed_ir = root / attempt["directory"] / "build-ir.json" if attempt else None
-        same_attempt = attempt and (attempt["revision"] == revision(data)
-                                   or (failed_ir.exists() and model_record_matches(attempt, data, read(failed_ir))))
+        attempt_settings = load_settings(root / attempt["directory"]) if attempt else settings
+        same_attempt = attempt and settings_record_matches(attempt, settings, attempt_settings) and (
+            attempt["revision"] == revision(data)
+            or (failed_ir.exists() and model_record_matches(attempt, data, read(failed_ir), settings, attempt_settings)))
         if (same_attempt and attempt.get("overlayInputs") == inputs and attempt["status"] != "ok"):
             for stage in ("overlay_apply", "moc3", "review"):
                 stale[stage] = True
@@ -178,7 +187,8 @@ def snapshot(root):
         bounds = image.getchannel("A").getbbox()
     result = {"schemaVersion": 1, "workspaceId": state["workspaceId"], "status": "ok", "ir": data, "revision": revision(data), "stale": stale,
               "overlay": overlay, "sourceImage": "/studio-files/source.png", "sourceBounds": bounds,
-              "artworkBounds": bounds, "build": None, "qa": None}
+              "artworkBounds": bounds, "build": None, "qa": None,
+              "buildSettings": {"settings": settings, "revision": settings_signature(settings)}}
     if state.get("latestImport"):
         artwork = root / state["latestImport"] / "after.png"
         result["artworkImage"] = file_url(root, artwork)
@@ -223,6 +233,20 @@ def save_workspace(root, payload):
             if part["geometry"]["bbox"] != previous["geometry"]["bbox"]:
                 raise StudioError("EDIT_SCOPE", "Raster bbox is fixed; edit polygon or landmarks", "save", part_id=part["id"], field="geometry.bbox")
         write(root / "authoring-rig.json", candidate)
+    return snapshot(root)
+
+
+def save_build_settings(root, payload):
+    validate_protocol("BuildSettingsRequest", payload)
+    root = Path(root).resolve(strict=True)
+    with locked(root):
+        data = read(root / "authoring-rig.json")
+        if payload["revision"] != revision(data):
+            raise StudioError("BASE_CONFLICT", "IR changed in another editor; reload before saving build settings", "build-settings")
+        current = load_settings(root)
+        if payload["settingsRevision"] != settings_signature(current):
+            raise StudioError("SETTINGS_CONFLICT", "Build settings changed in another editor; read the current settings before saving", "build-settings")
+        write(root / "build-settings.json", payload["settings"])
     return snapshot(root)
 
 
@@ -316,13 +340,16 @@ def rebuild_workspace(root):
         data = read(root / "authoring-rig.json")
         validate_authoring_rig(data, root)
         state = read(root / "studio-state.json")
+        settings = load_settings(root)
         context = {"revision": revision(data), "overlayInputs": overlay_inputs(root, state),
-                   "signatureVersion": 2, "modelInputSignature": model_input_signature(data)}
+                   "signatureVersion": 2, "modelInputSignature": model_input_signature(data),
+                   "buildSettingsSignature": settings_signature(settings), "buildSettings": settings}
         build = root / "builds" / uuid.uuid4().hex
         build.mkdir(parents=True)
         write(build / "build-ir.json", data)
+        write(build / "build-settings.json", settings)
         built = build_psd(root / "authoring-rig.json", build / "artwork.psd")
-        configuration = build_configuration(data, built["layers"])
+        configuration = {**settings, **build_configuration(data, built["layers"])}
         write(build / "native-configuration.json", configuration)
         native_dir = build / "native"
         jar = ROOT / "psd2live/build/libs/psd2live-0.7.1.jar"
@@ -414,6 +441,7 @@ def qa_workspace(root, port):
         review["studioRevision"] = view["revision"]
         review["signatureVersion"] = 2
         review["modelInputSignature"] = model_input_signature(data)
+        review["buildSettingsSignature"] = settings_signature(load_settings(root))
         review["buildId"] = state["latestBuild"]
         write(directory / "review.json", review)
         state["latestQa"] = directory.relative_to(root).as_posix()

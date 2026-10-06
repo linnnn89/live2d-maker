@@ -733,6 +733,9 @@
                     ],
                     "additionalProperties": true
                   }
+                },
+                "buildSettings": {
+                  "$ref": "#/definitions/BuildSettings"
                 }
               },
               "required": [
@@ -785,6 +788,9 @@
         "workspaceId": {
           "pattern": "^[a-f0-9]{32}$",
           "type": "string"
+        },
+        "buildSettings": {
+          "$ref": "#/definitions/BuildSettingsState"
         }
       },
       "required": [
@@ -1108,6 +1114,82 @@
       "required": [
         "tag",
         "side"
+      ],
+      "additionalProperties": false
+    },
+    "BuildSettings": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "atlasSize": {
+          "type": "integer",
+          "enum": [
+            1024,
+            2048,
+            4096
+          ]
+        },
+        "meshInteriorDensity": {
+          "type": "number",
+          "minimum": 12,
+          "maximum": 80
+        },
+        "headTurnStrength": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "atlasSize",
+        "meshInteriorDensity",
+        "headTurnStrength"
+      ],
+      "additionalProperties": false
+    },
+    "BuildSettingsState": {
+      "type": "object",
+      "properties": {
+        "settings": {
+          "$ref": "#/definitions/BuildSettings"
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "settings",
+        "revision"
+      ],
+      "additionalProperties": false
+    },
+    "BuildSettingsRequest": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "const": 1
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "settingsRevision": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "settings": {
+          "$ref": "#/definitions/BuildSettings"
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "revision",
+        "settingsRevision",
+        "settings"
       ],
       "additionalProperties": false
     }

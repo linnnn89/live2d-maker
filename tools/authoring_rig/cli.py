@@ -146,13 +146,15 @@ def cmd_import_generated(args):
 
 def cmd_studio(args):
     from authoring_rig.studio import (open_workspace, snapshot, save_workspace, rebuild_workspace,
-                                     qa_workspace, preview_generated, commit_generated)
+                                     qa_workspace, preview_generated, commit_generated, save_build_settings)
     if args.command == "studio-open":
         result = open_workspace(args.workspace, args.ir, args.psd, args.overlay, args.overlay_baseline)
     elif args.command == "studio-snapshot":
         result = snapshot(args.workspace)
     elif args.command == "studio-save":
         result = save_workspace(args.workspace, json.load(sys.stdin))
+    elif args.command == "studio-build-settings":
+        result = save_build_settings(args.workspace, json.load(sys.stdin))
     elif args.command == "studio-rebuild":
         result = rebuild_workspace(args.workspace)
     elif args.command == "studio-import-preview":
@@ -234,7 +236,7 @@ def main():
     p_replay.set_defaults(func=cmd_native)
 
     for command in ("studio-open", "studio-snapshot", "studio-save", "studio-rebuild", "studio-qa",
-                    "studio-import-preview", "studio-import-commit"):
+                    "studio-import-preview", "studio-import-commit", "studio-build-settings"):
         studio = sub.add_parser(command, help="Local Studio workspace operation")
         studio.add_argument("--workspace", required=True)
         if command == "studio-open":

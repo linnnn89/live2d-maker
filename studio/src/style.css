@@ -741,3 +741,12 @@ footer>div{
 .semantic-fields label { display:flex; align-items:center; gap:6px; }
 .semantic-fields select { padding:6px; max-width:150px; }
 .semantic-editor ul { padding-left:18px; overflow-wrap:anywhere; max-height:160px; overflow:auto; }
+.preview-column { overflow-y: auto; }
+.build-settings { padding:10px 12px; background:#fff; border:1px solid #dfe7f1; border-radius:8px; font-size:13px; flex-shrink:0; }
+.build-settings summary { cursor:pointer; font-weight:600; }
+.build-settings p { margin:8px 0; color:#647996; }
+.build-settings fieldset { margin:0; padding:0; border:0; display:flex; flex-direction:column; gap:8px; }
+.build-settings label { display:flex; align-items:center; gap:8px; }
+.build-settings input { width:90px; }
+.settings-actions { display:flex; flex-wrap:wrap; gap:6px; }
+.settings-actions button { font-size:12px; padding:6px 8px; }

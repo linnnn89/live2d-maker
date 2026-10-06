@@ -10,6 +10,8 @@ data class AuthoringBuildConfig(
     val schemaVersion: Int = 1,
     val atlasSize: Int = 2048,
     val meshSpacing: Int = 24,
+    val meshInteriorDensity: Float = 40f,
+    val headTurnStrength: Float = 1f,
     val generatePhysics: Boolean = false,
     val exportCmo3: Boolean = false,
     val exportMotions: Boolean = false,
@@ -39,11 +41,15 @@ class AuthoringPipelineFacade {
             val settings = json.decodeFromString<AuthoringBuildConfig>(configurationJson)
             require(settings.schemaVersion == 1) { "Unsupported authoring configuration version" }
             require(settings.atlasSize > 0 && settings.meshSpacing > 0) { "Atlas size and mesh spacing must be positive" }
+            require(settings.meshInteriorDensity.isFinite() && settings.meshInteriorDensity in 12f..80f &&
+                settings.headTurnStrength.isFinite() && settings.headTurnStrength in 0f..2f) { "Invalid mesh interior spacing or head turn strength" }
             val customPhysics = overlay.physicsEdits.isNotEmpty()
             // Explicit physics edits enable physics but suppress generated default hair/eye settings.
             return PipelineConfig(
                 atlasSize = settings.atlasSize,
                 meshSpacing = settings.meshSpacing,
+                meshInteriorDensity = settings.meshInteriorDensity,
+                headTurnStrength = settings.headTurnStrength,
                 generatePhysics = settings.generatePhysics || customPhysics,
                 exportCmo3 = settings.exportCmo3,
                 exportMotions = settings.exportMotions,
