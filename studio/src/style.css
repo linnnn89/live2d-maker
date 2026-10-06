@@ -716,6 +716,21 @@ footer>div{
 .mask-overlay{display:block;width:100%;height:100%;image-rendering:pixelated}
 .import-images.single{grid-template-columns:1fr}
 .asset-hash{overflow-wrap:anywhere}
+.parameters-panel{flex-shrink:0;min-height:280px;padding-bottom:12px}
+.parameters-panel>.parameters{max-height:300px;flex-shrink:0}
+.parameter-group summary,.pose-panel summary{cursor:pointer;font-size:13px;font-weight:600}
+.parameter small{display:block;color:var(--muted);font-size:10px;overflow-wrap:anywhere}
+.parameter input[type=range]{min-width:30px}
+.parameter input[type=number]{width:76px;padding:5px;flex-shrink:0}
+.parameter>div{gap:6px}
+.parameter>div>button{padding:4px 8px}
+.pose-panel{margin-top:12px;font-size:12px}
+.pose-presets,.pose-save{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.pose-presets button,.pose-save button,.saved-poses button{padding:5px 8px;font-size:12px}
+.pose-save input{width:100%;min-width:0}
+.saved-poses{list-style:none;padding:0;margin:0;max-height:180px;overflow:auto}
+.saved-poses li{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:6px 0}
+.saved-poses small{width:100%;color:var(--muted)}
 @media(max-width:560px){
   .actions{flex-wrap:wrap}
   .import-fields,.import-images{grid-template-columns:1fr}

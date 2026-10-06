@@ -43,6 +43,23 @@ async function serverFor(config,runner){
   return {url:`http://127.0.0.1:${config.port}`,close:()=>new Promise(resolve=>server.close(resolve))};
 }
 
+test('preview pose HTTP contract validates saved library versions and preserves conflict identity',async()=>{
+  const {ProtocolError}=require(path.join(output,'src/protocol/index.js'));
+  const calls=[];let conflict=false;const server=await serverFor(config(),async(command,input)=>{
+    if(input)calls.push([command,JSON.parse(input)]);if(conflict)throw new ProtocolError('POSE_CONFLICT','Saved poses changed','poses');
+    return snapshot;
+  });
+  const payload={schemaVersion:1,operation:'save',revision:'base',settingsRevision:'a'.repeat(64),overlayRevision:'b'.repeat(64),buildId:'builds/'+('c'.repeat(32)),posesRevision:'d'.repeat(64),name:'Look',values:{ParamAngleX:20}};
+  try{
+    assert.equal((await fetch(server.url+'/api/poses',{method:'POST',body:JSON.stringify(payload)})).status,200);assert.equal(calls[0][0],'studio-poses');
+    for(const change of [{values:{}},{values:{ParamAngleX:'bad'}},{buildId:'outside'},{posesRevision:'old'},{extra:true}])assert.equal((await fetch(server.url+'/api/poses',{method:'POST',body:JSON.stringify({...payload,...change})})).status,400);
+    assert.equal(calls.length,1);
+    assert.equal((await fetch(server.url+'/api/poses',{method:'POST',body:JSON.stringify({schemaVersion:1,operation:'delete',posesRevision:'d'.repeat(64),id:'e'.repeat(32)})})).status,200);
+    conflict=true;const response=await fetch(server.url+'/api/poses',{method:'POST',body:JSON.stringify(payload)});assert.equal(response.status,409);assert.equal((await response.json()).detail.code,'POSE_CONFLICT');conflict=false;
+    assert.equal((await fetch(server.url+'/api/snapshot')).status,200);
+  }finally{await server.close();}
+});
+
 test('transport validates methods, origin, body and protocol before running, and releases the exclusive gate on failure',async()=>{
   const c=config(),calls=[];let release;
   const service=await serverFor(c,(command,payload)=>{calls.push([command,payload]);return command==='studio-open'
