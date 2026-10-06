@@ -151,6 +151,7 @@ def cmd_studio(args):
     from authoring_rig.projects import recover_project, save_project, restore_project, revision_list, pack_archive, create_project, list_projects
     from authoring_rig.delivery import export_model
     from authoring_rig.poses import update_poses
+    from authoring_rig.rig_edits import update_rig_edits
     if args.command == "studio-catalog":
         request = json.load(sys.stdin)
         from authoring_rig.studio_protocol import validate_protocol
@@ -179,6 +180,8 @@ def cmd_studio(args):
         result = export_model(args.workspace, json.load(sys.stdin))
     elif args.command == "studio-poses":
         result = update_poses(args.workspace, json.load(sys.stdin))
+    elif args.command == "studio-rig-edit":
+        result = update_rig_edits(args.workspace, json.load(sys.stdin))
     elif args.command == "studio-rebuild":
         result = rebuild_workspace(args.workspace)
     elif args.command == "studio-import-preview":
@@ -265,7 +268,7 @@ def main():
 
     for command in ("studio-open", "studio-snapshot", "studio-save", "studio-rebuild", "studio-qa",
                       "studio-import-preview", "studio-import-commit", "studio-build-settings", "studio-catalog",
-                      "studio-project-save", "studio-project-restore", "studio-project-revisions", "studio-project-archive", "studio-model-export", "studio-poses"):
+                      "studio-project-save", "studio-project-restore", "studio-project-revisions", "studio-project-archive", "studio-model-export", "studio-poses", "studio-rig-edit"):
         studio = sub.add_parser(command, help="Local Studio workspace operation")
         studio.add_argument("--workspace", required=True)
         if command == "studio-open":

@@ -2,6 +2,8 @@ import { createRoot } from 'react-dom/client';
 import './style.css';
 import { ImportGenerated } from './ImportGenerated';
 import { useModelPreview } from './viewer/useModelPreview';
+import {RigEditPanel} from './model/RigEditPanel';
+import {IssuePanel} from './model/IssuePanel';
 import {ParameterPanel} from './model/ParameterPanel';
 import { RecoveryPanel } from './recovery/RecoveryPanel';
 import { WorkspaceProvider,useWorkspace } from './workspace/WorkspaceContext';
@@ -14,7 +16,7 @@ import { ProjectPanel } from './project/ProjectPanel';
 import { ModelExportPanel } from './project/ModelExportPanel';
 function App(){
   const {saved,editor,draft,ir,dirty,selected,busy,message,error,editingLocked,showQa,setShowQa,showImport,
-    openImport,closeImport,commitImport,retryOpen,action,history}=useWorkspace();
+    openImport,closeImport,commitImport,retryOpen,action,history,setError}=useWorkspace();
   const modelUrl=saved?.build?.modelUrl;
   const {attachFrame,onLoad,parameters,previewStatus,setParameter,reset,applyPose}=useModelPreview(modelUrl,saved?.build?.modelBounds,!!saved);
   const stale = (stage: string) => dirty || saved?.stale[stage];
@@ -42,6 +44,8 @@ function App(){
         {modelUrl && ir ? <iframe key={modelUrl} ref={attachFrame} title="Cubism 实时预览" onLoad={onLoad} src={'/live2d-viewer/index.html?' + new URLSearchParams({ model: modelUrl, vendor: '/public/vendor/cubism/', canvaspx: `${ir.canvas.width},${ir.canvas.height}`, w: '640', h: '760', embed: '1' })}/> : <div className="empty">点击 Rebuild 生成预览</div>}
       </div></section>
       <ParameterPanel parameters={parameters} setParameter={setParameter} reset={reset} applyPose={applyPose}/>
+      <RigEditPanel parameters={parameters}/>
+      <IssuePanel/>
       <BuildSettingsPanel/>
       <ProjectPanel/>
       <ModelExportPanel/>
@@ -51,7 +55,7 @@ function App(){
     </main>
     {showImport && saved && ir && <ImportGenerated revision={saved.revision} ir={ir} selectedId={selected} onClose={closeImport} onCommit={commitImport}/>}
     <footer><span className={!saved ? 'muted' : dirty ? 'pending' : ''}>● {!saved ? 'IR 未加载' : dirty ? 'IR 未保存' : 'IR 已保存'}</span><div>{[['psd', 'PSD'], ['base_rig', '模型'], ['review', 'Pose QA']].map(([stage, label]) => <span key={stage} className={!saved ? 'muted' : stale(stage) ? 'pending' : 'valid'}>● {label} {!saved ? '状态未知' : stale(stage) ? '待更新' : '已更新'}</span>)}<span className={overlayStatus === 'broken' ? 'invalid' : overlayStatus === 'ok' ? 'valid' : overlayStatus === 'needs-review' ? 'pending' : 'muted'} title={dirty ? 'IR 未保存，Overlay 需重新核对' : saved?.overlay.reasons.join('\n')}>● Overlay {!saved ? '未加载' : overlayStatus === 'not-loaded' ? '未载入' : overlayStatus}</span></div></footer>
-    {showQa && saved?.qa && <div className="modal-backdrop"><section className="qa-modal" role="dialog" aria-modal="true" aria-label="Pose QA 结果"><div className="panel-heading"><h2>Pose QA · {saved.qa.poses} 个姿态{stale('review') ? '（旧版本）' : ''}</h2><div><a href={saved.qa.reviewUrl} target="_blank" rel="noreferrer">review.json</a><button onClick={() => setShowQa(false)}>关闭</button></div></div><img src={saved.qa.contactSheet} alt="Pose QA 姿态联系表"/></section></div>}
+    {showQa && saved?.qa && <div className="modal-backdrop"><section className="qa-modal" role="dialog" aria-modal="true" aria-label="Pose QA 结果"><div className="panel-heading"><h2>Pose QA · {saved.qa.poses} 个姿态{stale('review') ? '（旧版本）' : ''}</h2><div><a href={saved.qa.reviewUrl} target="_blank" rel="noreferrer">review.json</a><button onClick={() => setShowQa(false)}>关闭</button></div></div><div className="qa-shots">{saved.qa.shots?.map(shot=><button key={shot.name} aria-label={'载入 '+shot.name} disabled={editingLocked||!!stale('review')} onClick={()=>{try{applyPose(shot.values);setShowQa(false);}catch(e){setError(e instanceof Error?e.message:String(e));}}}><img src={shot.image} alt={shot.name}/><span>载入 {shot.name}</span></button>)}</div><img src={saved.qa.contactSheet} alt="Pose QA 姿态联系表"/></section></div>}
   </div>;
 }
 

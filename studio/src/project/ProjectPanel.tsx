@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../api';
 import type { ProjectDownload, ProjectRevisions } from '../protocol/generated';
 import { useWorkspace } from '../workspace/WorkspaceContext';
@@ -7,12 +7,21 @@ export function ProjectPanel() {
   const {saved,dirty,editingLocked,settingsPending,setError,setBusy,editor,saveProject,restoreProject}=useWorkspace();
   const [history,setHistory]=useState<ProjectRevisions|null>(null),[message,setMessage]=useState('保存项目');
   const project=new URLSearchParams(window.location.search).get('project');
-  async function refresh(){try{setHistory(await api<ProjectRevisions>('project-revisions'));}catch(e){setError(e instanceof Error?e.message:String(e));}}
-  useEffect(()=>{if(project&&saved)void refresh();},[project,saved?.workspaceId]);
+  const readKey=useRef(''),key=project+':'+saved?.workspaceId+':'+saved?.project?.head;
+  async function refresh(){
+    if(editingLocked)return;
+    readKey.current=key;editor.setBlocked(true);setBusy('正在读取工程修订…');
+    try{setHistory(await api<ProjectRevisions>('project-revisions'));}
+    catch(e){setError(e instanceof Error?e.message:String(e));}
+    finally{editor.setBlocked(false);setBusy('');}
+  }
+  // A model edit checkpoints the project. Read that head after the active operation,
+  // under the same gate; unlocking the read must not trigger another identical read.
+  useEffect(()=>{if(project&&saved&&!editingLocked&&readKey.current!==key)void refresh();},[key,editingLocked]);
   if(!project||!saved)return null;
   const locked=editingLocked||settingsPending;
   async function save(){if(!history)return;const result=await saveProject(history.head,message);if(result)setHistory(result);}
-  async function restore(id:string){if(!history)return;if(await restoreProject(history.head,id))await refresh();}
+  async function restore(id:string){if(!history)return;await restoreProject(history.head,id);}
   async function download(){
     if(locked||dirty)return;editor.setBlocked(true);setBusy('正在归档工程…');setError('');
     try{const result=await api<ProjectDownload>('project-archive');const link=document.createElement('a');link.href=result.url;link.download=result.filename;link.click();}

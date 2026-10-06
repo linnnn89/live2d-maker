@@ -791,3 +791,13 @@ footer>div{
 .project-panel fieldset { margin:0; padding:0; border:0; display:flex; flex-direction:column; gap:10px; }
 .project-panel fieldset label { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
 .project-panel select { max-width:100%; }
+
+.rig-edit-panel,.issue-panel{border:1px solid var(--line);border-radius:8px;padding:12px;background:white;flex-shrink:0;font-size:12px;overflow-wrap:anywhere}
+.rig-edit-panel summary,.issue-panel summary{font-weight:600;cursor:pointer}
+.rig-edit-panel label{display:block;margin:8px 0}
+.rig-edit-panel input,.rig-edit-panel select{max-width:100%;display:block;width:100%;margin-top:4px}
+.rig-edit-panel li,.issue-panel li{margin:12px 0}
+.qa-shots{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin:12px 0}
+.qa-shots button{flex-direction:column;min-width:0;overflow:hidden}
+.qa-shots span{max-width:100%;overflow-wrap:anywhere;white-space:normal}
+.qa-shots button img{width:100%;max-height:180px;object-fit:contain}
