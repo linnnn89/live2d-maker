@@ -58,6 +58,7 @@ class ViewModelAgentWorkspace(
 	private val viewModel: PSD2LiveViewModel,
     private val storeRoot: Path = AgentWorkspaceStore.defaultRoot(),
 ) : AgentWorkspace, AutoCloseable {
+	private val workspaceService = io.github.psd2live.application.WorkspaceService()
 	private val editMutex = Mutex()
 	private val historyLock = Any()
 	private var workspaceStore = AgentWorkspaceStore(storeRoot)
@@ -500,25 +501,18 @@ class ViewModelAgentWorkspace(
                 put("reference_id", kotlinx.serialization.json.JsonPrimitive(ref!!.text("id")))
                 put("placement_finalized", kotlinx.serialization.json.JsonPrimitive(false))
             }), calibrationLayerIds = addedDocument.rigEdits.calibrationLayerIds.ifEmpty { ref!!.strings("calibration_layer_ids").toSet() }))
-		val preview = viewModel.buildAgentWorkspacePreview(nextDocument.source, nextDocument.toConfig(current))
-        if (nextDocument.rigEdits.assetLayers != baseDocument.rigEdits.assetLayers || nextDocument.rigEdits.calibrationLayerIds != baseDocument.rigEdits.calibrationLayerIds)
-            validateRegisteredNeutral(preview, nextDocument.rigEdits.assetLayers.filter { (id, record) -> baseDocument.rigEdits.assetLayers[id] != record }.keys)
+		val prepared = kotlinx.coroutines.runInterruptible(Dispatchers.Default) {
+            workspaceService.prepareEdit(baseDocument, nextDocument, nextDocument.toConfig(current))
+        }
+        val preview = prepared.preview
 		val nextRevision = revisionId(current, nextDocument)
         require(nextRevision != before.revisionId) { "Operation did not change the workspace" }
 		val summary = "Added generated layer '${request.name.trim()}' ($layerId)"
 		val selection = synchronized(historyLock) {
             require(historyTree === tree && tree.head().node.id == before.historyHeadNodeId) { "Workspace history changed during the operation; refresh HEAD" }
-            applyPreviewOrThrow(preview, baseDocument, nextDocument, summary)
-			val committed = tree.commit(
-				expectedHeadNodeId = request.expectedHistoryHeadNodeId,
-				snapshot = nextDocument,
-				revisionId = nextRevision,
-				snapshotHash = nextRevision,
-				summary = summary,
-				actor = "agent",
-				taskId = request.taskId,
-			)
-			committed
+            workspaceService.commitEdit(prepared, tree, request.expectedHistoryHeadNodeId, nextRevision, summary, "agent", request.taskId) { edit ->
+                applyPreview(edit.preview, edit.before, edit.after, summary)
+            }
 		}
 		scheduleHistoryPersistence(projectId, tree)
 		viewModel.loadAgentWorkspacePreview(preview)
@@ -551,25 +545,18 @@ class ViewModelAgentWorkspace(
 			}
 		}
 		val nextDocument = baseDocument.copy(deletedLayerIds = baseDocument.deletedLayerIds + layerId)
-		val preview = viewModel.buildAgentWorkspacePreview(nextDocument.source, nextDocument.toConfig(current))
-        if (nextDocument.rigEdits.assetLayers != baseDocument.rigEdits.assetLayers || nextDocument.rigEdits.calibrationLayerIds != baseDocument.rigEdits.calibrationLayerIds)
-            validateRegisteredNeutral(preview, nextDocument.rigEdits.assetLayers.filter { (id, record) -> baseDocument.rigEdits.assetLayers[id] != record }.keys)
+		val prepared = kotlinx.coroutines.runInterruptible(Dispatchers.Default) {
+            workspaceService.prepareEdit(baseDocument, nextDocument, nextDocument.toConfig(current))
+        }
+        val preview = prepared.preview
 		val nextRevision = revisionId(current, nextDocument)
         require(nextRevision != before.revisionId) { "Operation did not change the workspace" }
 		val summary = "Soft-deleted layer $layerId"
 		val selection = synchronized(historyLock) {
             require(historyTree === tree && tree.head().node.id == before.historyHeadNodeId) { "Workspace history changed during the operation; refresh HEAD" }
-            applyPreviewOrThrow(preview, baseDocument, nextDocument, summary)
-			val committed = tree.commit(
-				expectedHeadNodeId = expectedHistoryHeadNodeId,
-				snapshot = nextDocument,
-				revisionId = nextRevision,
-				snapshotHash = nextRevision,
-				summary = summary,
-				actor = "agent",
-				taskId = taskId,
-			)
-			committed
+            workspaceService.commitEdit(prepared, tree, expectedHistoryHeadNodeId, nextRevision, summary, "agent", taskId) { edit ->
+                applyPreview(edit.preview, edit.before, edit.after, summary)
+            }
 		}
 		scheduleHistoryPersistence(projectId, tree)
 		viewModel.loadAgentWorkspacePreview(preview)
@@ -679,23 +666,17 @@ class ViewModelAgentWorkspace(
 		}
 		val nextDocument = mutation(baseDocument, parameters)
 		require(nextDocument != baseDocument) { "Parameter edit did not change the workspace" }
-		val preview = viewModel.buildAgentWorkspacePreview(nextDocument.source, nextDocument.toConfig(current))
-        if (nextDocument.rigEdits.assetLayers != baseDocument.rigEdits.assetLayers || nextDocument.rigEdits.calibrationLayerIds != baseDocument.rigEdits.calibrationLayerIds)
-            validateRegisteredNeutral(preview, nextDocument.rigEdits.assetLayers.filter { (id, record) -> baseDocument.rigEdits.assetLayers[id] != record }.keys)
+		val prepared = kotlinx.coroutines.runInterruptible(Dispatchers.Default) {
+            workspaceService.prepareEdit(baseDocument, nextDocument, nextDocument.toConfig(current))
+        }
+        val preview = prepared.preview
 		val nextRevision = revisionId(current, nextDocument)
         require(nextRevision != before.revisionId) { "Operation did not change the workspace" }
 		val selection = synchronized(historyLock) {
             require(historyTree === tree && tree.head().node.id == before.historyHeadNodeId) { "Workspace history changed during the operation; refresh HEAD" }
-            applyPreviewOrThrow(preview, baseDocument, nextDocument, summary)
-			tree.commit(
-				expectedHeadNodeId = expectedHeadNodeId,
-				snapshot = nextDocument,
-				revisionId = nextRevision,
-				snapshotHash = nextRevision,
-				summary = summary,
-				actor = "agent",
-				taskId = taskId,
-			)
+            workspaceService.commitEdit(prepared, tree, expectedHeadNodeId, nextRevision, summary, "agent", taskId) { edit ->
+                applyPreview(edit.preview, edit.before, edit.after, summary)
+            }
 		}
 		scheduleHistoryPersistence(projectId, tree)
 		viewModel.loadAgentWorkspacePreview(preview)
@@ -1255,23 +1236,17 @@ class ViewModelAgentWorkspace(
 		}
 		val nextDocument = mutation(baseDocument, puppet)
 		require(nextDocument != baseDocument) { "Rig edit did not change the workspace" }
-		val preview = viewModel.buildAgentWorkspacePreview(nextDocument.source, nextDocument.toConfig(current))
-        if (nextDocument.rigEdits.assetLayers != baseDocument.rigEdits.assetLayers || nextDocument.rigEdits.calibrationLayerIds != baseDocument.rigEdits.calibrationLayerIds)
-            validateRegisteredNeutral(preview, nextDocument.rigEdits.assetLayers.filter { (id, record) -> baseDocument.rigEdits.assetLayers[id] != record }.keys)
+		val prepared = kotlinx.coroutines.runInterruptible(Dispatchers.Default) {
+            workspaceService.prepareEdit(baseDocument, nextDocument, nextDocument.toConfig(current))
+        }
+        val preview = prepared.preview
 		val nextRevision = revisionId(current, nextDocument)
         require(nextRevision != before.revisionId) { "Operation did not change the workspace" }
 		val selection = synchronized(historyLock) {
             require(historyTree === tree && tree.head().node.id == before.historyHeadNodeId) { "Workspace history changed during the operation; refresh HEAD" }
-            applyPreviewOrThrow(preview, baseDocument, nextDocument, summary)
-			tree.commit(
-				expectedHeadNodeId = expectedHeadNodeId,
-				snapshot = nextDocument,
-				revisionId = nextRevision,
-				snapshotHash = nextRevision,
-				summary = summary,
-				actor = "agent",
-				taskId = taskId,
-			)
+            workspaceService.commitEdit(prepared, tree, expectedHeadNodeId, nextRevision, summary, "agent", taskId) { edit ->
+                applyPreview(edit.preview, edit.before, edit.after, summary)
+            }
 		}
 		scheduleHistoryPersistence(projectId, tree)
 		viewModel.loadAgentWorkspacePreview(preview)

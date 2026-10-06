@@ -1,4 +1,4 @@
-package io.github.psd2live.agent
+package io.github.psd2live.application
 
 import io.github.psd2live.core.RigPreviewModel
 import org.umamo.render.eval.CpuDeformationEvaluator

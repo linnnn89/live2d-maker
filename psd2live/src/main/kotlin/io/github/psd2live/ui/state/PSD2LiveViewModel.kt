@@ -46,6 +46,7 @@ import kotlin.math.sin
 class PSD2LiveViewModel : AutoCloseable {
 	private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 	private val pipeline = PSD2LivePipeline()
+    private val workspaceService = io.github.psd2live.application.WorkspaceService(pipeline = pipeline)
 	private val preferences by lazy { Preferences.userNodeForPackage(PSD2LiveViewModel::class.java) }
 	private var agentWorkspace: AgentWorkspace? = null
     private val projectSession = io.github.psd2live.project.ProjectSession(this)
@@ -1636,7 +1637,7 @@ class PSD2LiveViewModel : AutoCloseable {
 
 	/** CPU-heavy rebuild used by the authenticated Agent transaction boundary. */
 	internal suspend fun buildAgentWorkspacePreview(source: SourceArt, config: PipelineConfig): RigPreviewModel =
-		runInterruptible(Dispatchers.Default) { pipeline.buildPreview(source, config) }
+		runInterruptible(Dispatchers.Default) { workspaceService.preview(source, config) }
 
     internal suspend fun sampleAgentMotion(bundle: io.github.psd2live.core.CubismRuntimeBundle,
                                           parameters: List<ParameterId>, frames: Int, fps: Int): List<Map<ParameterId, Float>> =
@@ -1761,8 +1762,6 @@ class PSD2LiveViewModel : AutoCloseable {
 			}
 			try {
 				val config = _state.value.buildConfig()
-				val baseLayers = previous.analysis.layers.filter { it.source !is io.github.psd2live.core.MouthLipLayer }
-				val baseAnalysis = previous.analysis.copy(layers = baseLayers)
 				var lastReportedStage: String? = null
 				val progress = ProgressListener { stage, frac ->
 					_state.update { current ->
@@ -1787,7 +1786,7 @@ class PSD2LiveViewModel : AutoCloseable {
 					}
 				}
 				val rebuilt = runInterruptible(Dispatchers.Default) {
-					pipeline.buildPreview(baseAnalysis, config, progress)
+					workspaceService.preview(previous, config, progress)
 				}
 				val packedAtlasSize = rebuilt.atlas.pages.firstOrNull()?.image?.width ?: config.atlasSize
 				_state.update { current ->

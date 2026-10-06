@@ -1,6 +1,7 @@
 package io.github.psd2live.application
 
 import io.github.psd2live.agent.*
+import io.github.psd2live.core.*
 import io.github.psd2live.core.Bounds
 import io.github.psd2live.core.RigEditOverlay
 import io.github.psd2live.history.WorkspaceHistoryTree
@@ -136,4 +137,96 @@ class WorkspaceServiceTest {
             assertEquals(before, extractions())
         } finally { root.toFile().deleteRecursively() }
     }
+    private fun editFixture(): Pair<AgentWorkspaceDocument, PipelineConfig> {
+        val source = PsdReader.read(Files.readAllBytes(Path.of("examples/ds/psd-input/ds.psd")))
+        val document = AgentWorkspaceDocument(source, emptyMap(), emptySet(), emptyMap(), emptyMap(), RigEditOverlay.Empty)
+        val config = PipelineConfig(atlasSize = 1024, generatePhysics = false, exportMotions = false, exportCmo3 = false)
+        return document to config
+    }
+
+    @Test fun preparedEditPublishesOneNativeModelAndDurableHistoryForEitherActor() {
+        val (before, config) = editFixture()
+        val sourcePixels = before.source.layers.map { it.raster.rgba.copyOf() }
+        val overlay = RigEditOverlay(keyformSetEdits = listOf(RigKeyformSetEdit(
+            RigTargetRef(RigTargetKind.ART_MESH, "ArtMeshFace"), mapOf("ParamAngleX" to 30f),
+            channels = RigKeyformChannelsEdit(opacity = .4f))))
+        val after = before.copy(rigEdits = overlay)
+        val service = WorkspaceService()
+        val prepared = service.prepareEdit(before, after, config.copy(rigEdits = overlay))
+        val reference = PSD2LivePipeline().buildPreview(after.source, config.copy(rigEdits = overlay))
+        assertContentEquals(reference.runtimeBundle.assets.single { it.path.endsWith(".moc3") }.bytes, prepared.preview.runtimeBundle.assets.single { it.path.endsWith(".moc3") }.bytes)
+        val basePreview = service.preview(before.source, config)
+        val desktopPreview = service.preview(basePreview, config.copy(rigEdits = overlay), ProgressListener { _, _ -> })
+        assertContentEquals(reference.runtimeBundle.assets.single { it.path.endsWith(".moc3") }.bytes,
+            desktopPreview.runtimeBundle.assets.single { it.path.endsWith(".moc3") }.bytes)
+        assertSame(before.source, prepared.after.source)
+        val root = Files.createTempDirectory("workspace-edit-test-")
+        try {
+            for (actor in listOf("user", "agent")) {
+                var live = before
+                var publications = 0
+                val tree = WorkspaceHistoryTree(before, "before", "before")
+                val committed = service.commitEdit(prepared, tree, tree.head().node.id, "edited", "Opacity keyform", actor, null) {
+                    if (live != it.before) false else { live = it.after; publications++; true }
+                }
+                assertEquals(1, publications)
+                assertEquals(after, live)
+                assertEquals(actor, committed.node.actor)
+                val store = AgentWorkspaceStore(root.resolve(actor))
+                store.persistHistory("project", tree.state())
+                assertEquals(overlay, store.loadHistory("project")!!.head().snapshot.rigEdits)
+                assertEquals(committed.node.id, store.loadHistory("project")!!.head().node.id)
+            }
+            before.source.layers.forEachIndexed { index, layer -> assertContentEquals(sourcePixels[index], layer.raster.rgba) }
+        } finally { root.toFile().deleteRecursively() }
+    }
+
+    @Test fun staleHeadOrLiveCasRefusalCannotPublishOrAppendPreparedEdit() {
+        val (before, config) = editFixture()
+        val after = before.copy(layerVisibility = mapOf(before.source.layers.first().id.raw to false))
+        val service = WorkspaceService()
+        val prepared = service.prepareEdit(before, after, config.copy(layerVisibility = after.layerVisibility))
+        val tree = WorkspaceHistoryTree(before, "before", "before")
+        val initial = tree.head().node.id
+        var publications = 0
+        assertFailsWith<IllegalStateException> {
+            service.commitEdit(prepared, tree, initial, "edited", "Hide layer", "user", null) { false }
+        }
+        assertEquals(1, tree.nodes().size)
+        assertFailsWith<IllegalArgumentException> {
+            service.commitEdit(prepared, tree, initial, "edited", "", "user", null) { publications++; true }
+        }
+        assertEquals(0, publications)
+        val other = tree.commit(initial, before, "other", "other", "Concurrent edit", "agent")
+        assertFailsWith<io.github.psd2live.history.StaleWorkspaceHeadException> {
+            service.commitEdit(prepared, tree, initial, "edited", "Hide layer", "user", null) { publications++; true }
+        }
+        assertEquals(0, publications)
+        assertEquals(other.node.id, tree.head().node.id)
+        assertEquals(2, tree.nodes().size)
+    }
+
+    @Test fun mismatchedCandidateOrFailedNativeEditLeavesOriginalHistoryAndModel() {
+        val (before, config) = editFixture()
+        val service = WorkspaceService()
+        val original = service.preview(before.source, config)
+        val tree = WorkspaceHistoryTree(before, "before", "before")
+        val head = tree.head().node.id
+        val overlay = RigEditOverlay(keyformSetEdits = listOf(RigKeyformSetEdit(
+            RigTargetRef(RigTargetKind.ART_MESH, "ArtMeshFace"), mapOf("ParamAbsent" to 30f),
+            channels = RigKeyformChannelsEdit(opacity = .4f))))
+        val after = before.copy(rigEdits = overlay)
+        assertFailsWith<IllegalArgumentException> { service.prepareEdit(before, after, config) }
+        // A new axis is accepted by the core Overlay algebra; missing parent frames are a real build failure.
+        val broken = before.copy(parentOverrides = mapOf("lyid:12" to "MissingParentWarp"))
+        val failure = assertFailsWith<IllegalStateException> {
+            service.prepareEdit(before, broken, config.copy(parentOverrides = broken.parentOverrides))
+        }
+        assertTrue(failure.message!!.contains("Unknown parent coordinate frame"))
+        assertEquals(head, tree.head().node.id)
+        assertEquals(before, tree.head().snapshot)
+        assertEquals(1, tree.nodes().size)
+        assertContentEquals(original.runtimeBundle.assets.single { it.path.endsWith(".moc3") }.bytes, service.preview(before.source, config).runtimeBundle.assets.single { it.path.endsWith(".moc3") }.bytes)
+    }
+
 }
