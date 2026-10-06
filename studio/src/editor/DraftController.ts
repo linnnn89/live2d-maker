@@ -15,6 +15,7 @@ export class DraftController<T extends SavedArtwork = SavedArtwork> {
   ) {}
   subscribe = (listener: () => void): (() => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
   getSnapshot = (): DraftState | null => this.snapshot;
+  getBase = (): SavedArtwork | null => this.session?.inspectBase() ?? null;
   install(ir: ArtworkIR, revision: string): void {
     if (this.session?.inspect().phase === 'saving') throw new DraftError('BUSY', '正在保存草稿');
     if (!this.session?.hasBase(ir, revision)) this.session = new DraftSession(ir, revision, this.id());

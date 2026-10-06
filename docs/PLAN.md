@@ -8,7 +8,9 @@
 
 R1a 已完成浏览器预览适配器、参数按帧重绘和模型来源标识；Linux 前端构建、7 项适配器回归及 Chromium 交互检查通过。原生建模和 Windows 调用链的变更留待 PC 实测，见交接记录第 20 节。
 
-R1b 已实现人和 Agent 共用的编辑命令与草稿事务：版本检查、批量原子应用、逐字段差异、撤销/重做、拖拽合并、保存/放弃，以及浏览器结构化入口和离线 JSON 提案工具。Linux 构建及 19 项回归通过，Chromium 使用固定 API 响应验证人/Agent 交替编辑；调用契约见 [STUDIO_DRAFT_COMMANDS.md](STUDIO_DRAFT_COMMANDS.md)，交接见第 21 节。实时图层合成与原生 Agent 联动尚未实施。
+R1b 已实现人和 Agent 共用的编辑命令与草稿事务：版本检查、批量原子应用、逐字段差异、撤销/重做、拖拽合并、保存/放弃，以及浏览器结构化入口和离线 JSON 提案工具。Linux 构建及 19 项回归通过，Chromium 使用固定 API 响应验证人/Agent 交替编辑；调用契约见 [STUDIO_DRAFT_COMMANDS.md](STUDIO_DRAFT_COMMANDS.md)，交接见第 21 节。R1c 已补充即时合成，原生 Agent 联动尚未实施。
+
+R1c 已实现 Worker 像素合成、当前草稿/已保存美术/原始参照对照与带版本的 Agent PNG 读取。Linux 构建、37 项回归及 Chromium 桌面/手机宽度交互通过；原生链未改动。R1 之后的工程审阅与下一步优先级见 [ENGINEERING_REVIEW_R1.md](ENGINEERING_REVIEW_R1.md)，交接见第 22 节。
 
 ## 0. 数据与实现边界
 
@@ -87,7 +89,7 @@ CLI 默认使用随仓应用 JAR；warps、physics、structure、authoringJourna
 
 重建失败保留旧模型，失败状态刷新后仍可见，QA 不沿用旧成功结果。首次打开遇到 busy409 最多尝试三次，其他错误或重试耗尽后允许手动重开。参照图范围与成功模型范围分别保存，导入但未重建时保持旧模型镜位。
 
-界面只在本地 Vite 服务中工作；`dist/` 不能独立执行 Python CLI。参照背景不会随裁切和隐藏操作实时合成，当前效果要看重建后的模型。操作细节集中在 [Studio 使用说明](../studio/README.md)。
+界面只在本地 Vite 服务中工作；`dist/` 不能独立执行 Python CLI。美术画布通过 R1c 实时合成当前草稿，模型仍需显式重建。操作细节集中在 [Studio 使用说明](../studio/README.md)。
 
 ### P6 素材导入
 

@@ -6,7 +6,7 @@
 
 预览由独立 ViewerAdapter 管理加载、错误、取景及重绘。参数滑块和重置按动画帧合并重绘，不编码 PNG；需要截图时才调用截图接口。预览区标明当前已保存模型，或提示未保存/已保存但尚未更新的修改。独立 viewer 支持 `embed=1`，由自身控制嵌入布局。
 
-前端检查：`npm run build`；预览适配器与草稿命令回归：`npm test`。这些用例不依赖 Python、JVM、Edge 或 Windows。
+前端检查：`npm run build`；预览适配器、草稿命令与美术像素回归：`npm test`。这些用例不依赖 Python、JVM、Edge 或 Windows。
 
 R1b 提供撤销、重做、放弃草稿和逐字段差异；一次拖动为一个撤销步骤，保存或导入新版本后清空草稿历史。人和 Agent 共用版本化命令。浏览器 Agent 使用 `window.studioDraft.execute`；无浏览器的 Agent 使用 `node studio/scripts/draft-cli.mjs` 从 JSON 生成候选 IR 与差异。调用契约、并发和保存边界见 [STUDIO_DRAFT_COMMANDS.md](../docs/STUDIO_DRAFT_COMMANDS.md)。离线工具只生成提案，工作区保存仍需现有完整验证。
 
@@ -43,13 +43,17 @@ npm run dev
 5. 参数滑块读取 `window.viewer.params()` 的实际范围，并通过 `setParams` + `snapshot` 更新画面；重置恢复原生默认值。
 6. 模型与当前 IR 一致时可运行 Pose QA。默认 16 姿态覆盖 neutral、头 X/Y/Z ±30、身体 X ±10、嘴 0/0.5/1、闭眼、闭眼张嘴和可用的头发参数 ±1。头发参数由导出的 CDI 清单确定；其余必需参数缺失或范围不足仍失败，不静默删姿态。产物包含固定 spec、spec hash、实际参数/镜位、16 张完整 PNG、contact sheet 和 review.json；界面可查看联系表。每次尝试先取消旧的成功 gate，失败不会继续显示本次 QA 通过。
 
-`polygon` 是当前 PNG 的 alpha 裁切边界，按原画布像素中心、even-odd 填充；外部 alpha 置零，内部 alpha/RGB、PNG 原文件、offset/bbox 不变。不提供补画、形变或拓扑编辑；收缩后再扩张可以从保留的原 PNG 恢复。默认导入 bbox 矩形与不提供 polygon 均保持原栅格。`landmarks` 可添加命名点和拖动，保存到 IR，暂不驱动 PSD2Live 绑定。画布背景展示原合成图或最近一次确认素材导入的合成图，拖点时不实时重新合成；右侧展示最近一次成功导出的 moc3。
+`polygon` 是当前 PNG 的 alpha 裁切边界，按原画布像素中心、even-odd 填充；外部 alpha 置零，内部 alpha/RGB、PNG 原文件、offset/bbox 不变。不提供补画、形变或拓扑编辑；收缩后再扩张可以从保留的原 PNG 恢复。默认导入 bbox 矩形与不提供 polygon 均保持原栅格。`landmarks` 可添加命名点和拖动，保存到 IR，暂不驱动 PSD2Live 绑定。画布默认按当前草稿即时合成，隐藏、透明度和轮廓变更会更新美术画面；右侧展示最近一次成功导出的 moc3。
 
 本界面仅允许编辑 geometry/appearance，不开放 source hash、asset 路径/哈希、稳定 ID、语义、层名或 z 序写入。语义仍由 PSD2Live 的层名分类。默认取景由透明像素 bbox 测量，不使用 Agent 视觉估坐标，因此此流程不触发 P2。
 
 “全图”按当前显示参照图的 alpha 范围取景，包含原人物范围之外的新素材。快照保留 `sourceBounds`（原始参照），新增 `artworkBounds`（当前显示参照图）及 `build.modelBounds`（上次成功构建对应 IR 的平面合成范围）。Cubism 自动取景使用成功模型自己的范围；确认新素材但尚未重建时，旧模型镜位保持不变。新构建报告保存模型范围；旧报告缺少该字段时从其 `build-ir.json` 和保留素材计算，无须修改原报告。范围由对应版本的平面 artwork 测量，不代表所有变形极值的动态包围盒。
 
-画布上方明确标注“原始参照图”或“上次导入合成图”。参照背景不会随隐藏/裁切操作实时重新合成；当前效果请查看重建后的 Cubism 预览，避免将参照图误认作已保存 IR 的实时渲染。
+画布可切换“当前草稿”“已保存美术”“原始参照”。前两者使用同一像素渲染器，后者保留工作区打开时的参照图；查看保存版本和原始参照时不能拖动轮廓。保存后更新对照基线，美术变化不会自动重建模型。
+
+R1c 的 PNG 解码、像素中心 even-odd 裁切、透明度及普通 alpha 叠加在 Web Worker 中执行；图层素材和裁切结果有缓存，普通重绘不编码 PNG。“导出美术 PNG”及 `window.studioDraft.capture` 显式导出完整画布，不包含网格、控制点或 Cubism 模型。Agent 响应携带草稿和保存版本，生成期间发生修改会返回冲突。契约见 [STUDIO_DRAFT_COMMANDS.md](../docs/STUDIO_DRAFT_COMMANDS.md#r1c-版本化美术图像输出)。
+
+使用纯 JavaScript `fast-png@8.0.0` 保留未预乘的 PNG 样本。支持 8 位 RGB/RGBA、灰度/灰度 alpha 和低位深调色板/灰度 PNG；16 位 PNG 明确报错。单张素材和画布最多 16777216 像素；超限、缺失、尺寸或哈希不符会显示错误，不能导出部分合成结果。浏览器屏幕缩放可能插值，像素一致性按导出的原始尺寸 RGBA 核对。
 
 ## 导入生成素材
 

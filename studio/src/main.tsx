@@ -8,6 +8,10 @@ import type { Parameter } from './viewer/ViewerAdapter';
 
 import { DraftController } from './editor/DraftController';
 import { DraftError, type ArtworkIR as IR, type Bounds, type Point, type EditCommand, type DraftRequest, type DraftResult } from './editor/contracts';
+import { ArtworkCanvas, type ArtworkSource } from './artwork/ArtworkCanvas';
+import { ArtworkClient } from './artwork/ArtworkClient';
+import { captureArtwork } from './artwork/capture';
+import type { CaptureRequest, CaptureResult } from './artwork/contracts';
 
 type Snapshot = {
   ir: IR; revision: string; sourceImage: string; artworkImage?: string; sourceBounds: Bounds | null; artworkBounds: Bounds | null; stale: Record<string, boolean>;
@@ -15,7 +19,11 @@ type Snapshot = {
   build: null | { modelUrl: string; modelBounds: Bounds | null; revision: string; modelSha256: string; labelCount: number; warnings: string[] };
   qa: null | { status: string; contactSheet: string; reviewUrl: string; revision: string; poses: number };
 };
-declare global { interface Window { studioDraft?: { schemaVersion: 1; execute(request: DraftRequest): Promise<DraftResult<Snapshot>> } } }
+declare global { interface Window { studioDraft?: {
+  schemaVersion: 1;
+  execute(request: DraftRequest): Promise<DraftResult<Snapshot>>;
+  capture(request: CaptureRequest): Promise<CaptureResult>;
+} } }
 
 type Handle = { kind: 'polygon'; index: number } | { kind: 'landmark'; name: string };
 
@@ -42,6 +50,8 @@ function App() {
     }
   }, setSaved));
   const draft = useSyncExternalStore(editor.subscribe, editor.getSnapshot);
+  const [artwork] = useState(() => new ArtworkClient());
+  const [artworkSource, setArtworkSource] = useState<ArtworkSource>('draft');
   const ir = draft?.ir;
   const dirty = draft?.dirty ?? false;
   const [selected, setSelected] = useState('');
@@ -58,6 +68,7 @@ function App() {
   const drawing = useRef<SVGSVGElement>(null);
   const drag = useRef<{ handle: Handle; partId: string; pointerId: number } | null>(null);
   const editingLocked = !!busy || draft?.phase !== 'idle';
+  const canvasLocked = editingLocked || artworkSource !== 'draft';
   const part = ir?.parts.find(p => p.id === selected);
   const polygon = part?.geometry.polygon || (part ? [[part.geometry.bbox[0], part.geometry.bbox[1]], [part.geometry.bbox[2], part.geometry.bbox[1]], [part.geometry.bbox[2], part.geometry.bbox[3]], [part.geometry.bbox[0], part.geometry.bbox[3]]] as Point[] : []);
   const modelUrl = saved?.build?.modelUrl;
@@ -65,10 +76,13 @@ function App() {
   const apply = (snapshot: Snapshot) => { setSaved(snapshot); editor.install(snapshot.ir, snapshot.revision); };
 
   useEffect(() => {
-    const bridge = { schemaVersion: 1 as const, execute: (request: DraftRequest) => editor.execute(request) };
+    const bridge = { schemaVersion: 1 as const, execute: (request: DraftRequest) => editor.execute(request),
+      capture: (request: CaptureRequest) => captureArtwork(request, editor.getSnapshot, editor.getBase, ir => artwork.capture(ir)) };
     window.studioDraft = bridge;
     return () => { if (window.studioDraft === bridge) delete window.studioDraft; };
-  }, [editor]);
+  }, [editor, artwork]);
+
+  useEffect(() => () => artwork.dispose(), [artwork]);
 
   useEffect(() => {
     let cancelled = false;
@@ -138,6 +152,16 @@ function App() {
     if (!result.ok) setError(result.error.message);
     else { setError(''); setMessage(operation === 'discard' ? '已放弃草稿，恢复已保存 IR' : ''); }
   }
+  async function downloadArtwork() {
+    const state = editor.getSnapshot();
+    if (!state || artworkSource === 'reference') return;
+    const result = await captureArtwork({ schemaVersion: 1, state, source: artworkSource }, editor.getSnapshot, editor.getBase, ir => artwork.capture(ir));
+    if (!result.ok) { setError(result.error.message); return; }
+    const link = document.createElement('a');
+    link.href = result.image.dataUrl;
+    link.download = `artwork-${result.image.source}-${result.image.draftId}-${result.image.revision}.png`;
+    link.click(); setError(''); setMessage('美术 PNG 已导出');
+  }
   function pointCommand(handle: Handle, point: Point, partId = selected): EditCommand {
     const target = editor.getSnapshot()!.ir.parts.find(p => p.id === partId)!;
     const [l, t, r, b] = target.geometry.bbox;
@@ -163,7 +187,7 @@ function App() {
     drag.current = null; editor.endGesture(cancel);
   }
   function start(event: PointerEvent<SVGCircleElement>, handle: Handle) {
-    if (editingLocked || !part) return;
+    if (canvasLocked || !part) return;
     event.preventDefault();
     try {
       editor.beginGesture(); drag.current = { handle, partId: part.id, pointerId: event.pointerId }; setActive(handle); setMessage(''); setError('');
@@ -216,20 +240,24 @@ function App() {
           <button disabled={draft?.phase === 'gesture'} className="part-select" onClick={() => { setSelected(p.id); setActive(null); }} aria-pressed={selected === p.id}><img src={'/studio-files/' + p.asset.path} alt=""/><span>{p.name}</span><span className="chevron">›</span></button>
         </div>)}{ir && !orderedParts.length && <p className="empty">没有匹配的图层</p>}</div>
       </aside>
-      <section className="panel artwork-panel"><div className="panel-heading"><h2>美术画布</h2><div className="view-actions"><button onClick={() => setFocused(false)} aria-pressed={!focused}><Icon name="full"/>全图</button><button disabled={!part} onClick={() => setFocused(true)} aria-pressed={focused}><Icon name="focus"/>聚焦图层</button></div></div>
-        {saved && <p className="canvas-reference">背景：{saved.artworkImage ? '上次导入合成图' : '原始参照图'}。当前裁切和显示效果请查看重建后的 Cubism 预览。</p>}
+      <section className="panel artwork-panel"><div className="panel-heading"><h2>美术画布</h2><div className="view-actions"><button disabled={draft?.phase === 'gesture'} onClick={() => setFocused(false)} aria-pressed={!focused}><Icon name="full"/>全图</button><button disabled={!part || draft?.phase === 'gesture'} onClick={() => setFocused(true)} aria-pressed={focused}><Icon name="focus"/>聚焦图层</button></div></div>
+        <div className="artwork-controls"><div role="group" aria-label="美术显示来源">
+          {([['draft', '当前草稿'], ['saved', '已保存美术'], ['reference', '原始参照']] as const).map(([source, label]) => <button key={source} disabled={!ir || draft?.phase === 'gesture'} aria-pressed={artworkSource === source} onClick={() => setArtworkSource(source)}>{label}</button>)}
+        </div><button disabled={editingLocked || !ir || artworkSource === 'reference'} onClick={downloadArtwork}>导出美术 PNG</button></div>
+        {saved && <p className="canvas-reference">{artworkSource === 'draft' ? '当前草稿：显示当前图层、透明度和裁切效果，可直接编辑。' : artworkSource === 'saved' ? '已保存美术：显示上次保存的图层合成；切换到当前草稿可编辑。' : '原始参照：工作区打开时的参照图；切换到当前草稿可编辑。'} Cubism 区域仍显示上次生成模型。</p>}
         <div className="artboard checker"><svg ref={drawing} viewBox={viewBox} aria-label="可编辑美术画布" onPointerMove={move} onPointerUp={e => finishGesture(false, e.pointerId)} onPointerCancel={e => finishGesture(true, e.pointerId)} onLostPointerCapture={e => finishGesture(true, e.pointerId)}>
-          {ir && saved && <image href={saved.artworkImage || saved.sourceImage} x="0" y="0" width={ir.canvas.width} height={ir.canvas.height}/>}
-          {part && <g><polygon points={polygon.map(p => p.join(',')).join(' ')} fillRule="evenodd" fill="rgba(0,97,255,.035)" stroke="#0864ff" strokeWidth="2" vectorEffect="non-scaling-stroke"/>
+          {ir && saved && (artworkSource === 'reference' ? <image href={saved.sourceImage} x="0" y="0" width={ir.canvas.width} height={ir.canvas.height}/>
+            : <ArtworkCanvas key={artworkSource} ir={artworkSource === 'saved' ? saved.ir : ir} client={artwork} source={artworkSource} identity={artworkSource === 'saved' ? `saved:${saved.revision}` : `${draft!.draftId}:${draft!.revision}`}/>)}
+          {part && artworkSource === 'draft' && <g><polygon points={polygon.map(p => p.join(',')).join(' ')} fillRule="evenodd" fill="rgba(0,97,255,.035)" stroke="#0864ff" strokeWidth="2" vectorEffect="non-scaling-stroke"/>
             {polygon.map((point, i) => <circle key={i} data-handle={`polygon-${i}`} aria-label={`多边形顶点 ${i + 1}`} cx={point[0]} cy={point[1]} r={viewWidth / 115} fill="#0864ff" stroke="white" strokeWidth="2" vectorEffect="non-scaling-stroke" onPointerDown={e => start(e, { kind: 'polygon', index: i })}/>)}
             {Object.entries(part.geometry.landmarks || {}).map(([name, point]) => <g key={name}><circle aria-label={`关键点 ${name}`} data-handle={`landmark-${name}`} cx={point[0]} cy={point[1]} r={viewWidth / 115} fill="#f19b28" stroke="white" strokeWidth="2" vectorEffect="non-scaling-stroke" onPointerDown={e => start(e, { kind: 'landmark', name })}/><text x={point[0] + viewWidth / 60} y={point[1]} fontSize={viewWidth / 55} fill="#674514">{name}</text></g>)}
           </g>}
         </svg></div>
         <div className="inspector"><span className="muted">已选图层</span>{part && <><img src={'/studio-files/' + part.asset.path} alt=""/><strong>{part.name}</strong></>}
-          <label>X <input aria-label="顶点 X" type="number" step="0.01" disabled={editingLocked || !currentPoint} value={currentPoint?.[0] ?? ''} onChange={e => { if (active && currentPoint && Number.isFinite(e.target.valueAsNumber)) changePoint(active, [e.target.valueAsNumber, currentPoint[1]]); }}/></label>
-          <label>Y <input aria-label="顶点 Y" type="number" step="0.01" disabled={editingLocked || !currentPoint} value={currentPoint?.[1] ?? ''} onChange={e => { if (active && currentPoint && Number.isFinite(e.target.valueAsNumber)) changePoint(active, [currentPoint[0], e.target.valueAsNumber]); }}/></label>
+          <label>X <input aria-label="顶点 X" type="number" step="0.01" disabled={canvasLocked || !currentPoint} value={currentPoint?.[0] ?? ''} onChange={e => { if (active && currentPoint && Number.isFinite(e.target.valueAsNumber)) changePoint(active, [e.target.valueAsNumber, currentPoint[1]]); }}/></label>
+          <label>Y <input aria-label="顶点 Y" type="number" step="0.01" disabled={canvasLocked || !currentPoint} value={currentPoint?.[1] ?? ''} onChange={e => { if (active && currentPoint && Number.isFinite(e.target.valueAsNumber)) changePoint(active, [currentPoint[0], e.target.valueAsNumber]); }}/></label>
         </div>
-        <details className="landmark-editor"><summary>关键点注记</summary><p>关键点保存到 IR；重建时不驱动绑定。拖动蓝色顶点可裁切图层。</p><div><input aria-label="关键点名称" placeholder="例如 iris_center" value={landmarkName} onChange={e => setLandmarkName(e.target.value)}/><button disabled={editingLocked || !part || !landmarkName.trim()} onClick={() => {
+        <details className="landmark-editor"><summary>关键点注记</summary><p>关键点保存到 IR；重建时不驱动绑定。拖动蓝色顶点可裁切图层。</p><div><input aria-label="关键点名称" placeholder="例如 iris_center" value={landmarkName} onChange={e => setLandmarkName(e.target.value)}/><button disabled={canvasLocked || !part || !landmarkName.trim()} onClick={() => {
           if (!part) return;
           const name = landmarkName.trim();
           const [l, t, r, b] = part.geometry.bbox;
