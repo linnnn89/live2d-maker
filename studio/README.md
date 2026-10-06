@@ -71,13 +71,17 @@ R1c 的 PNG 解码、像素中心 even-odd 裁切、透明度及普通 alpha 叠
 
 ## 导入生成素材
 
-先保存 IR，再点击顶部“导入生成素材”。选择外部生成的 RGBA 透明 PNG 和与画布同尺寸的灰度二值 mask（0 保护、255 可编辑），每个 PNG 最大 16 MB。填写可识别的层名、素材生成说明及整数画布矩形。可新增顶层，或按现有图层 ID 替换；替换保留 ID、z 序和显示设置。隐藏图层不可在此流程替换。
+先保存 IR，再点击顶部“导入素材”。选择 8 位 RGBA 透明 PNG（最大 16 MB），填写可识别的层名与来源说明，选择手绘/人工制作、外部素材或 AI 生成；只有 AI 素材需要提示词。可新增顶层，或按现有图层 ID 替换；替换保留 ID、z 序和显示设置，画布高亮原目标位置。隐藏图层不可在此流程替换。
 
-默认要求素材尺寸等于放置范围；显式勾选适配后，按 alpha 内容裁透明边、保持比例缩放。可选源矩形裁切会记录被排除的可见像素。点击“检查导入”复用 `import-generated` 的完整验证，检查配准素材及前后完整合成图在保护区内的变化。局部前后图默认聚焦放置区域，可切换全图或打开原图；报告显示变化像素及保护区的可见像素、变化像素、最大差值。
+在画布拖动蓝色矩形放置素材，用四角手柄缩放；缩放启用按可见内容等比适配，精确整数坐标在折叠设置中。未勾选适配时要求素材尺寸等于放置范围。可选源矩形裁切记录排除的可见像素，放置示意同步显示裁切/适配和替换结果；浏览器插值与 Pillow 最终缩放可能不同，以预检合成图为准。
 
-预检和取消均不修改活动 IR、源文件或成功模型/QA。修改任何输入会使预检失效。“确认导入”再次核对工作区 revision、候选 IR 和素材哈希；其他编辑器修改后必须刷新并重新预检。确认后更新 IR/画布，旧模型和 QA 归档保留但标为待更新，须 Rebuild 后再运行 Pose QA。每次成功预检归档到 `imports/<id>/`，保留生成原图、mask、说明、前后图、报告及候选 IR；取消后保留审计档案，不自动清理。
+mask 默认全图保护。使用“矩形可编辑区”或连续画笔开放局部，“恢复保护区”擦除；可重置，也可载入与画布同尺寸的二值 PNG（最大 16 MB），再继续绘制。绿色显示可编辑区。持久检查使用原画布分辨率的 0/255 灰度 mask，界面示意最多 1024 像素长边，不对大图的 mask 数据降采样。mask 必须同时包含保护区和可编辑区，不能全图开放。
 
-主画布的自由编辑仍仅开放 geometry/appearance；素材、层名与语义变更通过严格的导入契约完成。此入口不调用生成 API，也不自动制作 mask 或从不透明图分离背景。
+点击“检查导入”复用 `import-generated` 的完整验证，检查配准素材及前后合成图在保护区内的变化；违规显示画布范围和调整说明，不裁掉违规像素。局部前后图默认聚焦放置区域，可切换全图、并排/导入前/导入后或打开原图；报告显示变化像素和范围，以及保护区的可见像素、变化像素、最大差值。
+
+预检和取消均不修改活动 IR、源文件或成功模型/QA。放置、绘制、来源或其他输入变化会使预检失效。“确认导入”再次核对工作区 revision、候选 IR/素材哈希、原图/mask/来源记录及 AI 提示词证据；其他编辑器修改后必须刷新并重新预检。确认后更新 IR/画布，旧模型和 QA 保留但标为待更新，须 Rebuild 后再运行 Pose QA。每次成功预检归档到 `imports/<id>/`，保留原图、mask、asset-source.json、前后图、报告和候选 IR；AI 另存提示词。图层“素材来源”显示来源说明、AI 提示词和原图 SHA-256。取消保留审计档案，不自动清理；尚未提交的放置/mask 只存在当前对话框，关闭即丢弃。
+
+主画布的自由编辑仍仅开放 geometry/appearance；素材、层名与语义变更通过严格的导入契约完成。此入口不调用生成 API，也不从不透明图分离背景。原有 import-generated CLI 和 prompt 字段保持 AI 导入兼容；新客户端传 origin，不为人工素材制造提示词。IR provenance 的 external、description、prompt 新字段需要当前 schema，旧文件不自动改写。
 
 ## CLI、Overlay 与运行边界
 
@@ -87,6 +91,7 @@ R1c 的 PNG 解码、像素中心 even-odd 裁切、透明度及普通 alpha 叠
 - `studio-snapshot --workspace <目录>`
 - `studio-save --workspace <目录>`：stdin 为 `{"revision":"...","ir":{...}}`。
 - `studio-import-preview --workspace <目录>`：stdin 为 `{"revision":"...","generatedPng":"<base64 PNG>","maskPng":"<base64 PNG>","bounds":[left,top,right,bottom],"name":"tongue","prompt":"生成说明","replacePart":null,"fit":false,"spriteBounds":null}`。返回预检 ID、版本、前后图 URL 和像素报告；文件名由服务端固定，不接受浏览器文件路径。
+- 新来源契约用 `"origin":{"kind":"manual或external","description":"作者/制作或来源说明"}` 替代 prompt；AI 使用 `{"kind":"ai","description":"来源说明","prompt":"提示词"}`。非 AI 来源拒绝 prompt 字段。离线 `import-generated` 可通过 `--origin-file <AssetOrigin JSON>` 使用同一契约；未提供时仍须 `--prompt-file`，按原 AI 流程处理。
 - `studio-import-commit --workspace <目录>`：stdin 为 `{"id":"<预检 ID>","revision":"<预检版本>"}`，返回更新后快照。重复确认或旧版本候选均拒绝。
 - `studio-rebuild --workspace <目录>`
 - `studio-qa --workspace <目录> --port 5173`：须有正在运行的 Studio dev server，负责本地资源路径。

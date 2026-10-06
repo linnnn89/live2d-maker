@@ -20,6 +20,11 @@ from .validator import validate_authoring_rig
 from .raster import clip_polygon
 
 
+def pixel_bounds(pixels):
+    ys, xs = np.nonzero(pixels)
+    return [int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1] if len(xs) else None
+
+
 def png_bytes(image):
     buffer = io.BytesIO()
     image.save(buffer, format="PNG")
@@ -48,7 +53,7 @@ def composite_ir(data, root, replacement=None):
 
 
 def import_generated(ir_path, generated_path, mask_path, bounds, name, prompt_path,
-                     out_dir, replace_part=None, fit=False, sprite_bounds=None):
+                     out_dir, replace_part=None, fit=False, sprite_bounds=None, origin=None):
     ir_path = Path(ir_path).resolve(strict=True)
     root = ir_path.parent
     data = json.loads(ir_path.read_text(encoding="utf-8"))
@@ -68,9 +73,17 @@ def import_generated(ir_path, generated_path, mask_path, bounds, name, prompt_pa
     tag, side, confidence = classify_layer(name)
     if tag == "UNKNOWN":
         raise ValueError("Generated layer name must have a recognized PSD2Live semantic")
-    prompt = Path(prompt_path).read_text(encoding="utf-8")
-    if not prompt.strip():
-        raise ValueError("Generation prompt cannot be empty")
+    # Legacy callers remain AI imports. Manual/external artwork has an explicit
+    # source record and never needs a fabricated generation prompt.
+    if origin is None:
+        if not prompt_path: raise ValueError("Provide --origin-file or a legacy --prompt-file")
+        prompt = Path(prompt_path).read_text(encoding="utf-8")
+        origin = {"kind": "ai", "description": "Legacy generated artwork", "prompt": prompt}
+    from .studio_protocol import validate_protocol
+    validate_protocol("AssetOrigin", origin)
+    if not origin["description"].strip() or (origin["kind"] == "ai" and not origin["prompt"].strip()):
+        raise ValueError("Asset source description / AI prompt cannot be empty")
+    prompt = origin.get("prompt", "")
     with Image.open(mask_path) as mask_image:
         if mask_image.format != "PNG" or mask_image.mode not in ("L", "1"):
             raise ValueError("Mask must be a grayscale binary PNG (0 protected, 255 editable)")
@@ -115,7 +128,8 @@ def import_generated(ir_path, generated_path, mask_path, bounds, name, prompt_pa
     outside = mask == 0
     outside_alpha = int(((np.asarray(registered)[:, :, 3] != 0) & outside).sum())
     if outside_alpha:
-        raise ValueError(f"Generated sprite has {outside_alpha} visible pixels outside the mask")
+        area = pixel_bounds((np.asarray(registered)[:, :, 3] != 0) & outside)
+        raise ValueError(f"Sprite has {outside_alpha} visible pixels outside the mask at canvas bounds {area}; extend the editable area or adjust placement")
     new = copy.deepcopy(data)
     if replace_part is not None:
         matches = [p for p in new["parts"] if p["id"] == replace_part]
@@ -137,7 +151,9 @@ def import_generated(ir_path, generated_path, mask_path, bounds, name, prompt_pa
                            "size": {"width": size[0], "height": size[1]}, "offset": {"left": left, "top": top}},
                  "geometry": {"bbox": list(bounds), "polygon": [[left, top], [right, top], [right, bottom], [left, bottom]]},
                  "semantic": {"tag": tag, "side": side, "confidence": confidence},
-                 "provenance": {"source": "imagegen", "toolVersion": "authoring_rig_generated_0.1.0",
+                 "provenance": {"source": {"ai": "imagegen", "manual": "manual", "external": "external"}[origin["kind"]],
+                                "description": origin["description"], **({"prompt": prompt} if origin["kind"] == "ai" else {}),
+                                "toolVersion": "authoring_rig_generated_0.2.0",
                                 "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
                                 "upstreamHash": hashlib.sha256(Path(generated_path).read_bytes()).hexdigest()}})
     validate_authoring_rig(new)
@@ -147,16 +163,18 @@ def import_generated(ir_path, generated_path, mask_path, bounds, name, prompt_pa
     changed = np.any(delta != 0, axis=2)
     outside_diff = int((changed & outside).sum())
     if outside_diff:
-        raise ValueError(f"Artwork replacement changes {outside_diff} pixels outside the mask")
+        area = pixel_bounds(changed & outside)
+        raise ValueError(f"Artwork replacement changes {outside_diff} pixels outside the mask at canvas bounds {area}; include the removed artwork in the editable area")
     if not changed.any():
         raise ValueError("Generated artwork produces no visible composite change")
     report = {"status": "ok", "action": "import-generated", "part_id": part["id"],
               "ir_file": str(out / "authoring-rig.json"), "bounds": list(bounds), "registration": registration,
               "mask_sha256": hashlib.sha256(Path(mask_path).read_bytes()).hexdigest(),
-              "prompt_sha256": hashlib.sha256(prompt.encode()).hexdigest(),
+              "source": origin,
+              **({"prompt_sha256": hashlib.sha256(prompt.encode()).hexdigest()} if origin["kind"] == "ai" else {}),
               "outside_visible_pixels": outside_alpha, "outside_changed_pixels": outside_diff,
               "outside_max_diff": int(delta[outside].max()) if outside.any() else 0,
-              "changed_pixels": int(changed.sum()), "max_diff": int(delta.max()),
+              "changed_pixels": int(changed.sum()), "changed_bounds": pixel_bounds(changed), "max_diff": int(delta.max()),
               "visual_acceptance": "pending native export and Pose QA"}
     out.mkdir(parents=True)
     for original in data["parts"]:
@@ -172,6 +190,7 @@ def import_generated(ir_path, generated_path, mask_path, bounds, name, prompt_pa
     after.save(out / "after.png")
     shutil.copyfile(mask_path, out / "generation-mask.png")
     shutil.copyfile(generated_path, out / "generation-original.png")
-    (out / "generation-prompt.txt").write_text(prompt, encoding="utf-8")
+    if origin["kind"] == "ai": (out / "generation-prompt.txt").write_text(prompt, encoding="utf-8")
+    (out / "asset-source.json").write_text(json.dumps(origin, ensure_ascii=False, indent=2), encoding="utf-8")
     (out / "generation-report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     return report

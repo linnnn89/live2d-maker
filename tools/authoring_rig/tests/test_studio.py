@@ -1,5 +1,6 @@
 import copy
 import base64
+import hashlib
 import io
 import json
 import tempfile
@@ -14,6 +15,49 @@ from tools.authoring_rig.studio import (open_workspace, save_workspace, snapshot
 
 
 class StudioPersistence(unittest.TestCase):
+    def test_manual_external_and_ai_origins_preserve_protection_and_committed_source_records(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);workspace,first,payload=self.import_fixture(root)
+            payload.pop("prompt")
+            original={file:(workspace/file).read_bytes() for file in ("authoring-rig.json","source.png","origin-ir.json")}
+            for kind in ("manual","external","ai"):
+                origin={"kind":kind,"description":"Fixture author / source"}
+                if kind=="ai": origin["prompt"]="Isolated hand-drawn tongue"
+                preview=preview_generated(workspace,{**payload,"origin":origin})
+                archive=workspace/"imports"/preview["id"]
+                self.assertEqual(json.loads((archive/"asset-source.json").read_text()),origin)
+                self.assertEqual(preview["report"]["source"],origin)
+                self.assertEqual(preview["report"]["changed_bounds"],[9,9,10,10])
+                self.assertEqual(preview["report"]["outside_changed_pixels"],0)
+                self.assertEqual((archive/"generation-prompt.txt").exists(),kind=="ai")
+                self.assertEqual({file:(workspace/file).read_bytes() for file in original},original)
+                if kind=="manual": manual=preview
+            candidate=json.loads((workspace/"imports"/manual["id"]/"candidate-ir.json").read_text())
+            part=next(p for p in candidate["parts"] if p["id"]==manual["partId"])
+            self.assertEqual(part["provenance"]["source"],"manual");self.assertNotIn("prompt",part["provenance"])
+            self.assertEqual(part["provenance"]["upstreamHash"],hashlib.sha256(base64.b64decode(payload["generatedPng"])).hexdigest())
+            imports=list((workspace/"imports").iterdir())
+            mask=Image.new("L",(32,32));mask.putpixel((0,0),255);raw=io.BytesIO();mask.save(raw,format="PNG")
+            with self.assertRaisesRegex(ValueError,r"outside the mask at canvas bounds \[9, 9, 10, 10\]"):
+                preview_generated(workspace,{**payload,"origin":{"kind":"manual","description":"source"},"maskPng":base64.b64encode(raw.getvalue()).decode()})
+            self.assertEqual(list((workspace/"imports").iterdir()),imports)
+            archive=workspace/"imports"/manual["id"]
+            for filename in ("generation-original.png","generation-mask.png","asset-source.json"):
+                path=archive/filename;raw=path.read_bytes();path.write_bytes(b'{}' if filename.endswith('.json') else b'changed')
+                with self.assertRaisesRegex(ValueError,"Import .*changed|Import evidence changed"):
+                    commit_generated(workspace,{"id":manual["id"],"revision":first["revision"]})
+                self.assertEqual((workspace/"authoring-rig.json").read_bytes(),original["authoring-rig.json"])
+                path.write_bytes(raw)
+            imported=commit_generated(workspace,{"id":manual["id"],"revision":first["revision"]})
+            self.assertEqual(next(p for p in imported["ir"]["parts"] if p["id"]==manual["partId"])["provenance"],part["provenance"])
+            with self.assertRaisesRegex(ValueError,"IR changed"):
+                commit_generated(workspace,{"id":preview["id"],"revision":first["revision"]})
+            rebuilt=root/"manual.psd"
+            from tools.authoring_rig.builder import build_psd
+            build_psd(workspace/"authoring-rig.json",rebuilt)
+            self.assertEqual(len(PSDImage.open(rebuilt)),2)
+            self.assertEqual((workspace/"source.png").read_bytes(),original["source.png"])
+
     def test_import_bounds_follow_reference_and_successful_model_versions(self):
         with tempfile.TemporaryDirectory() as temp:
             workspace, first, payload = self.import_fixture(Path(temp))

@@ -14,12 +14,13 @@ symlinkSync(path.join(root, 'node_modules'), path.join(output, 'node_modules'), 
 after(() => rmSync(output, { recursive: true, force: true }));
 const compiled = spawnSync(process.execPath, [path.join(root, 'node_modules/typescript/bin/tsc'),
   '--target', 'ES2022', '--module', 'commonjs', '--lib', 'ES2022,DOM', '--strict', '--skipLibCheck',
-  '--outDir', output, 'src/artwork/ArtworkRenderer.ts', 'src/artwork/capture.ts', 'src/editor/DraftController.ts', 'src/project/paths.ts'], { cwd: root, encoding: 'utf8' });
+  '--outDir', output, 'src/artwork/ArtworkRenderer.ts', 'src/artwork/capture.ts', 'src/editor/DraftController.ts', 'src/project/paths.ts', 'src/assets/mask.ts'], { cwd: root, encoding: 'utf8' });
 assert.equal(compiled.status, 0, compiled.stdout + compiled.stderr);
 const require = createRequire(import.meta.url);
 const { ArtworkRenderer } = require(path.join(output, 'artwork/ArtworkRenderer.js'));
 const { captureArtwork } = require(path.join(output, 'artwork/capture.js'));
 const { DraftController } = require(path.join(output, 'editor/DraftController.js'));
+const {blankMask,rectangleMask,brushMask,moveBounds,resizeBounds,maskFromPixels,alphaBounds}=require(path.join(output,'assets/mask.js'));
 // Codec is ESM; resolve its dependency from the installed project, not the temp folder.
 for (const name of ['png', 'AssetCache', 'ArtworkClient']) {
   const source = readFileSync(path.join(root, `src/artwork/${name}.ts`), 'utf8');
@@ -41,6 +42,25 @@ const { MemoryBudget } = require(path.join(output,'artwork/MemoryBudget.js'));
 const { artworkKey } = require(path.join(output,'artwork/content.js'));
 const fixtures = JSON.parse(readFileSync(path.join(root, 'tests/fixtures/artwork.json')));
 const bytes = value => Buffer.from(value, 'base64');
+
+test('local editable masks use binary pixel-centre strokes and placement stays inside the canvas',()=>{
+  const mask=blankMask(8,6);assert.deepEqual([...mask],Array(48).fill(0));
+  rectangleMask(mask,8,6,[1,1,4,3],true);
+  assert.deepEqual([...mask.entries()].filter(([,v])=>v===255).map(([i])=>i),[9,10,11,17,18,19]);
+  const stroke=blankMask(8,6);brushMask(stroke,8,6,[2,3],[6,3],1,true);
+  assert.deepEqual([...stroke.entries()].filter(([,v])=>v===255).map(([i])=>i),[17,18,19,20,21,22,25,26,27,28,29,30]);
+  brushMask(stroke,8,6,[4,3],[4,3],1,false);assert.equal(stroke[19],0);assert.equal(stroke[20],0);assert.equal(stroke[17],255);
+  assert.ok([...stroke].every(v=>v===0||v===255));
+  assert.deepEqual(moveBounds([2,1,5,4],100,-100,8,6),[5,0,8,3]);
+  assert.deepEqual(resizeBounds([2,1,5,4],2,[100,100],8,6),[2,1,8,6]);
+  assert.deepEqual(resizeBounds([2,1,5,4],0,[100,100],8,6),[4,3,5,4]);
+  const image={width:8,height:6,data:new Uint8ClampedArray(8*6*4)};
+  for(let i=0;i<mask.length;i++)image.data.set([mask[i],mask[i],mask[i],255],i*4);
+  assert.deepEqual(maskFromPixels(image,8,6),mask);image.data[0]=128;assert.throws(()=>maskFromPixels(image,8,6),/二值/);
+  assert.throws(()=>maskFromPixels(image,7,6),/尺寸/);
+  const sprite={width:4,height:4,data:new Uint8ClampedArray(64)};sprite.data[3]=255;sprite.data[(2*4+2)*4+3]=255;
+  assert.deepEqual(alphaBounds(sprite),[0,0,3,3]);assert.deepEqual(alphaBounds(sprite,[1,1,4,4]),[2,2,3,3]);assert.equal(alphaBounds(sprite,[3,3,4,4]),null);
+});
 
 for (const format of fixtures.formats) test(`PNG ${format.mode} preserves unpremultiplied pixels and transparency`, () => {
   const asset = decodeAsset(bytes(format.png));

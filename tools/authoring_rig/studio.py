@@ -303,7 +303,7 @@ def preview_generated(root, payload):
                                       temporary / "mask.png", payload.get("bounds"), name.strip(),
                                       temporary / "prompt.txt", temporary / "result",
                                       replace_part=payload.get("replacePart"), fit=payload.get("fit", False),
-                                      sprite_bounds=payload.get("spriteBounds"))
+                                      sprite_bounds=payload.get("spriteBounds"), origin=payload.get("origin"))
             token = uuid.uuid4().hex
             archive = root / "imports" / token
             shutil.copytree(temporary / "result", archive)
@@ -336,6 +336,23 @@ def commit_generated(root, payload):
         if revision(candidate) != preview["candidateRevision"]:
             raise StudioError("IMPORT_CONFLICT", "Import candidate changed; run preflight again", "import-commit")
         validate_authoring_rig(candidate, root)
+        part = next(part for part in candidate["parts"] if part["id"] == preview["partId"])
+        report = preview["report"]
+        evidence = {"generation-original.png": part["provenance"]["upstreamHash"],
+                    "generation-mask.png": report["mask_sha256"]}
+        if "prompt_sha256" in report: evidence["generation-prompt.txt"] = report["prompt_sha256"]
+        try:
+            for filename, expected_hash in evidence.items():
+                if hashlib.sha256((archive / filename).read_bytes()).hexdigest() != expected_hash:
+                    raise ValueError(f"Import evidence changed: {filename}")
+            if "source" in report:
+                source = read(archive / "asset-source.json")
+                if source != report["source"] or source["description"] != part["provenance"].get("description"):
+                    raise ValueError("Import source record changed")
+                if {"manual": "manual", "external": "external", "ai": "imagegen"}[source["kind"]] != part["provenance"]["source"] or source.get("prompt") != part["provenance"].get("prompt"):
+                    raise ValueError("Import source does not match candidate provenance")
+        except (OSError, ValueError, KeyError) as error:
+            raise StudioError("IMPORT_CONFLICT", f"{error}; run import preflight again", "import-commit") from error
         state = read(root / "studio-state.json")
         changed_state = {**state, "latestImport": archive.relative_to(root).as_posix()}
         write(root / "authoring-rig.json", candidate)
