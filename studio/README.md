@@ -6,7 +6,9 @@
 
 预览由独立 ViewerAdapter 管理加载、错误、取景及重绘。参数滑块和重置按动画帧合并重绘，不编码 PNG；需要截图时才调用截图接口。预览区标明当前已保存模型，或提示未保存/已保存但尚未更新的修改。独立 viewer 支持 `embed=1`，由自身控制嵌入布局。
 
-前端检查：`npm run build`；预览适配器回归：`npm test`。适配器用例不依赖 Python、JVM、Edge 或 Windows。
+前端检查：`npm run build`；预览适配器与草稿命令回归：`npm test`。这些用例不依赖 Python、JVM、Edge 或 Windows。
+
+R1b 提供撤销、重做、放弃草稿和逐字段差异；一次拖动为一个撤销步骤，保存或导入新版本后清空草稿历史。人和 Agent 共用版本化命令。浏览器 Agent 使用 `window.studioDraft.execute`；无浏览器的 Agent 使用 `node studio/scripts/draft-cli.mjs` 从 JSON 生成候选 IR 与差异。调用契约、并发和保存边界见 [STUDIO_DRAFT_COMMANDS.md](../docs/STUDIO_DRAFT_COMMANDS.md)。离线工具只生成提案，工作区保存仍需现有完整验证。
 
 ## 启动
 

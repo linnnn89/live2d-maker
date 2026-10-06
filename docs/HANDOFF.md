@@ -131,3 +131,17 @@ Chromium 151.0.7922.34 / Playwright：1440×1000 与 390×844，真实加载仓�
 浏览器检查的 open/save/rebuild 使用固定 API 响应，未调用 Python/JVM；它证明前端行为，不代表原生构建完成。临时脚本、截图和结果位于 `/tmp/live2d-r1a-browser-check.py`、`/tmp/live2d-r1a-evidence/`，不提交 Git。
 
 本轮保留 Windows 专属工作：portable/JVM 桥接、原生配置/导出/Overlay、DLL/OpenGL、桌面项目/界面及安装包。计划下一步为 R1b 的纯前端草稿命令与撤销/重做，原生接入待用户 PC 迭代。
+
+## 21. Studio R1b：人 / Agent 共享草稿命令（2026-10-06）
+
+用户确认将 R1b 调整为对 LLM Agent 可调用的命令与草稿事务。本轮提取 `studio/src/editor/{contracts,commands,DraftSession,DraftController}.ts`：按图层 ID 修改 visibility/opacity/polygon/landmark、严格命令字段检查、整批原子应用、draftId/revision 乐观并发、差异、撤销/重做及保存锁。UI 通过同一层编辑，拖拽提交一个历史步骤，取消恢复原状态。
+
+新增顶部撤销/重做/放弃和画布差异面板。`window.studioDraft.execute` 提供 inspect/diff/apply/undo/redo/discard/commit；commit 复用现有 save API，成功更新界面和保存基线，失败保留草稿。导入、构建和 QA 操作期间拒绝并发命令写入。历史仅限标签页当前草稿，保存或导入新版本清空。
+
+`studio/scripts/draft-cli.mjs` 从 stdin JSON 使用同一命令引擎输出候选 IR 与差异，不接触素材、保存服务或原生工具。它服务于没有浏览器连接的 Agent，但不是现有 Kotlin MCP 的新增工具，也不自动保存。详细 schema 和例子见 [STUDIO_DRAFT_COMMANDS.md](STUDIO_DRAFT_COMMANDS.md)。
+
+验证：Node 24.19.0 下 `npm run build` 和 `npm test` 通过，共 19 项（12 项草稿/CLI + 7 项 viewer）。草稿回归覆盖失败批次回滚、字段保留、版本冲突、手势合并/取消、保存并发冻结/失败保留/新基线、相同基线刷新和离线 JSON。
+
+Chromium 151.0.7922.34（Linux，1440×1000 / 390×844）使用固定工作区 API 响应及仓库 yelan 模型验证 UI/Agent 共用历史、差异、无效批次、过期版本、真实拖拽及取消、模拟失败/成功保存、模型来源与替换、参数实际像素变化、无预览 PNG 编码、响应式布局和重新加载。除刻意模拟失败保存产生的 HTTP 400 外，无控制台错误/警告。本轮浏览器检查未执行 Python/JVM 原生流程。
+
+本次只改 Studio TypeScript/Node/CSS、测试与文档。Python、Kotlin、portable JVM、DLL/OpenGL、Overlay 和 Windows 安装路径均未修改。R1a PR #5 尚未合并，R1b PR 以其分支为基线，需按顺序合并。实时图层合成、草稿跨刷新持久化及原生 Agent 工作区联动留待后续切片/PC 验证。
