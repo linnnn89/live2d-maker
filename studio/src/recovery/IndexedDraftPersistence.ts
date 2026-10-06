@@ -21,14 +21,16 @@ export class IndexedDraftPersistence implements DraftPersistence {
   subscribe(listener: () => void): () => void { this.listeners.add(listener); return()=>this.listeners.delete(listener); }
   close(): void { this.channel?.close();this.listeners.clear();void this.database?.then(db=>db.close()).catch(()=>{});this.database=null; }
   async list(workspaceId: string): Promise<DraftCheckpoint[]> {
+    const entries=await this.exportWorkspace(workspaceId),values=entries.map(entry=>entry.value);
+    for(const value of values)validateCheckpoint(value);
+    return values.sort((a,b)=>b.updatedAt-a.updatedAt);
+  }
+  async exportWorkspace(workspaceId: string): Promise<Entry[]> {
     const db=await this.open();
     return new Promise((resolve,reject)=>{
       const transaction=db.transaction('drafts','readonly');
       const request=transaction.objectStore('drafts').index('workspaceId').getAll(workspaceId);
-      transaction.oncomplete=()=>{
-        try { const values=(request.result as Entry[]).map(entry=>entry.value);for(const value of values)validateCheckpoint(value);resolve(values.sort((a,b)=>b.updatedAt-a.updatedAt)); }
-        catch(error){reject(error);}
-      };
+      transaction.oncomplete=()=>resolve(request.result as Entry[]);
       transaction.onabort=()=>reject(transaction.error ?? new Error('草稿读取事务已取消'));
     });
   }

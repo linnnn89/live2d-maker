@@ -163,4 +163,6 @@ Windows 构建、48 项回归通过，仅新增三项（含实际 Python CLI sch
 
 依据 [IndexedDB 官方使用说明](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API/Using_IndexedDB) 与 [transaction complete](https://developer.mozilla.org/en-US/docs/Web/API/IDBTransaction/complete_event) 在事务完成确认持久化；使用原生 IndexedDB/[BroadcastChannel](https://developer.mozilla.org/en-US/docs/Web/API/BroadcastChannel)，未加依赖。Windows 构建、51 项回归通过（仅新增三项，含真实旧工作区迁移），Python Studio 5 项通过。Edge 154 关闭并重启同一真实配置后恢复，验证一次撤销、保存仅清理本页/明确删除、外部 CLI 新基线后的部分兼容重放与旧草稿 JSON 导出、三个独立标签页记录、过期删除 RECOVERY_CONFLICT、注入配额错误后旧记录/内存保留与重试成功。重放不写磁盘，完整 PNG RGBA 对照 Python 一致；桌面/窄屏无溢出或页面/控制台错误。证据在 `out/e4-evidence/`。
 
+旧记录版本或格式无法读取时，独立错误提示不被正常备份状态覆盖，保留并允许导出原始记录；实际 Edge 注入未来版本记录后，确认继续编辑/备份、原样导出和磁盘不变均通过。
+
 备份属于浏览器配置/来源，清理或隐私模式会丢失；最近 200 ms、未完成手势和强制中断不保证恢复。pagehide 只尽力提交。恢复是一个新编辑步骤，不恢复旧撤销栈；JSON 导出不是完整项目包。未修改 Kotlin/原生建模/Overlay/DLL/安装器，剩余 E5/E6 与 R2–R8 继续推进。
