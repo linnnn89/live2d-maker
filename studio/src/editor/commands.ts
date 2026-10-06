@@ -1,4 +1,4 @@
-import { DraftError, type ArtworkIR, type DraftChange, type EditCommand, type Point } from './contracts';
+import { DraftError, type ArtworkIR, type DraftChange, type EditCommand, type Part, type Point } from './contracts';
 
 const reservedNames = new Set(['__proto__', 'constructor', 'prototype', 'parameter', 'parameters', 'deformer', 'keyform', 'physics']);
 const fields: Record<EditCommand['type'], string[]> = {
@@ -24,8 +24,17 @@ export function indexArtwork(ir: ArtworkIR): ReadonlyMap<string, number> {
 
 /** Validates the entire batch on a private candidate; caller's IR is never mutated. */
 export function applyCommands(ir: ArtworkIR, input: unknown, index = indexArtwork(ir)): ArtworkIR {
+  // Standalone callers may mutate the result; only the session uses structural sharing.
+  return structuredClone(applyCommandBatch(ir, input, index).ir);
+}
+
+export type LayerPatch = { index: number; before: Part; after: Part };
+
+/** Internal immutable batch: copy only targeted parts and edited fields. */
+export function applyCommandBatch(ir: ArtworkIR, input: unknown, index = indexArtwork(ir)): { ir: ArtworkIR; patches: LayerPatch[] } {
   if (!Array.isArray(input) || input.length === 0) throw new DraftError('INVALID_COMMAND', 'commands 必须是非空命令数组');
-  const candidate = structuredClone(ir);
+  const candidate = { ...ir, parts: [...ir.parts] };
+  const touched = new Set<number>();
   for (const raw of input) {
     if (!raw || typeof raw !== 'object' || Array.isArray(raw) || !Object.hasOwn(fields, raw.type)) {
       throw new DraftError('INVALID_COMMAND', '不支持的编辑命令');
@@ -35,8 +44,9 @@ export function applyCommands(ir: ArtworkIR, input: unknown, index = indexArtwor
       throw new DraftError('INVALID_COMMAND', '命令包含未知字段或缺少 partId');
     }
     const position = index.get(raw.partId);
-    const part = position === undefined ? undefined : candidate.parts[position];
-    if (!part) throw new DraftError('PART_NOT_FOUND', '目标图层不存在', raw.partId);
+    if (position === undefined || candidate.parts[position]?.id !== raw.partId) throw new DraftError('PART_NOT_FOUND', '目标图层不存在', raw.partId);
+    if (!touched.has(position)) { candidate.parts[position] = { ...candidate.parts[position] }; touched.add(position); }
+    const part = candidate.parts[position];
     switch (raw.type) {
       case 'set_visibility':
         if (typeof raw.visible !== 'boolean') throw new DraftError('INVALID_COMMAND', 'visible 必须是布尔值', part.id, 'visible');
@@ -49,22 +59,42 @@ export function applyCommands(ir: ArtworkIR, input: unknown, index = indexArtwor
       case 'set_polygon':
         if (!Array.isArray(raw.points) || raw.points.length < 3) throw new DraftError('INVALID_COMMAND', '轮廓至少需要三个点', part.id, 'points');
         for (const value of raw.points) point(value, part.id, 'points');
-        part.geometry.polygon = structuredClone(raw.points);
+        part.geometry = { ...part.geometry, polygon: structuredClone(raw.points) };
         break;
       case 'set_landmark':
         landmarkName(raw.name, part.id); point(raw.point, part.id, 'point');
-        part.geometry.landmarks = { ...part.geometry.landmarks, [raw.name]: [...raw.point] };
+        part.geometry = { ...part.geometry, landmarks: { ...part.geometry.landmarks, [raw.name]: [...raw.point] } };
         break;
       case 'remove_landmark':
         landmarkName(raw.name, part.id);
         if (!part.geometry.landmarks || !Object.hasOwn(part.geometry.landmarks, raw.name)) {
           throw new DraftError('LANDMARK_NOT_FOUND', '目标关键点不存在', part.id, raw.name);
         }
-        delete part.geometry.landmarks[raw.name];
+        part.geometry = { ...part.geometry, landmarks: { ...part.geometry.landmarks } };
+        delete part.geometry.landmarks![raw.name];
         break;
     }
   }
-  return candidate;
+  for (const position of touched) {
+    if (sameArtworkPart(ir.parts[position], candidate.parts[position])) candidate.parts[position] = ir.parts[position];
+  }
+  const patches = [...touched].sort((a, b) => a - b)
+    .filter(position => ir.parts[position] !== candidate.parts[position])
+    .map(position => ({ index: position, before: ir.parts[position], after: candidate.parts[position] }));
+  return { ir: patches.length ? candidate : ir, patches };
+}
+
+export function sameArtworkPart(left: Part, right: Part): boolean {
+  return (left.appearance?.visible ?? true) === (right.appearance?.visible ?? true)
+    && (left.appearance?.opacity ?? 255) === (right.appearance?.opacity ?? 255)
+    && same(left.geometry.polygon, right.geometry.polygon)
+    && same(left.geometry.landmarks ?? {}, right.geometry.landmarks ?? {});
+}
+
+export function replayPatches(ir: ArtworkIR, patches: LayerPatch[], direction: 'before' | 'after'): ArtworkIR {
+  const parts = [...ir.parts];
+  for (const patch of patches) parts[patch.index] = patch[direction];
+  return { ...ir, parts };
 }
 
 export function same(a: unknown, b: unknown): boolean {

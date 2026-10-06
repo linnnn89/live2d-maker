@@ -10,6 +10,8 @@
 
 R1b 提供撤销、重做、放弃草稿和逐字段差异；一次拖动为一个撤销步骤，保存或导入新版本后清空草稿历史。人和 Agent 共用版本化命令。浏览器 Agent 使用 `window.studioDraft.execute`；无浏览器的 Agent 使用 `node studio/scripts/draft-cli.mjs` 从 JSON 生成候选 IR 与差异。调用契约、并发和保存边界见 [STUDIO_DRAFT_COMMANDS.md](../docs/STUDIO_DRAFT_COMMANDS.md)。离线工具只生成提案，工作区保存仍需现有完整验证。
 
+E1b 的撤销/重做合计保留最近最多 100 步，历史 JSON 负载不超过 16 MiB；每步仅记录受影响图层。达到预算后淘汰最早步骤并提示可用历史数量。单步超过预算时保留编辑结果，但该步不可撤销，并切断旧历史；放弃草稿仍可恢复已保存 IR。取消拖拽不占用历史。这里的 16 MiB 是序列化历史预算，不是整个浏览器内存上限；统计和精确定义见命令契约。
+
 ## 启动
 
 需要仓库已有 `python/Scripts/python.exe`、`requirements-tools.txt` 中的依赖、`portable/PSD2Live` 与已核对的 Cubism runtime。前端使用 Node `^20.19.0 || >=22.12.0`，本轮实测 Node 24.19.0。只安装项目内依赖：

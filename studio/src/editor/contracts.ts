@@ -18,10 +18,15 @@ export type EditCommand =
   | { type: 'set_landmark'; partId: string; name: string; point: Point }
   | { type: 'remove_landmark'; partId: string; name: string };
 export type DraftChange = { partId: string; field: string; before: unknown; after: unknown };
+export type HistoryStatus = {
+  undoSteps: number; redoSteps: number; retainedBytes: number;
+  maxSteps: number; maxBytes: number; droppedSteps: number;
+};
 export type DraftState = DraftToken & {
   schemaVersion: 1; baseRevision: string; ir: ArtworkIR;
   dirty: boolean; changes: DraftChange[]; canUndo: boolean; canRedo: boolean;
   phase: 'idle' | 'gesture' | 'saving' | 'operation';
+  history: HistoryStatus;
 };
 export type DraftRequest =
   | { schemaVersion: 1; operation: 'inspect' | 'diff' }
