@@ -206,3 +206,15 @@ Windows Node 24.19.0：构建及 45 项回归通过，仅新增三项测试覆�
 项目内新增固定版本 MIT AJV 8.20.0 和开发用 json-schema-to-typescript 16.0.0，未全局安装或改变运行时。Windows Node 24.19.0 构建/48 项回归通过（只新增三项，含实际 Python CLI），既有 Python Studio 5 项通过。真实 Edge 154 / Python 工作区验证成功保存/下载与 PNG oracle、轻量读取、外部 CLI 基线改变后 Agent/UI BASE_CONFLICT 并保留草稿/撤销/磁盘、忙状态和非法字段、导入预检不写活动 IR/确认后 25 层/完整 PNG 对照一致、重载与窄屏布局。无页面异常，仅两个预期的主动保存冲突 HTTP 409 日志；证据在忽略目录 `out/e3-evidence/`。
 
 CLI 响应先转为 JSON wire value 再校验，兼容 Pillow 返回的 tuple bounds；回归覆盖实际 snapshot 命令。没有修改 Kotlin、原生配置/Overlay/DLL/安装器，桥接 runner/resource 拆分留 E5。Vite 8.3.2 构建/启动通过，但其未来 native loader 扩展名规则仍有提示；未升级或切换 loader。接续 E4 恢复，不将本切片称为整个规划完成。
+
+## 27. Studio E4：稳定身份与增量草稿恢复（2026-10-07）
+
+接续 E3 PR #11（`main@fe7b161`），Python 的 studio-state.json 持久化 workspaceId；旧工作区首次快照在排他锁内补齐，源、IR、revision、构建/QA 不因迁移变化。共享 schema 增加 Snapshot.workspaceId 和 DraftCheckpoint，生成 DTO 同步。
+
+原生 IndexedDB 保存字段 before/after 增量检查点，200 ms 合并 idle 编辑、写入串行，只有事务完成才显示已备份。单记录 8 MiB、单工作区 20 份/32 MiB；超限不淘汰旧草稿。各标签页独立 draftId，保存/放弃/撤销到无修改只清理本页成功写入的记录。广播及聚焦刷新只更新备份列表，不同步活动编辑 token。
+
+打开时先显示磁盘 IR，用户明确选择恢复/重放；逐字段检查 before/after，兼容修改原子应用、一次撤销，冲突/缺失图层及旧记录保留并可导出。恢复后仍须保存 IR，旧撤销栈不恢复。删除旧记录需确认，并在事务内核对 revision/updatedAt，过期删除被拒绝。配额/权限/记录格式错误可见，当前编辑不清空，可重试备份。
+
+Windows Node 24.19.0 构建、51 项回归通过（新增三项：恢复/冲突、写入合并/失败、真实旧工作区迁移），既有 Python Studio 5 项通过。实际 Edge 154 使用真实 Python 24 层工作区和持久浏览器配置，关闭重启后恢复/一次撤销、保存清理本页、确认删除旧记录、外部 CLI 修改后仅重放兼容 landmark/保留 opacity 冲突、JSON 导出保留原记录、三个独立标签页、过期删除 RECOVERY_CONFLICT、注入配额错误后内存/旧备份保持与重试成功均通过。恢复不写活动 IR，完整 PNG 对照 Python 逐像素一致；桌面/窄屏无溢出或页面/控制台错误。证据与浏览器配置在忽略目录 `out/e4-evidence/`。
+
+浏览器清理/隐私模式可能删除备份；最近 200 ms、未完成手势、强制进程中断不保证恢复，pagehide 仅尽力提交。重要修改仍需保存/导出。未修改 Kotlin、原生建模/Overlay/DLL/安装器，接续 E5/E6 和剩余 R2–R8。

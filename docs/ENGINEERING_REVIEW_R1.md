@@ -1,6 +1,6 @@
 # R1 之后的工程改进审阅
 
-审阅日期：2026-10-06；进度更新：2026-10-07。审阅基线：已合并 R1a/R1b 的 `main@5006207`，以及 R1c 分支中的即时合成实现。下文代码观察和旧测量保留审阅时含义；E1a/E1b/E2/E3 已实施，结果见末节，E4–E6 尚未实施。
+审阅日期：2026-10-06；进度更新：2026-10-07。审阅基线：已合并 R1a/R1b 的 `main@5006207`，以及 R1c 分支中的即时合成实现。下文代码观察和旧测量保留审阅时含义；E1a/E1b/E2/E3/E4 已实施，结果见末节，E5–E6 尚未实施。
 
 ## 结论与优先级
 
@@ -99,7 +99,7 @@ Vite 配置中路由、资源服务、body 解析、child process 和全局 busy
 
 **E1a 已于 2026-10-07 实施：按 ID 索引、轻量内部 token、差异缓存及稳定订阅快照**。保持公开命令和保存行为不变，37 项既有回归加 2 项状态隔离/千层序列回归通过。
 
-E1b 有界图层历史、E2 渲染失效与预算和 E3 协议统一已完成，随后是 E4 恢复。Python/原生签名与 WorkspaceService 等改造继续在用户 Windows PC 上按用例推进。
+E1b 有界图层历史、E2 渲染失效与预算、E3 协议统一和 E4 恢复已完成，随后是 E5 用例/桥接提取。Python/原生签名与 WorkspaceService 等改造继续在用户 Windows PC 上按用例推进。
 
 ### E1a 实施与本机对照
 
@@ -154,3 +154,15 @@ Edge 154.0.4258.53 在 1440×1000 和 390×844 使用实际 Studio/Python API，
 Windows 构建、48 项回归通过，仅新增三项（含实际 Python CLI schema 对照、快照/冲突/锁）；既有 Python Studio 5 项通过。真实 Edge/Python 24 层工作区验证完整/轻量读取、成功保存下载、CLI 外部修改后 Agent/UI 都返回 BASE_CONFLICT 且保留草稿/撤销/磁盘内容、非法字段和忙状态；UI 预检不改活动 IR，确认后 25 层，完整 PNG RGBA 与 Python 一致。桌面/窄屏无溢出和页面异常；仅两个主动触发保存冲突的 HTTP 409 控制台记录。证据在 `out/e3-evidence/`。实际验收发现 Pillow tuple bounds，CLI 先序列化为 JSON wire value 再校验；该场景纳入同一 CLI 回归。
 
 本切片未修改 Kotlin/原生建模/Overlay/安装器，Node 进程与资源路由拆分留 E5。Vite 8.3.2 现有 loader 构建/启动通过，但提示扩展名省略不兼容其未来 native loader 默认值；本轮未升级 Vite 或切换 loader。
+
+### E4 实施与 Windows 验收（2026-10-07）
+
+工作区状态持久化 UUID，旧工作区在已有排他锁内迁移，IR/源素材/版本不改变。恢复以稳定 workspaceId、协议版本和保存基线关联，IndexedDB 只保存增量字段 before/after 检查点；不保存全量 IR 或整个撤销栈。idle 编辑合并 200 ms，串行写入最新状态，事务完成才显示已备份。单记录 8 MiB、同工作区 20 份/32 MiB，超限不自动删除旧记录。
+
+界面先打开磁盘保存版本，再明确选择恢复；基线变化后逐字段比较，展示兼容/冲突/已存在修改。重放兼容命令为一个可撤销原子步骤，冲突和旧记录保留供导出，仍需显式保存。不同标签页独立 draftId，保存/放弃只清理本页记录，手工删除核对 revision/updatedAt 防止删除并发更新。记录广播/聚焦刷新不共享编辑 token，也不自动覆盖活动草稿。存储失败可重试，当前编辑与原记录保留。
+
+依据 [IndexedDB 官方使用说明](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API/Using_IndexedDB) 与 [transaction complete](https://developer.mozilla.org/en-US/docs/Web/API/IDBTransaction/complete_event) 在事务完成确认持久化；使用原生 IndexedDB/[BroadcastChannel](https://developer.mozilla.org/en-US/docs/Web/API/BroadcastChannel)，未加依赖。Windows 构建、51 项回归通过（仅新增三项，含真实旧工作区迁移），Python Studio 5 项通过。Edge 154 关闭并重启同一真实配置后恢复，验证一次撤销、保存仅清理本页/明确删除、外部 CLI 新基线后的部分兼容重放与旧草稿 JSON 导出、三个独立标签页记录、过期删除 RECOVERY_CONFLICT、注入配额错误后旧记录/内存保留与重试成功。重放不写磁盘，完整 PNG RGBA 对照 Python 一致；桌面/窄屏无溢出或页面/控制台错误。证据在 `out/e4-evidence/`。
+
+旧记录版本或格式无法读取时，独立错误提示不被正常备份状态覆盖，保留并允许导出原始记录；实际 Edge 注入未来版本记录后，确认继续编辑/备份、原样导出和磁盘不变均通过。
+
+备份属于浏览器配置/来源，清理或隐私模式会丢失；最近 200 ms、未完成手势和强制中断不保证恢复。pagehide 只尽力提交。恢复是一个新编辑步骤，不恢复旧撤销栈；JSON 导出不是完整项目包。未修改 Kotlin/原生建模/Overlay/DLL/安装器，剩余 E5/E6 与 R2–R8 继续推进。

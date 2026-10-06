@@ -13,6 +13,7 @@ import { ArtworkCanvas, type ArtworkSource } from './artwork/ArtworkCanvas';
 import { ArtworkClient } from './artwork/ArtworkClient';
 import { captureArtwork } from './artwork/capture';
 import type { CaptureRequest, CaptureResult } from './artwork/contracts';
+import { RecoveryPanel } from './recovery/RecoveryPanel';
 
 declare global { interface Window { studioDraft?: {
   schemaVersion: 1;
@@ -222,6 +223,7 @@ function App() {
       <button className="primary" disabled={editingLocked || !saved?.build || !!stale('moc3')} onClick={() => action('qa')}><Icon name="play"/>Run Pose QA</button>
     </div></header>
     {(busy || error || message) && <div className={'notice ' + (error ? 'error' : '')} role={error ? 'alert' : 'status'}>{error || busy || message}{!saved && !busy && <button onClick={() => { setError(''); setBusy('正在打开工作区…'); setOpenAttempt(value => value + 1); }}>重新打开工作区</button>}</div>}
+    <RecoveryPanel key={saved?.workspaceId??'unloaded'} saved={saved} editor={editor} locked={editingLocked}/>
     <main className="workspace">
       <aside className="panel parts-panel"><h2>图层</h2><label className="search"><Icon name="search"/><input aria-label="搜索图层" placeholder="搜索图层" value={search} onChange={e => setSearch(e.target.value)}/></label>
         <div className="part-list">{orderedParts.map(p => <div className={'part-row ' + (selected === p.id ? 'selected' : '')} key={p.id}>

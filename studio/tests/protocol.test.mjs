@@ -22,7 +22,7 @@ const { api }=require(path.join(output,'api.js'));
 const fixture=()=>({canvas:{width:2,height:2},parts:[{id:'face',name:'face',z:0,
   asset:{path:'face.png',offset:{left:0,top:0},size:{width:2,height:2}},
   geometry:{bbox:[0,0,2,2]},semantic:{tag:'FACE',side:'none'}}]});
-const snapshot=()=>({schemaVersion:1,status:'ok',ir:fixture(),revision:'base',stale:{psd:true},
+const snapshot=()=>({schemaVersion:1,workspaceId:'0'.repeat(32),status:'ok',ir:fixture(),revision:'base',stale:{psd:true},
   overlay:{status:'not-loaded',reasons:[]},sourceImage:'/studio-files/source.png',sourceBounds:null,artworkBounds:null,build:null,qa:null});
 
 test('shared command schema and optional reads preserve v1 full state, isolation and token semantics',async()=>{
