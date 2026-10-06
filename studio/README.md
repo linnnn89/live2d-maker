@@ -102,3 +102,13 @@ R1c 的 PNG 解码、像素中心 even-odd 裁切、透明度及普通 alpha 叠
 E5 将打开/保存/导入/原生任务编排放在 `src/workspace/useWorkspaceActions.ts`，画布、图层、点属性和差异在同目录。`bridge/transport.ts`、`runner.ts`、`resources.ts` 分别负责 HTTP、Python CLI 和资源白名单；Vite 配置只组合它们。交互、命令和单工作区排他请求语义保持，尚无后台任务队列。
 
 保存关键点注记后，不再将已有 PSD/模型/Pose QA 标记为待更新；关键点仍不驱动绑定。轮廓、显示、素材或绑定输入变化仍需更新。模型和 QA 保留原始生成 revision，以版本化模型输入签名核对；旧/未知报告不能证明对应关系时仍要求重建/检查。手动 Rebuild 仍执行重建。
+
+## 项目构建设置
+
+右侧“项目构建设置”提供贴图尺寸（1024/2048/4096）、网格内部间距（12–80 px）和头部转向强度（0–2）。默认 2048/40/1 保持既有预览行为。内部间距越小网格越密，原生按部件规则调整；它对应 `meshInteriorDensity`，不改变用于组件拆分的 `meshSpacing`。转向强度 0 关闭头部转向位移，具体模型效果仍需预览检查。
+
+先保存或放弃美术草稿，再“保存设置”或“保存并重建”。设置未保存时模型仍使用磁盘设置；已保存但未重建时旧模型保留并标明待更新，QA 关闭。面板显示上次构建实际采用值。重新读取设置会替换面板输入，放弃设置修改只恢复本页设置输入；构建设置不进入美术撤销栈。未保存设置在正常离开页面时提示，尚无自动设置草稿备份。
+
+设置保存在工作区独立 `build-settings.json`，不进入美术 IR；旧工作区缺该文件时读取默认值且不自动写入。CLI `studio-build-settings --workspace <目录>` 从 stdin 接收 `{ "schemaVersion":1, "revision":"<IR revision>", "settingsRevision":"<快照 buildSettings.revision>", "settings":{ "schemaVersion":1, "atlasSize":2048, "meshInteriorDensity":40, "headTurnStrength":1 } }`。IR 或设置版本冲突拒绝写入；`SETTINGS_CONFLICT` 对应 HTTP 409，界面保留本页输入，用户明确重新读取后再提交。
+
+构建、失败和 QA 报告同时记录模型输入与设置签名，构建目录保存设置副本。设置变更使模型/QA 失效，美术 PSD/PNG 不变；旧无设置签名报告仅能对应原默认值。改变设置不会把另一组设置下的原生失败结论误认成当前结果，但目标不存在等自身非法 Overlay 仍拒绝。物理及交付文件选项随后续迭代开放。

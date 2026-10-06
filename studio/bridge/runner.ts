@@ -3,7 +3,7 @@ import path from 'node:path';
 import {ProtocolError,backendError,validateProtocol} from '../src/protocol';
 export type BridgeConfig={repo:string;workspace:string;python:string;port:number;env:NodeJS.ProcessEnv};
 export type StudioRunner=(command:string,payload?:string)=>Promise<unknown>;
-const allowed=new Set(['studio-open','studio-snapshot','studio-save','studio-rebuild','studio-qa','studio-import-preview','studio-import-commit']);
+const allowed=new Set(['studio-open','studio-snapshot','studio-save','studio-rebuild','studio-qa','studio-import-preview','studio-import-commit','studio-build-settings']);
 export function createRunner(config:BridgeConfig,launch:typeof spawn=spawn):StudioRunner {
  const {repo,workspace,python,port,env}=config;
  return function run(command: string, payload?: string): Promise<unknown> {

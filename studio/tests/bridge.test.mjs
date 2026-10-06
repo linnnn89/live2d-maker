@@ -81,3 +81,26 @@ test('runner constructs shell-free Windows arguments and checks CLI results, wit
   const workspace=path.join(repo,'out/studio-e4-verified');
   if(existsSync(c.python)&&existsSync(path.join(workspace,'studio-state.json'))){const real=await createRunner({...c,workspace})('studio-snapshot');assert.equal(real.status,'ok');assert.equal(real.workspaceId.length,32);}
 });
+
+test('build settings transport validates the versioned preference contract and preserves conflict identity',async()=>{
+  const {ProtocolError}=require(path.join(output,'src/protocol/index.js'));
+  const calls=[];let conflict=false;
+  const service=await serverFor(config(),async(command,payload)=>{
+    calls.push([command,JSON.parse(payload)]);
+    if(conflict)throw new ProtocolError('SETTINGS_CONFLICT','settings changed','build-settings');
+    return snapshot;
+  });
+  const payload={schemaVersion:1,revision:'base',settingsRevision:'1'.repeat(64),settings:{schemaVersion:1,atlasSize:1024,meshInteriorDensity:12,headTurnStrength:0}};
+  try{
+    for(const invalid of [{...payload,settingsRevision:'bad'},{...payload,settings:{...payload.settings,headTurnStrength:3}},{...payload,settings:{...payload.settings,unknown:true}}]){
+      const response=await fetch(service.url+'/api/build-settings',{method:'POST',body:JSON.stringify(invalid)});
+      assert.equal(response.status,400);assert.equal((await response.json()).detail.code,'INVALID_REQUEST');
+    }
+    assert.equal(calls.length,0);
+    const response=await fetch(service.url+'/api/build-settings',{method:'POST',body:JSON.stringify(payload)});
+    assert.equal(response.status,200);assert.deepEqual(calls,[['studio-build-settings',payload]]);
+    conflict=true;
+    const denied=await fetch(service.url+'/api/build-settings',{method:'POST',body:JSON.stringify(payload)});
+    assert.equal(denied.status,409);assert.equal((await denied.json()).detail.code,'SETTINGS_CONFLICT');
+  }finally{await service.close();}
+});

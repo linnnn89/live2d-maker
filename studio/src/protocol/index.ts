@@ -72,7 +72,7 @@ export function backendError(input: unknown, status = 400, stage = 'transport'):
 }
 
 export function errorStatus(code: string): number {
-  if (['BASE_CONFLICT','BACKEND_BUSY','DRAFT_CONFLICT'].includes(code)) return 409;
+  if (['BASE_CONFLICT','BACKEND_BUSY','DRAFT_CONFLICT','SETTINGS_CONFLICT'].includes(code)) return 409;
   if (code === 'FORBIDDEN') return 403;
   if (code === 'METHOD_NOT_ALLOWED') return 405;
   if (code === 'REQUEST_SIZE') return 413;

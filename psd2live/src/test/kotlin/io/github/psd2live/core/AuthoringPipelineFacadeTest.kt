@@ -9,6 +9,18 @@ import kotlin.test.assertTrue
 
 class AuthoringPipelineFacadeTest {
     @Test
+    fun projectSettingsConfigureMeshSamplingAndHeadStrengthWithBounds() {
+        val config = AuthoringPipelineFacade.configuration("""{"atlasSize":1024,"meshInteriorDensity":12,"headTurnStrength":0}""", RigEditOverlay.Empty)
+        assertEquals(1024, config.atlasSize)
+        assertEquals(12f, config.meshInteriorDensity)
+        assertEquals(0f, config.headTurnStrength)
+        assertEquals(24, config.meshSpacing) // Component splitting remains an independent native default.
+        for (input in listOf("""{"meshInteriorDensity":11}""", """{"meshInteriorDensity":81}""",
+            """{"headTurnStrength":-0.1}""", """{"headTurnStrength":2.1}""")) {
+            assertFailsWith<IllegalArgumentException> { AuthoringPipelineFacade.configuration(input, RigEditOverlay.Empty) }
+        }
+    }
+    @Test
     fun explicitClassificationContractUsesNativeEnumsAndStableSourceIds() {
         val config = AuthoringPipelineFacade.configuration("""{"layerOverrides":{"lyid:2":{"tag":"TAIL","side":"LEFT"}}}""", RigEditOverlay.Empty)
         assertEquals(mapOf("lyid:2" to LayerClassificationOverride(SemanticTag.TAIL, Side.LEFT)), config.layerOverrides)

@@ -45,7 +45,7 @@ export function createTransport(config:BridgeConfig,runner:StudioRunner){
           return;
         }
         if (!pathname.startsWith('/api/')) { next(); return; }
-        const routes: Record<string, string> = { '/api/open': 'studio-open', '/api/snapshot': 'studio-snapshot', '/api/save': 'studio-save', '/api/rebuild': 'studio-rebuild', '/api/qa': 'studio-qa', '/api/import-preview': 'studio-import-preview', '/api/import-commit': 'studio-import-commit' };
+        const routes: Record<string, string> = { '/api/open': 'studio-open', '/api/snapshot': 'studio-snapshot', '/api/save': 'studio-save', '/api/rebuild': 'studio-rebuild', '/api/qa': 'studio-qa', '/api/import-preview': 'studio-import-preview', '/api/import-commit': 'studio-import-commit', '/api/build-settings': 'studio-build-settings' };
         const command = routes[pathname];
         if (!command || req.method !== (command === 'studio-snapshot' ? 'GET' : 'POST')) { sendError(res, new ProtocolError('METHOD_NOT_ALLOWED', 'Unsupported route or method', 'transport'), 'transport'); return; }
         // Reject cross-origin writes and DNS rebinding; no browser input becomes a shell command/path.
@@ -56,12 +56,12 @@ export function createTransport(config:BridgeConfig,runner:StudioRunner){
         if (busy) { sendError(res, new ProtocolError('BACKEND_BUSY', 'Studio is busy; wait for the active command', 'transport', true), 'transport'); return; }
         busy = true;
         try {
-          const input = ['studio-save', 'studio-import-preview', 'studio-import-commit'].includes(command)
+          const input = ['studio-save', 'studio-import-preview', 'studio-import-commit', 'studio-build-settings'].includes(command)
             ? await body(req, command === 'studio-import-preview' ? 48 * 1024 * 1024 : undefined) : undefined;
           if (input !== undefined) {
             let value: unknown;
             try { value = JSON.parse(input); } catch { throw new ProtocolError('INVALID_REQUEST', 'Request must be valid JSON', 'protocol'); }
-            validateProtocol(command === 'studio-save' ? 'SaveRequest' : command === 'studio-import-preview' ? 'ImportPreviewRequest' : 'ImportCommitRequest', value);
+            validateProtocol(command === 'studio-save' ? 'SaveRequest' : command === 'studio-import-preview' ? 'ImportPreviewRequest' : command === 'studio-build-settings' ? 'BuildSettingsRequest' : 'ImportCommitRequest', value);
           }
           json(res, 200, await runner(command, input));
         }
