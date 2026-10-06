@@ -269,6 +269,7 @@ function App() {
             <span>{JSON.stringify(change.before)} → {JSON.stringify(change.after)}</span>
           </li>)}</ul> : <p>与已保存 IR 一致。</p>}
         </details>
+        {!!draft?.history.droppedSteps && <p className="canvas-reference" role="status">历史保留上限已生效，较早或超出预算的步骤未保留。当前可撤销 {draft.history.undoSteps} 步、重做 {draft.history.redoSteps} 步；放弃草稿仍可恢复已保存版本。</p>}
       </section>
       <aside className="preview-column"><section className="panel preview-panel"><div className="panel-heading"><h2>Cubism 预览</h2><span className="preview-status">{previewStatus}</span></div><p className="canvas-reference" role="status">{previewSource}</p><div className="preview checker">
         {modelUrl && ir ? <iframe key={modelUrl} ref={attachFrame} title="Cubism 实时预览" onLoad={onLoad} src={'/live2d-viewer/index.html?' + new URLSearchParams({ model: modelUrl, vendor: '/public/vendor/cubism/', canvaspx: `${ir.canvas.width},${ir.canvas.height}`, w: '640', h: '760', embed: '1' })}/> : <div className="empty">点击 Rebuild 生成预览</div>}

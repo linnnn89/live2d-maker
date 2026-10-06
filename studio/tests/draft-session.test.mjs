@@ -189,3 +189,99 @@ test('indexed thousand-layer sequences preserve ID targeting, order and atomic h
   const reordered = { ...ir, parts: [...ir.parts].reverse() };
   assert.deepEqual(require(path.join(output, 'commands.js')).diffArtwork(ir, reordered), []);
 });
+
+test('part patches restore exact optional fields across mixed batches without mutating caller data', () => {
+  const original = fixture();
+  delete original.parts[0].geometry.polygon; delete original.parts[0].geometry.landmarks;
+  original.parts[0].geometry.extra = { nested: ['preserve'] };
+  const s = new DraftSession(original, 'base', 'patch');
+  const commands = [
+    { type: 'set_visibility', partId: 'hair', visible: true },
+    { type: 'set_landmark', partId: 'face', name: 'new', point: [10, 20] },
+    { type: 'set_landmark', partId: 'face', name: 'new', point: [30, 40] },
+    { type: 'set_polygon', partId: 'face', points: [[0, 0], [20, 0], [20, 30]] },
+    { type: 'set_opacity', partId: 'face', opacity: 10 },
+    { type: 'remove_landmark', partId: 'hair', name: 'center' },
+  ];
+  const before = structuredClone(original);
+  s.apply(s.token(), commands); const edited = s.inspect();
+  assert.deepEqual(original, before); assert.equal(edited.history.undoSteps, 1);
+  commands[1].point[0] = 90;
+  assert.deepEqual(s.inspect().ir.parts[0].geometry.landmarks.new, [30, 40]);
+  assert.deepEqual(edited.ir.parts[1].appearance, { visible: true, opacity: 255 });
+  edited.ir.parts[0].geometry.extra.nested.push('outside');
+  s.undo(s.token()); assert.deepEqual(s.inspect().ir, original);
+  s.redo(s.token()); assert.deepEqual(s.inspect().ir.parts[0].geometry.extra, { nested: ['preserve'] });
+  const standalone = applyCommands(original, [hide]);
+  standalone.parts[0].asset.path = 'outside'; standalone.parts[0].geometry.extra.nested.push('outside');
+  assert.deepEqual(original, before);
+  const state = s.inspect();
+  assert.throws(() => s.apply(s.token(), [hide, { type: 'remove_landmark', partId: 'hair', name: 'missing' }]), { code: 'LANDMARK_NOT_FOUND' });
+  assert.deepEqual(s.inspect(), state);
+});
+
+test('history enforces combined step and UTF-8 byte budgets and treats oversized edits as barriers', () => {
+  const s = new DraftSession(fixture(), 'base', 'step-cap', { maxSteps: 3, maxBytes: 100000 });
+  for (let value = 1; value <= 5; value++) s.apply(s.token(), [{ ...opacity, opacity: value }]);
+  assert.equal(s.inspect().history.undoSteps, 3); assert.equal(s.inspect().history.droppedSteps, 2);
+  const bytes = s.inspect().history.retainedBytes;
+  for (let i = 0; i < 3; i++) s.undo(s.token());
+  assert.equal(s.inspect().ir.parts[0].appearance.opacity, 2);
+  assert.equal(s.inspect().canUndo, false); assert.equal(s.inspect().history.redoSteps, 3);
+  assert.equal(s.inspect().history.retainedBytes, bytes);
+  for (let i = 0; i < 3; i++) s.redo(s.token());
+  assert.equal(s.inspect().ir.parts[0].appearance.opacity, 5);
+  s.undo(s.token()); s.apply(s.token(), [{ ...opacity, opacity: 9 }]);
+  assert.equal(s.inspect().canRedo, false); assert.equal(s.inspect().history.undoSteps, 3);
+
+  const ir = fixture(), one = structuredClone(ir.parts[0]), two = structuredClone(ir.parts[0]);
+  one.appearance = { visible: true, opacity: 1 }; two.appearance = { visible: true, opacity: 2 };
+  // Independent encoding of the documented touched-part before/after payload.
+  const b1 = Buffer.byteLength(JSON.stringify([{ index: 0, before: ir.parts[0], after: one }]));
+  const b2 = Buffer.byteLength(JSON.stringify([{ index: 0, before: one, after: two }]));
+  const limit = b1 + b2 - 1;
+  const bounded = new DraftSession(ir, 'base', 'byte-cap', { maxSteps: 100, maxBytes: limit });
+  bounded.apply(bounded.token(), [{ ...opacity, opacity: 1 }]);
+  assert.equal(bounded.inspect().history.retainedBytes, b1);
+  bounded.apply(bounded.token(), [{ ...opacity, opacity: 2 }]);
+  assert.equal(bounded.inspect().history.retainedBytes, b2);
+  assert.equal(bounded.inspect().history.undoSteps, 1); assert.equal(bounded.inspect().history.droppedSteps, 1);
+  bounded.undo(bounded.token()); assert.equal(bounded.inspect().ir.parts[0].appearance.opacity, 1);
+  bounded.redo(bounded.token());
+  const largePolygon = Array.from({ length: 1000 }, (_, i) => [i % 100, (i * 3) % 100]);
+  bounded.apply(bounded.token(), [{ type: 'set_polygon', partId: 'face', points: largePolygon }]);
+  assert.deepEqual(bounded.inspect().ir.parts[0].geometry.polygon, largePolygon);
+  assert.equal(bounded.inspect().history.retainedBytes, 0);
+  assert.equal(bounded.inspect().canUndo, false); assert.equal(bounded.inspect().canRedo, false);
+  const barrier = bounded.inspect(); bounded.undo(bounded.token()); assert.deepEqual(bounded.inspect(), barrier);
+  bounded.prepareSave(bounded.token()); bounded.releaseSave();
+  assert.equal(bounded.inspect().history.retainedBytes, 0); assert.equal(bounded.inspect().dirty, true);
+  bounded.discard(bounded.token()); assert.deepEqual(bounded.inspect().ir, ir);
+  assert.equal(bounded.inspect().history.droppedSteps, 0);
+  const tiny = new DraftSession(ir, 'base', 'tiny', { maxSteps: 1, maxBytes: 1 });
+  tiny.apply(tiny.token(), [hide]); tiny.apply(tiny.token(), [{ ...hide, visible: true }]);
+  assert.equal(tiny.inspect().dirty, false); assert.equal(tiny.inspect().history.droppedSteps, 2);
+  tiny.discard(tiny.token()); assert.equal(tiny.inspect().history.droppedSteps, 0);
+});
+
+test('long gestures occupy one budget step; cancellation and net-zero gestures preserve redo', () => {
+  const s = new DraftSession(fixture(), 'base', 'gesture-cap', { maxSteps: 1, maxBytes: 100000 });
+  s.apply(s.token(), [opacity]); s.undo(s.token()); const original = s.inspect();
+  s.beginGesture(s.token());
+  for (let i = 1; i <= 250; i++) s.updateGesture([{ ...opacity, opacity: i }]);
+  s.endGesture(true);
+  assert.deepEqual(s.inspect().ir, original.ir); assert.deepEqual(s.inspect().history, original.history);
+  s.beginGesture(s.token()); s.updateGesture([opacity]); s.updateGesture([{ ...opacity, opacity: 255 }]); s.endGesture(false);
+  assert.deepEqual(s.inspect().ir, original.ir); assert.deepEqual(s.inspect().history, original.history);
+  s.beginGesture(s.token());
+  for (let i = 1; i <= 250; i++) s.updateGesture([{ ...opacity, opacity: i }]);
+  s.endGesture(false);
+  assert.equal(s.inspect().history.undoSteps, 1); assert.equal(s.inspect().history.redoSteps, 0);
+  assert.equal(s.inspect().history.droppedSteps, 0);
+  s.undo(s.token()); assert.deepEqual(s.inspect().ir, original.ir);
+  s.redo(s.token()); assert.equal(s.inspect().ir.parts[0].appearance.opacity, 250);
+  s.apply(s.token(), [hide]);
+  assert.equal(s.inspect().history.droppedSteps, 1);
+  s.undo(s.token()); assert.equal(s.inspect().ir.parts[0].appearance.opacity, 250);
+  assert.equal(s.inspect().canUndo, false);
+});
