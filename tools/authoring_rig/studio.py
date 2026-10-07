@@ -16,7 +16,7 @@ from .stale import model_input_signature
 from .validator import validate_authoring_rig
 from .studio_protocol import StudioError, validate_protocol
 from .binding import build_configuration, classification_audit
-from .build_settings import load_settings, settings_signature, settings_record_matches
+from .build_settings import load_settings, settings_signature
 
 # Compatibility exports for existing CLI/native callers.
 from .workspace_store import read, write, revision, locked, file_url
