@@ -405,3 +405,9 @@ N1 的设置草稿保留初始基线与本地三个数值，远端新快照只�
 前端79项（77通过/2因Windows路径跳过）、构建、真实UI8项通过。新UI用例使用StrictMode、实际PNG Worker捕获、卸载/保留旧引用/重挂载，旧apply拒绝且新草稿保持干净。50次模拟worker生命周期清空活动任务/队列/handler，不宣称整体堆/GPU测量。证据在工作区外/tmp/live2d-n3-evidence/。后续持续实施plan见工程评审第9节；native/Windows接口未改动。
 
 N3b 继续收敛到 WorkspaceOperations：同步进入、自己的isCurrent/block/update/finish，旧所有者无法结束新任务；无队列/自动重试。工程/姿态/关键形/交付/设置/保存/重建/QA/导入接上同一门禁。保存启动后同步block，提交的新基线仍处于operation，Agent不可在后续阶段插入写入。成功交付保留可下载结果，后续snapshot失败只提供读取重试。前端82项（80通过/2原路径跳过）和构建通过；原UI8项及新交付fixture用例通过，StrictMode附加验证同tick重复读取只请求一次、旧读取迟到不释放新宿主门禁。原生算法/接口未修改，真实交付接入留W1。
+
+## 45. N5a：一次性导入 Worker 与迟到资源（2026-10-07）
+
+ImportClient每次任务创建独立Worker，只有一个active、无队列/缓存；完成/错误/取消后清空handler并terminate，旧回调不会影响后来任务。素材decode/alpha/crop、mask decode/PNG encode/Base64移出主线程；decode前沿用像素/文件上限并预留codec预算，失败释放lease。主线程不再保存RGBA副本，只保留尺寸/alpha/URL及原mask；预检传输mask副本不损坏编辑输入。已清理的effect不创建URL，取消后预检不发新请求或发布旧返回。源图裁切用重新检查而非新缓存，保持所有权简单。独立384MiBcodec预算不是浏览器/GPU整体上限；HTTP Base64副本仍待真实增长数据评估。
+
+前端86项（84通过/2原路径跳过）、构建通过，入口bundle437.62kB（原473.20kB），新Worker182.25kB按任务加载。2048²真实PNG、尺寸拒绝后恢复、反复取消、裁切、mask预检和纯Python提交通过，完成后importWorker0/关闭后spriteURL0；可控迟到fixture验证cleanup后URL创建0。未改原生建模。完整UI复跑结果与后续N4/N5b见工程评审第9节。

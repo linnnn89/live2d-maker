@@ -4,6 +4,7 @@ Run STUDIO_UI_URL=http://127.0.0.1:5173 python -m unittest
 tools.authoring_rig.tests.test_studio_ui -v. No native rebuild or Windows CLI is used.
 """
 import base64
+import io
 import json
 import os
 import tempfile
@@ -16,7 +17,7 @@ from psd_tools import PSDImage
 from playwright.sync_api import expect, sync_playwright
 
 from tools.authoring_rig.projects import create_project, project_root, revision_list, save_project, restore_project
-from tools.authoring_rig.studio import snapshot, save_workspace, save_build_settings
+from tools.authoring_rig.studio import snapshot, save_workspace, save_build_settings, preview_generated, commit_generated
 from tools.authoring_rig.studio_protocol import StudioError
 
 
@@ -50,6 +51,10 @@ class StudioUi(unittest.TestCase):
         self.page.route("**/*", self.route)
 
     def dispatch(self, operation, payload):
+        if operation == "import-preview":
+            return preview_generated(self.root, payload)
+        if operation == "import-commit":
+            return commit_generated(self.root, payload)
         if operation == "model-export":
             self.export_result = {"schemaVersion": 1, "target": payload["target"], "url": "/fixture.model.zip",
                 "filename": "fixture.model.zip", "files": [], "warnings": [], "cacheId": "a" * 32,
@@ -261,15 +266,22 @@ class StudioUi(unittest.TestCase):
         self.page.goto(os.environ["STUDIO_UI_URL"].rstrip("/") + "/lifecycle-harness?project=" + self.root.name)
         self.page.evaluate("""async () => {
             // Use Vite's exact React module URLs, including its version query, to share one dispatcher.
-            const contextSource = await (await fetch('/src/workspace/WorkspaceContext.tsx')).text();
+            const importSource = await (await fetch('/src/ImportGenerated.tsx')).text();
+            const contextUrl = importSource.match(/from \"([^\"]*WorkspaceContext\\.tsx[^\"]*)\"/)[1];
+            const contextSource = await (await fetch(contextUrl)).text();
             const mainSource = await (await fetch('/src/main.tsx')).text();
             const react = (await import(contextSource.match(/from \"([^\"]*react\\.js[^\"]*)\"/)[1])).default;
             const dom = (await import(mainSource.match(/from \"([^\"]*react-dom_client\\.js[^\"]*)\"/)[1])).default;
-            const {WorkspaceProvider, useWorkspace} = await import('/src/workspace/WorkspaceContext.tsx');
+            const {WorkspaceProvider, useWorkspace} = await import(contextUrl);
+            const {ImportGenerated} = await import('/src/ImportGenerated.tsx');
             function Probe() {
                 const workspace = useWorkspace();
                 react.useEffect(() => { window.currentWorkspace = workspace; }, [workspace]);
-                return react.createElement('p', null, workspace.saved ? '工作区已载入' : '正在载入');
+                return react.createElement(react.Fragment, null,
+                    react.createElement('p', null, workspace.saved ? '工作区已载入' : '正在载入'),
+                    workspace.showImport && workspace.saved && react.createElement(ImportGenerated,
+                        {revision:workspace.saved.revision, ir:workspace.ir, selectedId:workspace.selected,
+                         onClose:workspace.closeImport, onCommit:workspace.commitImport}));
             }
             window.mountHost = () => {
                 window.hostRoot = dom.createRoot(document.getElementById('host'));
@@ -307,6 +319,28 @@ class StudioUi(unittest.TestCase):
             return {capture:image.ok, old:old.error.code, dirty:currentWorkspace.dirty};
         }""")
         self.assertEqual(result, {"capture": True, "old": "ABORTED", "dirty": False})
+        self.page.evaluate("""() => {
+            const Worker = window.Worker;
+            window.Worker = function(url, options) {
+                if (!String(url).includes('import.worker')) return new Worker(url, options);
+                return {onmessage:null, onerror:null, terminate() {}, postMessage() {
+                    const callback = this.onmessage;
+                    window.lateImport = () => callback({data:{ok:true, value:{width:4,height:4,alpha:[0,0,1,1]}}});
+                }};
+            };
+            const create = URL.createObjectURL.bind(URL);
+            window.lateUrls = 0;
+            URL.createObjectURL = value => { lateUrls++; return create(value); };
+            currentWorkspace.openImport();
+        }""")
+        dialog = self.page.get_by_role("dialog", name="导入素材", exact=True)
+        dialog.get_by_label("透明素材 PNG", exact=True).set_input_files(
+            {"name": "pending.png", "mimeType": "image/png", "buffer": b"pending"})
+        self.page.wait_for_function("typeof window.lateImport === 'function'")
+        self.page.evaluate("currentWorkspace.closeImport()")
+        expect(dialog).to_have_count(0)
+        self.page.evaluate("window.lateImport()")
+        self.assertEqual(self.page.evaluate("lateUrls"), 0)
         before = self.requests.count("snapshot")
         self.page.evaluate("""async () => {
             const first = currentWorkspace.readBuildSettings();
@@ -355,3 +389,166 @@ class StudioUi(unittest.TestCase):
         self.assertEqual(self.requests.count("snapshot"), 2)
         self.assertFalse(self.errors)
         self.evidence("export-confirmed-after-read-retry")
+
+    def test_import_worker_preserves_mask_preflight_and_releases_workers_and_urls(self):
+        self.page.add_init_script("""(() => {
+            const Worker = window.Worker;
+            window.importWorkers = 0;
+            window.Worker = class extends Worker {
+                constructor(url, options) {
+                    super(url, options);
+                    this.importTask = String(url).includes('import.worker');
+                    if (this.importTask) window.importWorkers++;
+                }
+                terminate() {
+                    if (this.importTask) { window.importWorkers--; this.importTask = false; }
+                    return super.terminate();
+                }
+            };
+            const create = URL.createObjectURL.bind(URL), revoke = URL.revokeObjectURL.bind(URL);
+            window.spriteUrls = new Set();
+            URL.createObjectURL = blob => {
+                const url = create(blob);
+                if (blob.type === 'image/png') spriteUrls.add(url);
+                return url;
+            };
+            URL.revokeObjectURL = url => { spriteUrls.delete(url); return revoke(url); };
+        })()""")
+        self.open()
+        generated = Image.new("RGBA", (2048, 2048))
+        generated.paste((200, 20, 40, 255), (800, 800, 1000, 1000))
+        buffer = io.BytesIO(); generated.save(buffer, format="PNG")
+        png = {"name": "tongue.png", "mimeType": "image/png", "buffer": buffer.getvalue()}
+        for attempt in range(3):
+            self.page.get_by_role("button", name="导入素材", exact=True).click()
+            dialog = self.page.get_by_role("dialog", name="导入素材", exact=True)
+            if attempt == 0:
+                oversized = bytearray(buffer.getvalue()); oversized[16:20] = (2 ** 31 - 1).to_bytes(4, "big")
+                dialog.get_by_label("透明素材 PNG", exact=True).set_input_files(
+                    {"name": "oversized.png", "mimeType": "image/png", "buffer": bytes(oversized)})
+                expect(dialog.get_by_role("alert")).to_contain_text("图像尺寸无效")
+                self.assertEqual(self.page.evaluate("importWorkers"), 0)
+                self.assertEqual(self.page.evaluate("spriteUrls.size"), 0)
+            dialog.get_by_label("透明素材 PNG", exact=True).set_input_files(png)
+            expect(dialog.get_by_role("button", name="检查导入", exact=True)).to_be_enabled()
+            self.assertEqual(self.page.evaluate("importWorkers"), 0)
+            self.assertEqual(self.page.evaluate("spriteUrls.size"), 1)
+            dialog.get_by_role("button", name="取消", exact=True).click()
+            expect(dialog).to_have_count(0)
+            self.assertEqual(self.page.evaluate("spriteUrls.size"), 0)
+
+        self.page.get_by_role("button", name="导入素材", exact=True).click()
+        dialog = self.page.get_by_role("dialog", name="导入素材", exact=True)
+        dialog.get_by_label("透明素材 PNG", exact=True).set_input_files(png)
+        expect(dialog.get_by_role("button", name="检查导入", exact=True)).to_be_enabled()
+        dialog.get_by_text("源 PNG 裁切（可选）", exact=True).click()
+        dialog.get_by_label("仅导入指定矩形内的内容", exact=True).check()
+        for label, value in [("左", "800"), ("上", "800"), ("右", "1000"), ("下", "1000")]:
+            dialog.get_by_label("源图" + label, exact=True).fill(value)
+            expect(dialog.get_by_label("源图" + label, exact=True)).to_be_enabled()
+        expect(dialog.get_by_role("button", name="检查导入", exact=True)).to_be_disabled()
+        dialog.get_by_role("button", name="应用裁切坐标", exact=True).click()
+        expect(dialog.get_by_role("button", name="检查导入", exact=True)).to_be_enabled()
+        mask = Image.new("L", (32, 32)); mask.paste(255, (2, 3, 22, 23))
+        buffer = io.BytesIO(); mask.save(buffer, format="PNG")
+        dialog.get_by_label("保护区 mask", exact=True).set_input_files(
+            {"name": "mask.png", "mimeType": "image/png", "buffer": buffer.getvalue()})
+        expect(dialog.get_by_role("button", name="检查导入", exact=True)).to_be_enabled()
+        dialog.get_by_label("按可见内容等比适配范围", exact=True).check()
+        dialog.get_by_label("导入图层名称", exact=True).fill("tongue")
+        dialog.get_by_label("素材来源说明", exact=True).fill("Fixture artwork")
+        dialog.get_by_role("button", name="检查导入", exact=True).click()
+        expect(dialog.get_by_role("button", name="确认导入", exact=True)).to_be_enabled()
+        expect(dialog.get_by_text("预检通过 · tongue · TONGUE", exact=True)).to_be_visible()
+        self.assertEqual(self.page.evaluate("importWorkers"), 0)
+        self.evidence("import-worker-preflight")
+        dialog.get_by_role("button", name="确认导入", exact=True).click()
+        expect(dialog).to_have_count(0)
+        self.assertEqual(len(snapshot(self.root)["ir"]["parts"]), 2)
+        self.assertEqual(self.page.evaluate("spriteUrls.size"), 0)
+        self.assertEqual(self.requests.count("import-preview"), 1)
+        self.assertEqual(self.requests.count("import-commit"), 1)
+        self.assertFalse(self.errors)
+
+    def test_crop_typing_keeps_focus_and_only_checks_confirmed_coordinates(self):
+        self.page.add_init_script("""(() => {
+            const W = window.Worker;
+            window.importStarts = 0;
+            window.Worker = class extends W {
+                constructor(url, options) {
+                    super(url, options);
+                    if (String(url).includes('import.worker')) window.importStarts++;
+                }
+            };
+        })()""")
+        self.open()
+        image = Image.new("RGBA", (2048, 2048))
+        image.paste((200, 20, 40, 255), (800, 800, 1000, 1000))
+        buffer = io.BytesIO(); image.save(buffer, format="PNG")
+        self.page.get_by_role("button", name="导入素材", exact=True).click()
+        dialog = self.page.get_by_role("dialog", name="导入素材", exact=True)
+        dialog.get_by_label("透明素材 PNG", exact=True).set_input_files(
+            {"name": "crop.png", "mimeType": "image/png", "buffer": buffer.getvalue()})
+        check = dialog.get_by_role("button", name="检查导入", exact=True)
+        expect(check).to_be_enabled()
+        dialog.get_by_text("源 PNG 裁切（可选）", exact=True).click()
+        dialog.get_by_label("仅导入指定矩形内的内容", exact=True).check()
+        expect(check).to_be_enabled()
+        before = self.page.evaluate("importStarts")
+        control = dialog.get_by_label("源图左", exact=True)
+        control.click(); control.press("ControlOrMeta+A")
+        self.page.keyboard.type("800", delay=180)
+        self.assertEqual(control.input_value(), "800")
+        self.assertTrue(control.evaluate("e => e === document.activeElement"))
+        self.assertEqual(self.page.evaluate("importStarts"), before)
+        expect(check).to_be_disabled()
+        dialog.get_by_role("button", name="应用裁切坐标", exact=True).click()
+        expect(check).to_be_enabled()
+        self.assertEqual(self.page.evaluate("importStarts"), before + 1)
+        # New input invalidates the checked coordinates; returning to them can reuse their result.
+        control.fill("801"); expect(check).to_be_disabled()
+        control.fill("800"); expect(check).to_be_enabled()
+        self.assertEqual(self.page.evaluate("importStarts"), before + 1)
+        self.evidence("crop-continuous-input")
+
+    def test_cancel_during_inspection_releases_worker_and_rejects_late_result(self):
+        self.page.add_init_script("""(() => {
+            const W = window.Worker;
+            window.importWorkers = 0;
+            window.Worker = function(url, options) {
+                const worker = new W(url, options);
+                if (!String(url).includes('import.worker')) return worker;
+                window.importWorkers++;
+                const port = { onmessage: null, onerror: null,
+                    postMessage: (...args) => worker.postMessage(...args),
+                    terminate: () => { window.importWorkers--; worker.terminate(); }
+                };
+                worker.onmessage = event => {
+                    const callback = port.onmessage;
+                    window.lateImport = () => callback?.(event);
+                };
+                worker.onerror = event => port.onerror?.(event);
+                return port;
+            };
+            window.createdSpriteUrls = 0;
+            const create = URL.createObjectURL.bind(URL);
+            URL.createObjectURL = blob => { if(blob.type === 'image/png') window.createdSpriteUrls++; return create(blob); };
+        })()""")
+        self.open()
+        image = Image.new("RGBA", (16, 16)); image.paste((30, 80, 100, 255), (2, 2, 8, 8))
+        buffer = io.BytesIO(); image.save(buffer, format="PNG")
+        self.page.get_by_role("button", name="导入素材", exact=True).click()
+        dialog = self.page.get_by_role("dialog", name="导入素材", exact=True)
+        dialog.get_by_label("透明素材 PNG", exact=True).set_input_files(
+            {"name": "cancel.png", "mimeType": "image/png", "buffer": buffer.getvalue()})
+        self.page.wait_for_function("typeof window.lateImport === 'function'")
+        expect(dialog.get_by_role("button", name="检查导入", exact=True)).to_be_disabled()
+        dialog.get_by_role("button", name="取消", exact=True).click()
+        expect(dialog).to_have_count(0)
+        self.assertEqual(self.page.evaluate("importWorkers"), 0)
+        self.page.get_by_role("button", name="导入素材", exact=True).click()
+        self.page.evaluate("window.lateImport()")
+        expect(self.page.get_by_role("dialog").get_by_role("button", name="检查导入", exact=True)).to_be_disabled()
+        self.assertEqual(self.page.evaluate("createdSpriteUrls"), 0)
+        self.assertEqual(self.requests.count("import-preview"), 0)
+        self.assertEqual(self.requests.count("import-commit"), 0)
