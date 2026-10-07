@@ -448,4 +448,4 @@ main从615d0b8快进到origin/main@8647b83，实施在codex/windows-w1-acceptanc
 
 前端86项最终均验证、构建通过；Kotlin全量215项0失败0错误1可选nunif跳过，Cubism实际GPU初始化；测试堆2GiB解决真实PSD案例的默认512MiB不足。扩展后的服务组6/6通过。Python全量52项的1个Windows大小写fixture已定向修正；工程/归档6、交付2及最终真实React UI12项通过。新增自动化测试仅2项。完整事实、命令范围、资源表和失败原因见[R8第9节](ENGINEERING_REVIEW_R8.md#w1-windows-实测与定向修复2026-10-07)。
 
-证据out/w1-windows/与out/w1-*.log，仅隔离测试工程；本轮依赖恢复为锁定npm包和项目Python内psutil。Compose源码应用实际启动/窗口检查通过，但UIA仅Pane，逐控件交互及完整MCP网络的迟到关闭/重开未覆盖；未做Cubism Editor人工验收或Windows安装包发布。随仓/portable二进制没有替换，Studio本机优先使用新构建源码JAR；复现应先构建当前源码。本分支源/文档待按用户发布授权推送。
+证据out/w1-windows/与out/w1-*.log，仅隔离测试工程；本轮依赖恢复为锁定npm包和项目Python内psutil。Compose源码应用实际启动/窗口检查通过，但UIA仅Pane，逐控件交互及完整MCP网络的迟到关闭/重开未覆盖；未做Cubism Editor人工验收或Windows安装包发布。随仓/portable二进制没有替换，Studio本机优先使用新构建源码JAR；复现应先构建当前源码。本轮源码与文档对应 [Windows W1 PR #33](https://github.com/linnnn89/live2d-maker/pull/33)。
