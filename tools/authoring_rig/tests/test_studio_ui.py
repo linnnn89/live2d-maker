@@ -445,7 +445,10 @@ class StudioUi(unittest.TestCase):
         dialog.get_by_label("仅导入指定矩形内的内容", exact=True).check()
         for label, value in [("左", "800"), ("上", "800"), ("右", "1000"), ("下", "1000")]:
             dialog.get_by_label("源图" + label, exact=True).fill(value)
-            expect(dialog.get_by_role("button", name="检查导入", exact=True)).to_be_enabled()
+            expect(dialog.get_by_label("源图" + label, exact=True)).to_be_enabled()
+        expect(dialog.get_by_role("button", name="检查导入", exact=True)).to_be_disabled()
+        dialog.get_by_role("button", name="应用裁切坐标", exact=True).click()
+        expect(dialog.get_by_role("button", name="检查导入", exact=True)).to_be_enabled()
         mask = Image.new("L", (32, 32)); mask.paste(255, (2, 3, 22, 23))
         buffer = io.BytesIO(); mask.save(buffer, format="PNG")
         dialog.get_by_label("保护区 mask", exact=True).set_input_files(
@@ -466,3 +469,86 @@ class StudioUi(unittest.TestCase):
         self.assertEqual(self.requests.count("import-preview"), 1)
         self.assertEqual(self.requests.count("import-commit"), 1)
         self.assertFalse(self.errors)
+
+    def test_crop_typing_keeps_focus_and_only_checks_confirmed_coordinates(self):
+        self.page.add_init_script("""(() => {
+            const W = window.Worker;
+            window.importStarts = 0;
+            window.Worker = class extends W {
+                constructor(url, options) {
+                    super(url, options);
+                    if (String(url).includes('import.worker')) window.importStarts++;
+                }
+            };
+        })()""")
+        self.open()
+        image = Image.new("RGBA", (2048, 2048))
+        image.paste((200, 20, 40, 255), (800, 800, 1000, 1000))
+        buffer = io.BytesIO(); image.save(buffer, format="PNG")
+        self.page.get_by_role("button", name="导入素材", exact=True).click()
+        dialog = self.page.get_by_role("dialog", name="导入素材", exact=True)
+        dialog.get_by_label("透明素材 PNG", exact=True).set_input_files(
+            {"name": "crop.png", "mimeType": "image/png", "buffer": buffer.getvalue()})
+        check = dialog.get_by_role("button", name="检查导入", exact=True)
+        expect(check).to_be_enabled()
+        dialog.get_by_text("源 PNG 裁切（可选）", exact=True).click()
+        dialog.get_by_label("仅导入指定矩形内的内容", exact=True).check()
+        expect(check).to_be_enabled()
+        before = self.page.evaluate("importStarts")
+        control = dialog.get_by_label("源图左", exact=True)
+        control.click(); control.press("ControlOrMeta+A")
+        self.page.keyboard.type("800", delay=180)
+        self.assertEqual(control.input_value(), "800")
+        self.assertTrue(control.evaluate("e => e === document.activeElement"))
+        self.assertEqual(self.page.evaluate("importStarts"), before)
+        expect(check).to_be_disabled()
+        dialog.get_by_role("button", name="应用裁切坐标", exact=True).click()
+        expect(check).to_be_enabled()
+        self.assertEqual(self.page.evaluate("importStarts"), before + 1)
+        # New input invalidates the checked coordinates; returning to them can reuse their result.
+        control.fill("801"); expect(check).to_be_disabled()
+        control.fill("800"); expect(check).to_be_enabled()
+        self.assertEqual(self.page.evaluate("importStarts"), before + 1)
+        self.evidence("crop-continuous-input")
+
+    def test_cancel_during_inspection_releases_worker_and_rejects_late_result(self):
+        self.page.add_init_script("""(() => {
+            const W = window.Worker;
+            window.importWorkers = 0;
+            window.Worker = function(url, options) {
+                const worker = new W(url, options);
+                if (!String(url).includes('import.worker')) return worker;
+                window.importWorkers++;
+                const port = { onmessage: null, onerror: null,
+                    postMessage: (...args) => worker.postMessage(...args),
+                    terminate: () => { window.importWorkers--; worker.terminate(); }
+                };
+                worker.onmessage = event => {
+                    const callback = port.onmessage;
+                    window.lateImport = () => callback?.(event);
+                };
+                worker.onerror = event => port.onerror?.(event);
+                return port;
+            };
+            window.createdSpriteUrls = 0;
+            const create = URL.createObjectURL.bind(URL);
+            URL.createObjectURL = blob => { if(blob.type === 'image/png') window.createdSpriteUrls++; return create(blob); };
+        })()""")
+        self.open()
+        image = Image.new("RGBA", (16, 16)); image.paste((30, 80, 100, 255), (2, 2, 8, 8))
+        buffer = io.BytesIO(); image.save(buffer, format="PNG")
+        self.page.get_by_role("button", name="导入素材", exact=True).click()
+        dialog = self.page.get_by_role("dialog", name="导入素材", exact=True)
+        dialog.get_by_label("透明素材 PNG", exact=True).set_input_files(
+            {"name": "cancel.png", "mimeType": "image/png", "buffer": buffer.getvalue()})
+        self.page.wait_for_function("typeof window.lateImport === 'function'")
+        expect(dialog.get_by_role("button", name="检查导入", exact=True)).to_be_disabled()
+        dialog.get_by_role("button", name="取消", exact=True).click()
+        expect(dialog).to_have_count(0)
+        self.assertEqual(self.page.evaluate("importWorkers"), 0)
+        self.page.get_by_role("button", name="导入素材", exact=True).click()
+        self.page.evaluate("window.lateImport()")
+        expect(self.page.get_by_role("dialog").get_by_role("button", name="检查导入", exact=True)).to_be_disabled()
+        self.assertEqual(self.page.evaluate("createdSpriteUrls"), 0)
+        self.assertEqual(self.requests.count("import-preview"), 0)
+        self.assertEqual(self.requests.count("import-commit"), 0)
