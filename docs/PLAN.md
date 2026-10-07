@@ -2,7 +2,7 @@
 
 更新于 2026-10-07。目标是完成 PSD 编辑、素材导入、Live2D 重建和验证这些软件功能。角色素材只作为测试样本，不要求逐类制作完整角色。
 
-最新代码复评与后续实施 plan：见 [R8 后的工程评审](ENGINEERING_REVIEW_R8.md)，基于 `main@99f1908`。下一轮按 N0 Agent/用户交错与取消契约 → N1 设置草稿保护 → N2 修订状态闭环 → N3 操作用例统一推进；后续 N5a 导入资源预算、N4 存储/查询边界、N5b 归档流式处理。Windows 原生时序与资源验收列为 W1。当前均为计划，尚未实施。
+最新代码复评与后续实施 plan：见 [R8 后的工程评审](ENGINEERING_REVIEW_R8.md)，基于 `main@99f1908`。N0 核心 Agent 时序回归、N1 设置草稿保护、N2 修订状态闭环已在 `codex/studio-n0-n2-state-consistency` 实施，70 项前端检查、7 项真实 React/纯 Python UI 验收和构建通过，另 2 项前端检查因 Windows Python 路径跳过。下一轮按证据推进 N3 小范围操作用例与关闭生命周期、N5a 导入资源预算，再推进 N4 存储/查询边界与 N5b 归档流式处理。Windows 原生时序与资源验收 W1 仍待 PC 执行。详见工程评审第 8 节。
 
 设计参考：[Mesh Avatar Studio](https://github.com/shinshin86/mesh-avatar-studio)。安装与使用见 [环境说明](environment.md) 和 [Studio 使用说明](../studio/README.md)；历史验证记录见 [HANDOFF.md](HANDOFF.md)。
 

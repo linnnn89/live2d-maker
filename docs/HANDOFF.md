@@ -387,3 +387,13 @@ viewer 的 dynamics=1 入口显式加载既有 Cubism Web Framework 5-r.5（198a
 首次 SDK 回归在 doUpdateParameters 报空数组 length，核对随仓压缩代码及官方 5-r.5 源码证实 setEffectIds 必须初始化，按 model3 Groups 补齐，第二轮通过。浏览器脚本首次 range.fill(25) 不符合该输入 0.45 的步距，改为合法值 27 后续验通过，未改生产参数范围。官方参考：https://github.com/Live2D/CubismWebFramework/blob/5-r.5/src/motion/cubismmotion.ts 和 https://github.com/Live2D/CubismWebFramework/blob/5-r.5/src/physics/cubismphysics.ts 。
 
 R1–R8 规划首批必选范围完成。可选单图拆层/自动生成仍按具体需求和环境选择，不新增模型下载、外部服务或生成 API；外部/AI 素材已有候选预检/确认流程。完整时间轴、音频/事件副作用、复杂 Overlay 全组合、持久后台 job、任意单层增量绑定、Cubism Editor GUI 和美术质量评审没有被本次声明为完成。
+
+## 43. R8 后复评与 N0–N2：时序回归、设置输入保护、修订同步（2026-10-07）
+
+云端已对齐 main@99f1908，复评/后续 plan 位于 [ENGINEERING_REVIEW_R8.md](ENGINEERING_REVIEW_R8.md)。用户随后授权按步骤迭代，并要求避免过度防御/工程化。分支 codex/studio-n0-n2-state-consistency 先固化 Agent 原 token、迟到拒绝/ABA/双 Agent/重复请求回归，再修复三处实际复现的问题。
+
+N1 的设置草稿保留初始基线与本地三个数值，远端新快照只更新干净表单；dirty 表单显示基线变化与最新保存值，重读仍保留输入，显式放弃采用最新值，保存仍走原 CAS。设置成功保存、后续 rebuild 失败时按已保存设置重置基线。N2 同步工程用例已确认的 HEAD，允许恢复当前保存修订并保留原自动备份；每次恢复后刷新列表，包括 HEAD 未变的情况。列表读取失败保留工程操作成功提示、停用旧历史写入口，单独重试读取，不循环重试或重放写入。新 helper 仅处理设置草稿，未引入通用任务/事务/表单框架、额外生产依赖或协议版本。
+
+前端 72 项中 70 通过、2 项因缺少固定路径 Windows Python 跳过；生产构建通过。纯 Python 工程回归 2 项通过。新增 test_studio_ui.py 以真实 React 页面+纯 Python 函数和 API route fixture 验证 7 项：设置 dirty/409/重读/放弃、干净同步与保存、设置保存后模拟 rebuild 失败、HEAD 恢复、A/B 修订恢复再保存、恢复后的读取失败单独重试、外部 HEAD 冲突说明保留。Chromium 桌面 1440×960/窄屏390×844，页面身份/非空/Vite overlay/pageerror/目标交互和截图检查通过；主动409/400为预期响应。Browser 插件不可用，沿用现有 Playwright；截图为 /tmp/live2d-n0-n2-evidence/，不提交临时证据。
+
+复跑：启动 studio 的 npm run dev 后，STUDIO_UI_URL=http://127.0.0.1:5173 python -m unittest tools.authoring_rig.tests.test_studio_ui -v。未设置 URL 时该独立 UI 套件明确跳过。Windows CLI、Kotlin/JAR、JPype、真实模型生成和桌面 SDK 没有改动或重新验收；PC W1 仍待进行。后续优先 N3 的具体操作收尾/关闭句柄及 N5a 主线程素材解码预算，先证明交错或资源问题再决定抽取范围。

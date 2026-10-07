@@ -2,7 +2,7 @@
 
 评审日期：2026-10-07。已 `fetch` 并快进对齐 PC 最新主线：`99f19082f0a05402e396a0a8455cb0a26b7a3f51`（PR #27，R8）。相对上次云端 R1c 提交 `7fef01a`，新增 23 个非合并提交，119 个文件发生变化。本文件中的位置和结论以该基线为准。
 
-本轮交付是**评审与 plan**，以下修复尚未实施。仅修改文档；未修改生产代码、原生 JAR 或项目数据。原生 Windows 验收记录来自 [HANDOFF.md](HANDOFF.md) 第 31–42 节，不计作本次重新执行。
+初次交付为评审与 plan。后续已按用户授权完成 N0 核心时序回归、N1/N2 的 Linux 可验证范围，实施与验收见第 8 节。原生 Windows 验收记录来自 [HANDOFF.md](HANDOFF.md) 第 31–42 节，不计作本次重新执行。
 
 ## 1. 结论与已完成工作的对齐
 
@@ -19,6 +19,8 @@
 | R3–R8 产品能力 | 分类、设置、工程/交付、素材、姿态/关键形、动态预览 | 首批能力已接上；下一步先补完整操作序列中的一致性，而非立即增加时间轴或自动生成 |
 
 ## 2. 已复现的问题
+
+本节保留修复前证据；F1 已在 N1 修复，F2/F3 已在 N2 修复，回归范围见第 8 节。
 
 ### F1 / P1：收到其他页面的新设置快照，会静默丢失本页未保存设置
 
@@ -152,7 +154,7 @@ Agent 的已有草稿入口也应遵守同一操作门禁。未来增加工程�
 
 ## 6. 后续实施 plan
 
-状态：下面所有实施项均为 **待开始**。按 PR 分步提交，每一步满足验收再推进；本评审不等于已经完成修复。先以 N0 固化时序规则及回归矩阵，再修复 N1 和 N2；已有通过的保护作为回归基线，不重新实现一遍。
+状态：N0 核心草稿时序回归及 N1/N2 已实施并在 Linux 验证；N0 中宿主取消/资源所有权的扩展检查随 N3/N5 推进。其余实施项待开始，W1 待 PC 执行。按 PR 分步提交，每一步满足验收再推进；已有通过的保护作为回归基线，不重新实现一遍。
 
 | 顺序 / 建议 PR | 修改范围与具体产出 | 验收标准 | 环境边界 |
 | --- | --- | --- | --- |
@@ -181,3 +183,32 @@ Agent 的已有草稿入口也应遵守同一操作门禁。未来增加工程�
 - 本轮重点覆盖了新功能的状态/持久化边界、协议、归档和预览调度，并静态阅读原生服务及模块边界；不是对全部 Kotlin 算法或全部 Overlay 组合的穷尽评审。
 
 后续完成每一步时，在本文件 plan 中更新状态、PR 和验收结果，并追加 [HANDOFF.md](HANDOFF.md)。旧的 [R1 评审](ENGINEERING_REVIEW_R1.md) 保留为历史依据，不再把其中已完成的 E1–E6 当作待办。
+
+## 8. N0–N2 实施与 Linux 验收（2026-10-07）
+
+分支 `codex/studio-n0-n2-state-consistency`，基于评审时 main。按 N0、N1、N2 分别提交；生产变更仅涉及 TypeScript/React，Python 新增纯工程用例驱动的界面测试，未修改 native/build 实现。
+
+### 已实施的最小设计
+
+- **N0**：补两个可控时序回归，覆盖 Agent 提案迟到、用户 undo 回原内容、两个 Agent 竞争和重复提交；复用原 `draftId/revision`。文档说明 Agent 必须保留开始时的 token，不允许给旧提案换上当前 token。已有截图异步双检、门禁和历史/渲染预算测试继续通过。没有新增持久编辑代次或任务调度系统。
+- **N1**：`settingsDraft.ts` 只表达 workspace 身份、初始 `BuildSettingsState` 和本地设置。干净表单跟随新快照；有本地修改时保留原基线和输入，显示最新保存值。CAS 使用原基线；重读不丢输入，显式放弃采用最新值。确认设置保存成功时建立新基线，后续重建失败不把已经保存的设置误标为未保存。
+- **N2**：工程用例同步已确认的 HEAD；不把历史节点 createdAt 当成工程 updatedAt。恢复包括当前 HEAD，保留后端已有自动 checkpoint；恢复后明确刷新列表。列表读取失败清空可用于写入的旧列表、保留工程操作成功提示，提供独立重试读取；不循环重试、不自动重放写入。外部 HEAD 冲突仍由现有 CAS 拒绝，说明输入保留。
+
+本轮只增加解决三字段表单所需的局部状态和恢复列表失效计数。没有引入全局状态库、表单库、通用事务/命令框架、任意字段自动合并或新的协议版本。允许继续编辑美术，不通过全局冻结用户输入回避 F1。内存不增加新缓存；设置基线/输入是固定大小的三个数值，沿用已有有界历史和 Worker 预算。
+
+### 外部经验与取舍
+
+1. [React #15523：useEffect for synchronizing state and props](https://github.com/react/react/issues/15523)，特别是 [React 维护者关于按对象身份重置的建议](https://github.com/react/react/issues/15523#issuecomment-528281367) 与 [受条件约束的 render 中调整状态](https://github.com/react/react/issues/15523#issuecomment-553204248)。本项目按 workspace 身份重置设置草稿；同一 workspace 的服务端 revision 变化不强制 remount 丢输入。按条件接纳干净表单的新值，不用无条件 effect 回填。
+2. [React Hook Form #8233：与远端同步表单值及默认值](https://github.com/react-hook-form/react-hook-form/discussions/8233)。讨论明确提出远端后台更新可能覆盖用户输入，以及保留 dirty 值、通知用户新数据的思路。本项目采用输入/保存基线分离和冲突说明；三个字段无需引入 RHF，也不自动重设 CAS 基线或合并他人的设置。
+3. Reddit 检索线索：[提交期间禁用表单或等待 handleSubmit Promise](https://www.reddit.com/r/reactjs/comments/14dbw6w/disable_form_field_or_return_promise_in/)、[异步默认值讨论](https://www.reddit.com/r/reactjs/comments/111mrek/react_hook_form_tanstack_usequery_async/)。本次只能读取搜索索引摘要，原帖 JSON 返回 403，因此没有引用完整评论或把它们当作已核实结论。相关实现最终依据可读取的 GitHub 讨论、实际代码和回归证据；没有为这些讨论安装新库。
+
+### 验收结果与复跑
+
+- `npm test`：72 项，70 通过、2 项因固定 Windows Python 路径跳过；`npm run build` 通过。新增两个 Agent 时序回归、五个设置草稿回归，现有捕获/取消/预算/失败释放检查继续通过。
+- `python -m unittest tools.authoring_rig.tests.test_projects -v`：2 项通过。
+- 新增 [test_studio_ui.py](../tools/authoring_rig/tests/test_studio_ui.py)，使用现有 Playwright 依赖，真实 React 页面连接纯 Python 项目函数；API 经浏览器 route fixture 驱动，没有调用 Windows CLI 或原生建模。启动 `studio` 的现有 Vite 服务后执行 `STUDIO_UI_URL=http://127.0.0.1:5173 python -m unittest tools.authoring_rig.tests.test_studio_ui -v`；不设置 URL 时该套独立 UI 验收明确跳过。
+- 7 个场景通过：dirty 设置保留/409/重读/放弃；干净设置同步/保存成功；保存成功后模拟 rebuild 失败；恢复 HEAD 并显示备份；保存 B→恢复 A→保存 C；恢复成功后列表读取失败且只重试读取；外部 HEAD 冲突、保留输入和重读后成功保存。
+- 浏览器为 Chromium，`Browser plugin not available`，使用现有 Python Playwright。URL 为 `http://127.0.0.1:5173/?project=<fixture-id>`，桌面 1440×960，窄屏 390×844；页面身份、非空页面、无 Vite 错误覆盖层、无 pageerror、目标交互与截图检查通过。409 和模拟的 400 是主动注入的预期响应。
+- 截图保存在工作区外 `/tmp/live2d-n0-n2-evidence/`，未提交进仓库。验证不覆盖实际 Cubism/native、Windows CLI/Edge 或桌面 SDK；这些继续由 W1 执行。
+
+下一轮从 N3 中实际重复的操作收尾与关闭句柄开始，先用可控时序证明问题再抽取小范围用例；N5a 优先解决主线程大图解码和迟到资源分配。暂不一次性建立通用任务系统或并行迁移整条 Python/native 链路。
