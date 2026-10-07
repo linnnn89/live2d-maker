@@ -186,7 +186,7 @@ Agent 的已有草稿入口也应遵守同一操作门禁。未来增加工程�
 
 ## 8. N0–N2 实施与 Linux 验收（2026-10-07）
 
-分支 `codex/studio-n0-n2-state-consistency`，基于评审时 main。按 N0、N1、N2 分别提交；生产变更仅涉及 TypeScript/React，Python 新增纯工程用例驱动的界面测试，未修改 native/build 实现。
+分支 `codex/studio-n0-n2-state-consistency`，基于评审时 main；提交评审见 [PR #28](https://github.com/linnnn89/live2d-maker/pull/28)。按 N0、N1、N2 分别提交；生产变更仅涉及 TypeScript/React，Python 新增纯工程用例驱动的界面测试，未修改 native/build 实现。
 
 ### 已实施的最小设计
 
