@@ -89,4 +89,4 @@
 - **F3 已清理**：一次 Snapshot 查询复用 settings、build/review 报告及 Overlay 输入哈希，清除 studio 中已无内部调用的 settings_record_matches 导入。原兼容导出保持。model_issues 的反向依赖留待相关业务实际调整，没有另增服务层。
 - 新增真实 React 回归：逐键输入 800 保持完整值与焦点，输入不创建 Worker，确认后仅创建一个；新坐标停用预检；实际 Worker 返回被延迟时，点击取消释放线程，迟到结果不创建 URL/预检或进入新弹窗。
 
-最终 Linux 验收：前端 86/86（0 跳过）、纯 Python 18/18、真实 React/纯 Python fixture UI 12/12、生产构建通过。原生/use-case 函数体 AST 对照保持；浏览器为 Chromium，桌面 1440×960，沿用既有窄屏回归，目标输入/焦点/取消/截图及无 pageerror 检查通过。证据在工作区外 `/tmp/live2d-fix-evidence/`。按用户授权将修正同步到 PR #30/#31/#32，再依次合并 #29–#32；Windows W1 仍按 R8 文档执行。
+最终 Linux 验收：前端 86/86（0 跳过）、纯 Python 18/18、真实 React/纯 Python fixture UI 12/12、生产构建通过。原生/use-case 函数体 AST 对照保持；浏览器为 Chromium，桌面 1440×960，沿用既有窄屏回归，目标输入/焦点/取消/截图及无 pageerror 检查通过。证据在工作区外 `/tmp/live2d-fix-evidence/`。修正已同步到 PR #30/#31/#32，并按用户授权依次合并 #29–#32 到 main@a09d741；合并后的完整文件树与最终 Linux 验证树一致。Windows W1 仍按 R8 文档执行。

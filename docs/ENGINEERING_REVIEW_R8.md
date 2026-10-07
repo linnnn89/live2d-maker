@@ -217,9 +217,9 @@ Agent 的已有草稿入口也应遵守同一操作门禁。未来增加工程�
 
 用户授权继续至规划的 Linux 范围完成，或确实需要切换真实 Windows 才能继续。基于 main@a38406f（PR #28 已合并），后续按以下顺序推进；本节逐步追加结果，不把尚未实施的项目标为完成。
 
-Linux 实施与合并前修正验收已完成，以下四个 PR 按用户授权准备合并。按表中顺序评审/合并；每个后续 PR 以先前分支为 base，只包含本阶段增量。合并前一个后，将下一个 PR 的 base 改为 `main`，核对差异再继续。
+Linux 实施与合并前修正验收已完成，以下四个 PR 已按用户授权和表中顺序合并到 main@a09d741。每个后续 PR 最初以先前分支为 base；合并时逐项改为 `main` 并核对差异，全部合并完成。
 
-| 顺序 | 阶段 | PR | 当前 base |
+| 顺序 | 阶段 | PR | 原始 base |
 | --- | --- | --- | --- |
 | 1 | N3：生命周期与操作所有权 | [#29](https://github.com/linnnn89/live2d-maker/pull/29) | `main` |
 | 2 | N5a：导入 Worker 与资源预算 | [#30](https://github.com/linnnn89/live2d-maker/pull/30) | `codex/studio-n3-lifecycle` |

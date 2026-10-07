@@ -435,3 +435,5 @@ pack_archive不再收集所有原始字节，1MiB块同时哈希/压缩，最后
 导入路径删除无共享竞争的 MemoryBudget/LRU 租约和测试专用预算注入，保留文件/像素/格式限制、mask 副本与单任务终止；美术渲染预算不变。Snapshot 本次查询复用 settings、build/review 报告与 Overlay 哈希，清理无用导入。双向领域依赖留待相关业务调整，无新增服务层。
 
 最终前端86/86（0跳过）、纯Python18/18、真实UI12/12和构建通过；新增逐键800、Worker不随输入启动、确认后单次检查、新坐标预检门禁、检查中取消与旧结果隔离。入口438.25kB，导入Worker181.06kB。真实React/纯Python fixture，未执行native生成；原生/use-case函数体经AST对照保持。截图/tmp/live2d-fix-evidence/，Chromium桌面1440×960及既有窄屏回归。详细审查、最小plan及实施见 [ENGINEERING_REVIEW_N3_N5_SIMPLICITY.md](ENGINEERING_REVIEW_N3_N5_SIMPLICITY.md)；完成合并后转Windows W1。
+
+PR #29、#30、#31、#32 已依次合并到 main@a09d741，合并后的完整文件树与最终 Linux 验证树一致。PC 继续工作前拉取 main，按 R8 第9节 W1 验收。
