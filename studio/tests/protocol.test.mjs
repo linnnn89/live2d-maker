@@ -66,7 +66,8 @@ test('HTTP parser validates successful DTOs and preserves structured error ident
   } finally {globalThis.fetch=original;}
 });
 
-const python=path.join(repo,'python/Scripts/python.exe');
+const python=process.env.STUDIO_TEST_PYTHON?path.resolve(process.env.STUDIO_TEST_PYTHON):path.join(repo,'python/Scripts/python.exe');
+if(process.env.STUDIO_TEST_PYTHON)assert.ok(existsSync(python),'STUDIO_TEST_PYTHON must name an installed Python interpreter');
 test('real Python CLI shares schema validation and preserves workspace on conflict and busy errors',
   {skip: !existsSync(python) && 'project Windows Python is unavailable'},()=>{
   const examples=[{type:'set_visibility',partId:'face',visible:false},{type:'set_opacity',partId:'face',opacity:256},

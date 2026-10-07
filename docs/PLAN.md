@@ -2,7 +2,7 @@
 
 更新于 2026-10-07。目标是完成 PSD 编辑、素材导入、Live2D 重建和验证这些软件功能。角色素材只作为测试样本，不要求逐类制作完整角色。
 
-最新代码复评与后续实施 plan：见 [R8 后的工程评审](ENGINEERING_REVIEW_R8.md)。N0–N2 已通过 PR #28 合并到 main@a38406f。N3a 已完成关闭 client/Agent bridge 与旧 Worker 回调隔离，77 项前端检查、8 项真实 React/纯 Python UI 验收和构建通过，另 2 项因 Windows Python 路径跳过。用户授权持续推进：N3b 小型操作所有者 → N5a 导入资源预算 → N4 纯存储/查询边界 → N5b 工程归档流式处理；Windows 原生接入 W1 待 PC。当前实施状态、取舍与验收见工程评审第 9 节。
+最新代码复评与后续实施 plan：见 [R8 后的工程评审](ENGINEERING_REVIEW_R8.md)。N0–N2 已通过 PR #28 合并到 main@a38406f；N3 生命周期/操作所有权、N5a 导入Worker预算、N4 纯存储/查询、N5b 工程归档流式处理已完成Linux范围。86项前端（显式Linux Python、0跳过）、18项纯Python、10项真实React/纯Python UI和构建通过。256MiB受控归档样本的Python分配峰值从256.799MiB降至2.324MiB。下一步为PC W1：真实native Agent交错、模型/Overlay/交付/完整归档与大型项目资源观测；native交付打包本体的进一步优化待真实数据，不在云端修改。阶段结果、取舍和Windows具体plan见工程评审第9节。
 
 设计参考：[Mesh Avatar Studio](https://github.com/shinshin86/mesh-avatar-studio)。安装与使用见 [环境说明](environment.md) 和 [Studio 使用说明](../studio/README.md)；历史验证记录见 [HANDOFF.md](HANDOFF.md)。
 

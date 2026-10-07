@@ -417,3 +417,11 @@ ImportClient每次任务创建独立Worker，只有一个active、无队列/缓�
 workspace_store.py提取原子JSON读写、内容revision、原锁和URL；workspace_query.py装配Snapshot、模型匹配与Overlay证据。studio.py兼容导出保持原CLI/native入口，工程/姿态/问题等纯模块改依赖store/query；原生导出和rig-edit编排导入未迁移。失败atomic replace清理自己的tmp，原文件保留；不增加锁层、不改格式/签名。open/save/settings/import/rebuild/QA函数体经AST与前一提交对比一致。
 
 纯工程/持久化/签名11项及新store/query4项通过；原CLI studio-open JSON与直接query一致，身份迁移仍服从旧锁，实际独立进程Snapshot查询无需加载studio或native编排。中断恢复的失败注入改到实际store边界，恢复语义通过。完整UI复跑及后续N5b结果追加工程评审第9节，Windows/native接入仍待W1。
+
+## 47. N5b 与 Linux 最终交接：流式工程归档、容量闭环（2026-10-07）
+
+pack_archive不再收集所有原始字节，1MiB块同时哈希/压缩，最后写manifest；unpack逐块校验/落盘，create_project仍在临时目录完整验证后才发布。导出与导入共用文件数、256MiB单项、16MiBmanifest、1GiB展开总量（含manifest）及128MiB压缩包限制，导出同样拒绝casefold冲突。失败清理临时ZIP/锁并保留项目/历史。交付清单哈希改分块读取，export_model原生生成/打包本体与rig-edit函数体保持。
+
+新归档3项通过，覆盖32MiB二进制受限读取、删除原项目重开保留源/修订/姿态/产物、容量/大小写拒绝、中断清理。八个32MiB受控可压缩文件的两个Linux进程观测：旧pack 1.688秒、Python峰值256.799MiB/RSS331.512MiB；流式1.670秒、Python峰值2.324MiB/RSS76.008MiB。不是实际CMO3或不可压缩纹理性能验收，不宣称整个应用总内存上限。
+
+最终前端86/86、纯Python18/18、真实UI10/10及构建通过。STUDIO_TEST_PYTHON可显式选择Linux解释器，默认Windows路径保留，原两项协议/旧身份迁移检查实际执行而不跳过。UI证据/tmp/live2d-final-evidence/；Windows/native、实际大模型/CMO3及GPU观测没有在云端执行。Linux实施到此，详细W1 plan见工程评审第9节：真实Agent prepare/edit/checkout/迟到结果，真实Rebuild/Overlay/导入/姿态/交付/归档重开及资源增长；取得真实证据后才继续native交付打包与上传副本优化。

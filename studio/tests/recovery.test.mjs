@@ -56,7 +56,8 @@ test('backup coalesces completed edits, serializes pending writes, retains faile
   assert.equal(entries.get('tab-a').changes[0].after,60);session.endGesture(true);
   session.discard(session.token());backup.update(session.inspect());await backup.flush();assert.equal(entries.has('tab-a'),false);assert.equal(entries.has('tab-b'),true);
 });
-const python=path.join(repo,'python/Scripts/python.exe');
+const python=process.env.STUDIO_TEST_PYTHON?path.resolve(process.env.STUDIO_TEST_PYTHON):path.join(repo,'python/Scripts/python.exe');
+if(process.env.STUDIO_TEST_PYTHON)assert.ok(existsSync(python),'STUDIO_TEST_PYTHON must name an installed Python interpreter');
 test('legacy workspace migration keeps one persisted identity and leaves source, IR and revisions unchanged',
   {skip:!existsSync(python)&&'project Windows Python is unavailable'},()=>{
   const script=`import json,sys\nfrom pathlib import Path\nfrom tools.authoring_rig.tests.test_studio import StudioPersistence\nfrom tools.authoring_rig.studio import write\nw,s,p=StudioPersistence().import_fixture(Path(sys.argv[1]))\nstate=json.loads((w/'studio-state.json').read_text())\nstate.pop('workspaceId')\nwrite(w/'studio-state.json',state)\nprint(json.dumps({'workspace':str(w),'snapshot':s}))`;
