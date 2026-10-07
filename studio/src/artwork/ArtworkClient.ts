@@ -10,6 +10,7 @@ type Job = { id: number; kind: 'render' | 'capture'; ir: ArtworkIR; cancelled?: 
 /** Heavy pixel work stays off the UI thread. Only captures encode PNG. */
 export class ArtworkClient {
   private worker: Worker | null = null;
+  private closed = false;
   private sequence = 0;
   private active: Job | null = null;
   private queue: Job[] = [];
@@ -19,26 +20,34 @@ export class ArtworkClient {
   render(ir: ArtworkIR): Promise<PixelFrame> { return this.request('render', ir) as Promise<PixelFrame>; }
   capture(ir: ArtworkIR): Promise<PngFrame> { return this.request('capture', ir) as Promise<PngFrame>; }
   dispose(): void {
-    this.worker?.terminate(); this.worker = null;
+    this.closed = true;
+    this.stopWorker();
     this.rejectAll(new ArtworkError('ABORTED', '预览已关闭'));
   }
   private request(kind: 'render' | 'capture', ir: ArtworkIR): Promise<PixelFrame | PngFrame> {
+    if (this.closed) return Promise.reject(new ArtworkError('ABORTED', '预览已关闭'));
     if (kind==='capture' && this.queue.filter(job=>job.kind==='capture').length + (this.active?.kind==='capture'?1:0) >= MAX_CAPTURES) return Promise.reject(new ArtworkError('QUEUE_FULL','最多允许四个并发图像捕获，请等待当前任务完成'));
     if (new TextEncoder().encode(JSON.stringify(ir)).byteLength > MAX_IR_BYTES) return Promise.reject(new ArtworkError('MEMORY_BUDGET','美术请求超过 2 MiB，请减少本次工程数据'));
     if (!this.worker) {
-      this.worker = this.createWorker();
-      this.worker.onmessage = (event: MessageEvent<{ id: number; ok: boolean; value: PixelFrame | PngFrame; error: DraftFailure; metrics: Record<string,number> }>) => {
-        this.worker?.postMessage({ kind: 'ack', id:event.data.id });
-        this.metrics=event.data.metrics ?? this.metrics;
+      const worker = this.createWorker();
+      this.worker = worker;
+      worker.onmessage = (event: MessageEvent<{ id: number; ok: boolean; value: PixelFrame | PngFrame; error: DraftFailure; metrics: Record<string,number> }>) => {
+        if (this.worker !== worker) return;
+        worker.postMessage({ kind: 'ack', id:event.data.id });
         const job = this.active;
         if (!job || job.id!==event.data.id) return;
+        this.metrics=event.data.metrics ?? this.metrics;
         this.active=null;
         if (job.cancelled) job.reject(new ArtworkError('ABORTED','画面已被更新的草稿替代'));
         else if (event.data.ok) job.resolve(event.data.value);
         else job.reject(new ProtocolError(event.data.error.code,event.data.error.message,event.data.error.stage,event.data.error.retryable,event.data.error.partId,event.data.error.field));
         this.pump();
       };
-      this.worker.onerror = () => { this.worker?.terminate(); this.worker = null; this.rejectAll(new ArtworkError('RENDER_FAILED', '美术渲染线程发生错误，请重试')); };
+      worker.onerror = () => {
+        if (this.worker !== worker) return;
+        this.stopWorker();
+        this.rejectAll(new ArtworkError('RENDER_FAILED', '美术渲染线程发生错误，请重试'));
+      };
     }
     const id = ++this.sequence;
     return new Promise((resolve, reject) => {
@@ -59,4 +68,12 @@ export class ArtworkClient {
     catch(error) { this.active.reject(error);this.active=null;this.pump(); }
   }
   private rejectAll(error: Error): void { this.active?.reject(error); for(const job of this.queue)job.reject(error); this.active=null;this.queue=[]; }
+  private stopWorker(): void {
+    const worker = this.worker;
+    this.worker = null;
+    if (!worker) return;
+    worker.onmessage = null;
+    worker.onerror = null;
+    worker.terminate();
+  }
 }

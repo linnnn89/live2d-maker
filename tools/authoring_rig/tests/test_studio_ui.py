@@ -239,3 +239,61 @@ class StudioUi(unittest.TestCase):
         panel.get_by_role("button", name="保存项目修订", exact=True).click()
         expect(panel.locator("li").filter(has_text="My pending revision")).to_contain_text("当前保存修订")
         self.assertEqual(len(revision_list(self.root)["revisions"]), 3)
+
+    def test_strict_mode_cleanup_closes_old_bridge_and_worker_without_breaking_remount(self):
+        self.page.route("**/lifecycle-harness?*", lambda route: route.fulfill(
+            content_type="text/html", body='<title>Live2D Studio Lifecycle</title><div id="host"></div>'))
+        self.page.goto(os.environ["STUDIO_UI_URL"].rstrip("/") + "/lifecycle-harness?project=" + self.root.name)
+        self.page.evaluate("""async () => {
+            // Use Vite's exact React module URLs, including its version query, to share one dispatcher.
+            const contextSource = await (await fetch('/src/workspace/WorkspaceContext.tsx')).text();
+            const mainSource = await (await fetch('/src/main.tsx')).text();
+            const react = (await import(contextSource.match(/from \"([^\"]*react\\.js[^\"]*)\"/)[1])).default;
+            const dom = (await import(mainSource.match(/from \"([^\"]*react-dom_client\\.js[^\"]*)\"/)[1])).default;
+            const {WorkspaceProvider, useWorkspace} = await import('/src/workspace/WorkspaceContext.tsx');
+            function Probe() {
+                const workspace = useWorkspace();
+                react.useEffect(() => { window.currentWorkspace = workspace; }, [workspace]);
+                return react.createElement('p', null, workspace.saved ? '工作区已载入' : '正在载入');
+            }
+            window.mountHost = () => {
+                window.hostRoot = dom.createRoot(document.getElementById('host'));
+                window.hostRoot.render(react.createElement(react.StrictMode, null,
+                    react.createElement(WorkspaceProvider, null, react.createElement(Probe))));
+            };
+            window.mountHost();
+        }""")
+        expect(self.page.get_by_text("工作区已载入", exact=True)).to_be_visible()
+        result = self.page.evaluate("""async () => {
+            window.oldBridge = window.studioDraft;
+            window.oldClient = window.currentWorkspace.artwork;
+            const read = await oldBridge.execute({schemaVersion:1, operation:'inspect'});
+            const image = await oldBridge.capture({schemaVersion:1, state:read.state});
+            window.oldToken = read.state;
+            return {read:read.ok, capture:image.ok, png:image.ok && image.image.dataUrl.startsWith('data:image/png;base64,')};
+        }""")
+        self.assertEqual(result, {"read": True, "capture": True, "png": True})
+        self.page.evaluate("window.hostRoot.unmount()")
+        expect(self.page.get_by_text("工作区已载入", exact=True)).to_have_count(0)
+        self.assertTrue(self.page.evaluate("window.studioDraft === undefined"))
+        closed = self.page.evaluate("""async () => ({
+            read:(await oldBridge.execute({schemaVersion:1, operation:'inspect'})).error.code,
+            capture:(await oldBridge.capture({schemaVersion:1, state:oldToken})).error.code,
+            client:await oldClient.render(oldToken.ir).then(() => 'accepted', error => error.code)
+        })""")
+        self.assertEqual(closed, {"read": "ABORTED", "capture": "ABORTED", "client": "ABORTED"})
+        self.page.evaluate("window.mountHost()")
+        expect(self.page.get_by_text("工作区已载入", exact=True)).to_be_visible()
+        result = self.page.evaluate("""async () => {
+            const read = await studioDraft.execute({schemaVersion:1, operation:'inspect'});
+            const image = await studioDraft.capture({schemaVersion:1, state:read.state});
+            const old = await oldBridge.execute({schemaVersion:1, operation:'apply', state:oldToken,
+                commands:[{type:'set_opacity', partId:oldToken.ir.parts[0].id, opacity:80}]});
+            return {capture:image.ok, old:old.error.code, dirty:currentWorkspace.dirty};
+        }""")
+        self.assertEqual(result, {"capture": True, "old": "ABORTED", "dirty": False})
+        expect(self.page.locator("vite-error-overlay")).to_have_count(0)
+        self.assertIn("Studio", self.page.title())
+        self.assertFalse(self.errors)
+        self.evidence("strict-mode-reopened-host")
+        self.page.evaluate("window.hostRoot.unmount()")
