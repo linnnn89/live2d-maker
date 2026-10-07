@@ -4,7 +4,7 @@ import type { ProjectDownload, ProjectRevisions } from '../protocol/generated';
 import { useWorkspace } from '../workspace/WorkspaceContext';
 
 export function ProjectPanel() {
-  const { saved, dirty, editingLocked, settingsPending, setError, setBusy, editor,
+  const { saved, dirty, editingLocked, settingsPending, setError, beginOperation,
     saveProject, restoreProject, applyProjectRevisions } = useWorkspace();
   const [history, setHistory] = useState<ProjectRevisions | null>(null);
   const [message, setMessage] = useState('保存项目');
@@ -17,23 +17,24 @@ export function ProjectPanel() {
 
   async function refresh() {
     if (editingLocked) return;
+    const operation = beginOperation('正在读取工程修订…');
+    if (!operation) return;
     // Record attempts too: a failed read is retried explicitly, never in an effect loop.
     readKey.current = key;
-    editor.setBlocked(true);
-    setBusy('正在读取工程修订…');
     setHistoryError('');
     try {
       const result = await api<ProjectRevisions>('project-revisions');
+      if (!operation.isCurrent()) return;
       readKey.current = keyFor(result.head);
       setHistory(result);
       applyProjectRevisions(result);
     } catch (failure) {
+      if (!operation.isCurrent()) return;
       setHistory(null);
       setHistoryError('修订列表读取失败；已完成的工程操作仍然有效，请重试读取：'
         + (failure instanceof Error ? failure.message : String(failure)));
     } finally {
-      editor.setBlocked(false);
-      setBusy('');
+      operation.finish();
     }
   }
 
@@ -63,20 +64,20 @@ export function ProjectPanel() {
 
   async function download() {
     if (locked || dirty) return;
-    editor.setBlocked(true);
-    setBusy('正在归档工程…');
+    const operation = beginOperation('正在归档工程…');
+    if (!operation) return;
     setError('');
     try {
       const result = await api<ProjectDownload>('project-archive');
+      if (!operation.isCurrent()) return;
       const link = document.createElement('a');
       link.href = result.url;
       link.download = result.filename;
       link.click();
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : String(failure));
+      if (operation.isCurrent()) setError(failure instanceof Error ? failure.message : String(failure));
     } finally {
-      editor.setBlocked(false);
-      setBusy('');
+      operation.finish();
     }
   }
 

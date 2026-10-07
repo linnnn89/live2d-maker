@@ -403,3 +403,5 @@ N1 的设置草稿保留初始基线与本地三个数值，远端新快照只�
 基于 PR #28 已合并的 main@a38406f。三个确定性回归先失败后通过，复现 client dispose 后重启 Worker、崩溃 Worker 的旧回调影响替换实例、关闭后迟到统计改变。生产修改局限 ArtworkClient 和 workspace bridge/provider；关闭清空 handler 和队列，新请求返回 ABORTED，旧消息只能作用于原 Worker。Agent bridge 的旧引用与迟到返回失效，清除持有的 editor/render 引用；进行中的保存可能已经写入，关闭不能当作回滚或盲重试依据。React effect 每次 setup 创建新资源，支持 StrictMode cleanup/re-setup。
 
 前端79项（77通过/2因Windows路径跳过）、构建、真实UI8项通过。新UI用例使用StrictMode、实际PNG Worker捕获、卸载/保留旧引用/重挂载，旧apply拒绝且新草稿保持干净。50次模拟worker生命周期清空活动任务/队列/handler，不宣称整体堆/GPU测量。证据在工作区外/tmp/live2d-n3-evidence/。后续持续实施plan见工程评审第9节；native/Windows接口未改动。
+
+N3b 继续收敛到 WorkspaceOperations：同步进入、自己的isCurrent/block/update/finish，旧所有者无法结束新任务；无队列/自动重试。工程/姿态/关键形/交付/设置/保存/重建/QA/导入接上同一门禁。保存启动后同步block，提交的新基线仍处于operation，Agent不可在后续阶段插入写入。成功交付保留可下载结果，后续snapshot失败只提供读取重试。前端82项（80通过/2原路径跳过）和构建通过；原UI8项及新交付fixture用例通过，StrictMode附加验证同tick重复读取只请求一次、旧读取迟到不释放新宿主门禁。原生算法/接口未修改，真实交付接入留W1。

@@ -218,7 +218,7 @@ Agent 的已有草稿入口也应遵守同一操作门禁。未来增加工程�
 用户授权继续至规划的 Linux 范围完成，或确实需要切换真实 Windows 才能继续。基于 main@a38406f（PR #28 已合并），后续按以下顺序推进；本节逐步追加结果，不把尚未实施的项目标为完成。
 
 1. **N3a / 已验证**：`ArtworkClient.dispose` 成为关闭终态，失败 Worker 可被新 Worker 替换，但旧回调只认自己的实例。关闭时清空 handler、活动/排队任务；保留旧 client 的调用返回 `ABORTED`。每次 Workspace effect setup 创建新 client 和 Agent bridge，cleanup 关闭对应实例。旧 bridge 拒绝 inspect/apply/commit/capture，进行中的返回也不能冒充当前宿主结果；dispose 清除对 editor/render 的引用。已提交的保存可能完成，关闭不意味着回滚；重开后查询实际保存状态，不能盲重试。
-2. **N3b / 待实施**：把重复门禁/收尾收敛到 workspace 的小型操作所有者，组件仍保留业务输入、CAS 前提和结果展示。用同步进入检查避免同一 render 的重入，旧任务只能结束自己的操作；区分写入成功和后续读取失败。不开后台调度、自动重试或新的公开 Agent 权限。
+2. **N3b / 已验证**：`WorkspaceOperations` 只提供同步进入、当前所有者检查、门禁/进度和自身收尾；关闭释放引用。工程、姿态、关键形、交付、设置、IR 保存/重建/QA 和导入门禁共用；组件保留业务输入与原 CAS。先启动草稿保存，再同步加上操作门禁，避免保存新基线发布后至后续原生请求之间暴露空闲状态。交付响应确认后立即保存已成功的下载结果，快照失败单独显示并只重试读取。无队列、自动重试、后台调度或新的公开 Agent 权限。
 3. **N5a / 待实施**：把导入 decode/alpha/mask encode 移出主线程，明确独立任务预算与关闭释放；在 `arrayBuffer` 返回后检查任务是否还有效，避免已清理的 effect 创建迟到 URL。
 4. **N4 / 待实施**：先拆纯文件读写/锁/URL 原语与 Snapshot 查询，保留 `studio.py` 兼容导出。native/build 算法及原生 API 不变；Windows 真实接入留 W1。
 5. **N5b / 待实施**：工程 ZIP 分块读取、哈希与压缩；统一导出/导入大小规则并验证完整归档重开。涉及原生产物生成的交付路径若需修改，留 PC；不擅自删除历史。
@@ -227,3 +227,5 @@ Agent 的已有草稿入口也应遵守同一操作门禁。未来增加工程�
 N3a 的三个新增回归在修复前全部失败，分别复现关闭后重启、旧 error/message 影响替换 Worker、关闭后迟到统计改变；修复后通过。补充旧 bridge 读写/捕获拒绝、迟到成功/失败、保存已提交后关闭和 50 次任务生命周期检查。它们证明队列/handler/实例收尾，不等于浏览器整体堆或 GPU 已做长期内存测量。
 
 N3a 验收：前端 79 项，77 通过/原 Windows 路径 2 项跳过；构建通过。真实 React+纯 Python fixture 的 8 项 UI 回归通过，包括 StrictMode setup→cleanup→setup、真实 PNG Worker 捕获、卸载后旧 bridge/client 拒绝、重挂载捕获及旧 apply 拒绝。Browser plugin not available，沿用 Chromium/Playwright；桌面 1440×960、原窄屏用例390×844，页面身份/非空/无 Vite overlay/pageerror/交互与截图检查通过。证据 `/tmp/live2d-n3-evidence/`，不提交临时图片。未调用 native rebuild。
+
+N3b 验收：前端82项，80通过/原2项跳过，构建通过。三项操作回归覆盖同一tick重入、Agent保存/手势互斥、保存成功基线发布期间仍BUSY、关闭后的旧进度/成功/失败/finally不影响新操作。UI原8项通过，新交付用例通过，StrictMode用例增加同tick重复读取只发送一次请求与旧读取迟到不清除新宿主门禁。交付生成响应为协议fixture，未执行真实native导出；其接入验收仍由W1完成。

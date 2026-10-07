@@ -10,23 +10,26 @@ function group(id:string){return /^ParamAngle/.test(id)?'head':/^ParamEye/.test(
 const presets:{name:string;values:Record<string,number>}[]=[{name:'中立姿态',values:{}},{name:'向左转头',values:{ParamAngleX:-30}},{name:'向右转头',values:{ParamAngleX:30}},{name:'闭眼',values:{ParamEyeLOpen:0,ParamEyeROpen:0}},{name:'张嘴',values:{ParamMouthOpenY:1}}];
 
 export function ParameterPanel({parameters,setParameter,reset,applyPose}:{parameters:Parameter[];setParameter:(id:string,value:number)=>void;reset:()=>void;applyPose:(values:Record<string,number>)=>void}){
-  const {saved,dirty,editingLocked,settingsPending,editor,applySnapshot,setBusy,setError,setMessage}=useWorkspace();
+  const {saved,dirty,editingLocked,settingsPending,beginOperation,applySnapshot,setError,setMessage}=useWorkspace();
   const [name,setName]=useState(''),[error,setLocalError]=useState('');
   const locked=editingLocked||dirty||settingsPending;
   function compatible(values:Record<string,number>){return Object.entries(values).every(([id,value])=>parameters.some(p=>p.id===id&&Number.isFinite(value)&&p.min<=value&&value<=p.max));}
   function apply(values:Record<string,number>){try{applyPose(values);setLocalError('');}catch(e){setLocalError(e instanceof Error?e.message:String(e));}}
   async function persist(pose?:SavedPose){
-    if(!saved?.poses||locked)return;editor.setBlocked(true);setBusy(pose?'正在删除保存姿态…':'正在保存预览姿态…');setError('');setLocalError('');
+    if(!saved?.poses||locked)return;
+    const operation=beginOperation(pose?'正在删除保存姿态…':'正在保存预览姿态…');if(!operation)return;
+    setError('');setLocalError('');
     try{
       const payload=pose?{schemaVersion:1,posesRevision:saved.poses.revision,operation:'delete',id:pose.id}
         :{schemaVersion:1,posesRevision:saved.poses.revision,operation:'save',revision:saved.revision,settingsRevision:saved.buildSettings!.revision,overlayRevision:saved.overlayRevision,buildId:saved.build?.modelUrl?.match(/(builds\/[a-f0-9]{32})\//)?.[1],name:name.trim(),values:Object.fromEntries(parameters.map(p=>[p.id,p.value]))};
-      applySnapshot(await api<Snapshot>('poses',payload));setMessage(pose?'已删除保存姿态':'预览姿态已保存；模型绑定保持原样');if(!pose)setName('');
-    }catch(e){setError(e instanceof Error?e.message:String(e));}finally{editor.setBlocked(false);setBusy('');}
+      const result=await api<Snapshot>('poses',payload);if(!operation.isCurrent())return;
+      applySnapshot(result);setMessage(pose?'已删除保存姿态':'预览姿态已保存；模型绑定保持原样');if(!pose)setName('');
+    }catch(e){if(operation.isCurrent())setError(e instanceof Error?e.message:String(e));}finally{operation.finish();}
   }
   async function refresh(){
-    if(locked)return;editor.setBlocked(true);setBusy('正在读取姿态库…');setError('');
-    try{applySnapshot(await api<Snapshot>('snapshot'));setMessage('姿态库已读取，名称输入保留');}
-    catch(e){setError(e instanceof Error?e.message:String(e));}finally{editor.setBlocked(false);setBusy('');}
+    if(locked)return;const operation=beginOperation('正在读取姿态库…');if(!operation)return;setError('');
+    try{const result=await api<Snapshot>('snapshot');if(!operation.isCurrent())return;applySnapshot(result);setMessage('姿态库已读取，名称输入保留');}
+    catch(e){if(operation.isCurrent())setError(e instanceof Error?e.message:String(e));}finally{operation.finish();}
   }
   const canSave=!!parameters.length&&!!saved?.build?.parameters?.length&&!saved.stale.moc3&&!locked;
   return <section className="panel parameters-panel"><div className="panel-heading"><h2>参数与姿态</h2><button className="text-button" disabled={!parameters.length||editingLocked} onClick={()=>{reset();setLocalError('');}}>全部重置</button></div>

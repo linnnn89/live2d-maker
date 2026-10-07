@@ -39,6 +39,8 @@ class StudioUi(unittest.TestCase):
         self.errors = []
         self.fail_rebuild = False
         self.fail_revisions = 0
+        self.fail_snapshots = 0
+        self.export_result = None
         self.playwright = sync_playwright().start()
         self.addCleanup(self.playwright.stop)
         self.browser = self.playwright.chromium.launch(headless=True)
@@ -48,6 +50,13 @@ class StudioUi(unittest.TestCase):
         self.page.route("**/*", self.route)
 
     def dispatch(self, operation, payload):
+        if operation == "model-export":
+            self.export_result = {"schemaVersion": 1, "target": payload["target"], "url": "/fixture.model.zip",
+                "filename": "fixture.model.zip", "files": [], "warnings": [], "cacheId": "a" * 32,
+                "reused": False, "buildSettings": snapshot(self.root)["buildSettings"]["settings"],
+                "physics": False, "motions": 0, "modelSha256": "b" * 64,
+                "modelInputSignature": "c" * 64, "overlayRevision": payload["overlayRevision"]}
+            return self.export_result
         if operation == "project-revisions":
             if self.fail_revisions:
                 self.fail_revisions -= 1
@@ -64,7 +73,13 @@ class StudioUi(unittest.TestCase):
         if operation == "rebuild" and self.fail_rebuild:
             raise StudioError("BUILD_FAILED", "Fixture rebuild failed after settings save", "build")
         if operation in ("open", "snapshot"):
-            return snapshot(self.root)
+            if operation == "snapshot" and self.fail_snapshots:
+                self.fail_snapshots -= 1
+                raise StudioError("WORKSPACE_FAILED", "Fixture snapshot read failed", "snapshot")
+            value = snapshot(self.root)
+            if self.export_result:
+                value["export"] = {"result": self.export_result, "current": True}
+            return value
         raise AssertionError(f"Unexpected fixture operation: {operation}")
 
     def route(self, route):
@@ -292,8 +307,51 @@ class StudioUi(unittest.TestCase):
             return {capture:image.ok, old:old.error.code, dirty:currentWorkspace.dirty};
         }""")
         self.assertEqual(result, {"capture": True, "old": "ABORTED", "dirty": False})
+        before = self.requests.count("snapshot")
+        self.page.evaluate("""async () => {
+            const first = currentWorkspace.readBuildSettings();
+            const duplicate = currentWorkspace.readBuildSettings();
+            await Promise.all([first, duplicate]);
+        }""")
+        self.assertEqual(self.requests.count("snapshot") - before, 1)
+        self.page.evaluate("""() => {
+            const fetch = window.fetch;
+            const view = currentWorkspace.saved;
+            window.fetch = (url, options) => String(url).endsWith('/api/snapshot')
+                ? new Promise(resolve => { window.finishOldRead = () => resolve(new Response(JSON.stringify(view))); })
+                : fetch(url, options);
+            window.oldRead = currentWorkspace.readBuildSettings();
+            window.fetch = fetch;
+            window.hostRoot.unmount();
+            window.mountHost();
+        }""")
+        expect(self.page.get_by_text("工作区已载入", exact=True)).to_be_visible()
+        result = self.page.evaluate("""async () => {
+            const next = currentWorkspace.beginOperation('新宿主操作');
+            finishOldRead(); await oldRead;
+            const result = {active:next.isCurrent(), phase:currentWorkspace.editor.getSnapshot().phase};
+            next.finish(); return result;
+        }""")
+        self.assertEqual(result, {"active": True, "phase": "operation"})
         expect(self.page.locator("vite-error-overlay")).to_have_count(0)
         self.assertIn("Studio", self.page.title())
         self.assertFalse(self.errors)
         self.evidence("strict-mode-reopened-host")
         self.page.evaluate("window.hostRoot.unmount()")
+
+    def test_confirmed_export_survives_snapshot_failure_and_retries_only_the_read(self):
+        self.open()
+        panel = self.page.locator(".project-panel").filter(has=self.page.locator("summary", has_text="导出模型"))
+        panel.locator("summary").click()
+        self.fail_snapshots = 1
+        panel.get_by_role("button", name="生成交付包", exact=True).click()
+        expect(self.page.get_by_text("交付包已生成，请检查文件与警告后下载", exact=True)).to_be_visible()
+        expect(panel.get_by_role("alert")).to_contain_text("交付包已生成；状态读取失败")
+        expect(panel.get_by_role("link", name="下载模型交付包", exact=True)).to_have_attribute("href", "/fixture.model.zip")
+        panel.get_by_role("button", name="重新读取交付状态", exact=True).click()
+        expect(panel.get_by_role("alert")).to_have_count(0)
+        expect(panel.get_by_role("link", name="下载模型交付包", exact=True)).to_be_visible()
+        self.assertEqual(self.requests.count("model-export"), 1)
+        self.assertEqual(self.requests.count("snapshot"), 2)
+        self.assertFalse(self.errors)
+        self.evidence("export-confirmed-after-read-retry")
