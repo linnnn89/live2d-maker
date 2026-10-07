@@ -136,6 +136,7 @@ class ViewModelAgentWorkspace(
 
     internal suspend fun captureProject(summary: String, actor: String): ProjectCapture = editMutex.withLock {
         synchronized(historyLock) {
+            check(!isClosed.get()) { "Workspace is closed; use the active workspace" }
             val state = viewModel.state.value
             require(!state.isAnalyzing && recoveringProjectId == null) { "Workspace is still loading" }
             val id = projectId(state)
@@ -157,6 +158,7 @@ class ViewModelAgentWorkspace(
         val restoredTasks = AgentTaskManager().also { it.restore(tasks) }
         synchronized(historyLock) {
             val current = viewModel.state.value
+            check(!isClosed.get()) { "Workspace is closed; use the active workspace" }
             require(current.projectId == expected.projectId && current.projectEditVersion == expected.projectEditVersion) { "Workspace changed while opening project; open again after saving your edits" }
             workspaceStore = store
             historyProjectId = id
@@ -180,6 +182,7 @@ class ViewModelAgentWorkspace(
     }
 
     override suspend fun saveProject(): AgentWorkspaceMutationResult {
+        check(!isClosed.get()) { "Workspace is closed; use the active workspace" }
         val node = viewModel.saveProjectNow(actor = "agent")
         val selected = synchronized(historyLock) { historyTree!!.selectionAt(node) }
         return AgentWorkspaceMutationResult(node, selected.node.revisionId, emptyList(), "Project saved")
@@ -192,6 +195,7 @@ class ViewModelAgentWorkspace(
     }
 
 	override fun snapshot(): AgentProjectSnapshot {
+		check(!isClosed.get()) { "Workspace is closed; use the active workspace" }
 		val state = viewModel.state.value
 		val analysis = state.analysis
 		val revisionId = revisionId(state)
@@ -1559,7 +1563,7 @@ class ViewModelAgentWorkspace(
 		expected: AgentWorkspaceDocument,
 		next: AgentWorkspaceDocument,
 		status: String,
-	): Boolean = viewModel.applyAgentWorkspacePreview(
+	): Boolean = !isClosed.get() && viewModel.applyAgentWorkspacePreview(
 			preview = preview,
 			expectedSource = expected.source,
 			expectedLayerVisibility = expected.layerVisibility,
@@ -1634,7 +1638,9 @@ class ViewModelAgentWorkspace(
 	private val isClosed = AtomicBoolean(false)
 
 	override fun close() {
-		if (!isClosed.compareAndSet(false, true)) return
+		// Serialize closure with prepared-edit publication, without holding the
+		// history lock while waiting for persistence jobs to finish.
+		if (!synchronized(historyLock) { isClosed.compareAndSet(false, true) }) return
 		runCatching {
 			runBlocking {
 				withTimeoutOrNull(500L) {

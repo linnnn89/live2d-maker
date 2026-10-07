@@ -11,6 +11,7 @@ import {EventEmitter} from 'node:events';
 import {PassThrough} from 'node:stream';
 const studio=fileURLToPath(new URL('..',import.meta.url)),repo=path.dirname(studio);
 const output=mkdtempSync(path.join(tmpdir(),'studio-bridge-test-'));
+writeFileSync(path.join(output, 'package.json'), '{"type":"commonjs"}');
 symlinkSync(path.join(studio,'node_modules'),path.join(output,'node_modules'),'junction');
 after(()=>rmSync(output,{recursive:true,force:true}));
 const compile=spawnSync(process.execPath,[path.join(studio,'node_modules/typescript/bin/tsc'),'--target','ES2022',

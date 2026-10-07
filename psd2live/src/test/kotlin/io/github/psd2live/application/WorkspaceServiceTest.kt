@@ -189,8 +189,29 @@ class WorkspaceServiceTest {
         val tree = WorkspaceHistoryTree(before, "before", "before")
         val initial = tree.head().node.id
         var publications = 0
-        assertFailsWith<IllegalStateException> {
-            service.commitEdit(prepared, tree, initial, "edited", "Hide layer", "user", null) { false }
+        val original = service.preview(before.source, config)
+        val viewModel = io.github.psd2live.ui.state.PSD2LiveViewModel()
+        viewModel.setStateForTest(io.github.psd2live.ui.state.PSD2LiveState(
+            analysis = original.analysis, previewModel = original, atlasSize = 1024))
+        try {
+            // Prepare A, then use the actual desktop editor command to change B.
+            viewModel.setLayerVisibility(before.source.layers.last().id.raw, false)
+            val humanState = viewModel.state.value
+            assertFailsWith<IllegalStateException> {
+                service.commitEdit(prepared, tree, initial, "edited", "Hide layer", "agent", null) { edit ->
+                    viewModel.applyAgentWorkspacePreview(edit.preview,
+                        edit.before.source, edit.before.layerVisibility, edit.before.deletedLayerIds,
+                        edit.before.layerOverrides, edit.before.parentOverrides, edit.before.rigEdits,
+                        layerVisibility = edit.after.layerVisibility, deletedLayerIds = edit.after.deletedLayerIds,
+                        layerOverrides = edit.after.layerOverrides, parentOverrides = edit.after.parentOverrides,
+                        rigEdits = edit.after.rigEdits, status = "Late Agent commit")
+                }
+            }
+            assertEquals(humanState.layerVisibility, viewModel.state.value.layerVisibility)
+            assertSame(original, viewModel.state.value.previewModel)
+            assertEquals(humanState.statusText, viewModel.state.value.statusText)
+        } finally {
+            viewModel.close()
         }
         assertEquals(1, tree.nodes().size)
         assertFailsWith<IllegalArgumentException> {
@@ -203,6 +224,13 @@ class WorkspaceServiceTest {
         }
         assertEquals(0, publications)
         assertEquals(other.node.id, tree.head().node.id)
+        assertEquals(2, tree.nodes().size)
+        tree.checkout(initial)
+        assertFailsWith<io.github.psd2live.history.StaleWorkspaceHeadException> {
+            service.commitEdit(prepared, tree, other.node.id, "edited", "Late checkout edit", "agent", null) { publications++; true }
+        }
+        assertEquals(0, publications)
+        assertEquals(initial, tree.head().node.id)
         assertEquals(2, tree.nodes().size)
     }
 

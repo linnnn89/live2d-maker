@@ -437,3 +437,15 @@ pack_archive不再收集所有原始字节，1MiB块同时哈希/压缩，最后
 最终前端86/86（0跳过）、纯Python18/18、真实UI12/12和构建通过；新增逐键800、Worker不随输入启动、确认后单次检查、新坐标预检门禁、检查中取消与旧结果隔离。入口438.25kB，导入Worker181.06kB。真实React/纯Python fixture，未执行native生成；原生/use-case函数体经AST对照保持。截图/tmp/live2d-fix-evidence/，Chromium桌面1440×960及既有窄屏回归。详细审查、最小plan及实施见 [ENGINEERING_REVIEW_N3_N5_SIMPLICITY.md](ENGINEERING_REVIEW_N3_N5_SIMPLICITY.md)；完成合并后转Windows W1。
 
 PR #29、#30、#31、#32 已依次合并到 main@a09d741，合并后的完整文件树与最终 Linux 验证树一致。PC 继续工作前拉取 main，按 R8 第9节 W1 验收。
+
+## 49. Windows W1：真实链路、关闭隔离与资源观测（2026-10-07）
+
+main从615d0b8快进到origin/main@8647b83，实施在codex/windows-w1-acceptance。当前源码JAR与真实Edge/Python完成ds.psd重建、Overlay像素变化、16姿态QA、动态预览、可播放/编辑器交付、设置保存后重建失败保留旧模型、修订恢复/再保存及导入门禁。无Overlay新工程导入透明PNG后25层模型真实重建/QA通过；有Overlay时拓扑变化拒绝重放并可恢复。旧JAR基线拒绝也实际执行。完整182文件工程归档删除测试原目录后重开，保留6个修订、1个姿态、QA、模型/交付哈希和动态资源。
+
+本轮修复：旧原生Agent工作区关闭后仍可操作新预览；临时CommonJS编译受TEMP上级type=module影响；卸载canvas保留GPU bitmap。扩展既有原生服务回归实际prepare(A)→桌面VM用户编辑(B)→旧commit拒绝及checkout旧HEAD拒绝，另加关闭后拒绝读写/不改变新模型回归。实际48次4096²PNG取消的GPU显存由修复前114.4→616.0MiB，变为114.9→133.9MiB；12次动态iframe关闭后157.2→154.8MiB，Worker/URL0。
+
+取得真实数据后才改流式交付与上传：24.39MiB交付Python分配峰值47.140→13.412MiB，文件清单逐项同SHA；94.06MiB工程上传解码/导入峰值219.934→5.308MiB。上传计时排除预先准备的Base64和浏览器/Node/HTTP/JSON副本，单次观测不推断整体上限。保留格式、native准备/缓存/发布与原归档限制，无multipart/job/历史清理。
+
+前端86项最终均验证、构建通过；Kotlin全量215项0失败0错误1可选nunif跳过，Cubism实际GPU初始化；测试堆2GiB解决真实PSD案例的默认512MiB不足。扩展后的服务组6/6通过。Python全量52项的1个Windows大小写fixture已定向修正；工程/归档6、交付2及最终真实React UI12项通过。新增自动化测试仅2项。完整事实、命令范围、资源表和失败原因见[R8第9节](ENGINEERING_REVIEW_R8.md#w1-windows-实测与定向修复2026-10-07)。
+
+证据out/w1-windows/与out/w1-*.log，仅隔离测试工程；本轮依赖恢复为锁定npm包和项目Python内psutil。Compose源码应用实际启动/窗口检查通过，但UIA仅Pane，逐控件交互及完整MCP网络的迟到关闭/重开未覆盖；未做Cubism Editor人工验收或Windows安装包发布。随仓/portable二进制没有替换，Studio本机优先使用新构建源码JAR；复现应先构建当前源码。本轮源码与文档对应 [Windows W1 PR #33](https://github.com/linnnn89/live2d-maker/pull/33)。

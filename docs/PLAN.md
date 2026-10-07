@@ -2,13 +2,15 @@
 
 更新于 2026-10-07。目标是完成 PSD 编辑、素材导入、Live2D 重建和验证这些软件功能。角色素材只作为测试样本，不要求逐类制作完整角色。
 
-合并前追加审查：[N3–N5 冗余与复杂度审查](ENGINEERING_REVIEW_N3_N5_SIMPLICITY.md)。发现 N5a 裁切逐键输入会因禁用表单而丢失焦点，输入 `800` 实际只得到 `8`；现已在 Linux 修复，裁切坐标通过“应用裁切坐标”确认，输入保持焦点。一次性导入预算租约已移除，Snapshot 局部读取已复用；修订的最终验证已通过，已随 PR #29–#32 合并到 main@a09d741。下一步仍为真实 Windows W1。
+**当前 Windows 结果**：已从 main@615d0b8 快进对齐 origin/main@8647b83，并在本机执行 W1。真实 PSD 的重建、Overlay、16 姿态 QA、动态预览、两种交付、失败恢复、透明 PNG 导入及完整归档重开已实测；修复了关闭后的原生 Agent 工作区仍能写入、Windows 临时 CommonJS 模块受上级 package.json 影响，以及反复取消导入的 canvas GPU 资源增长。取得真实产物数据后完成交付文件与上传 Base64 的流式处理，未增加后台任务、格式或历史清理。详细结果、资源测量和验证边界见 [R8 第9节 Windows 实测](ENGINEERING_REVIEW_R8.md#w1-windows-实测与定向修复2026-10-07)及 [HANDOFF 第49节](HANDOFF.md)。Compose 桌面已启动并检查窗口，逐控件操作及完整 MCP 网络迟到交错尚未覆盖；不能把服务/VM 回归称为这两项已通过。
 
-最新代码复评与后续实施 plan：见 [R8 后的工程评审](ENGINEERING_REVIEW_R8.md)。N0–N2 已通过 PR #28 合并到 main@a38406f；N3 生命周期/操作所有权、N5a 导入Worker预算、N4 纯存储/查询、N5b 工程归档流式处理已完成Linux范围。86项前端（显式Linux Python、0跳过）、18项纯Python、12项真实React/纯Python UI和构建通过（含合并前修正回归）。256MiB受控归档样本的Python分配峰值从256.799MiB降至2.324MiB。下一步为PC W1：真实native Agent交错、模型/Overlay/交付/完整归档与大型项目资源观测；native交付打包本体的进一步优化待真实数据，不在云端修改。阶段结果、取舍和Windows具体plan见工程评审第9节。
+合并前追加审查：[N3–N5 冗余与复杂度审查](ENGINEERING_REVIEW_N3_N5_SIMPLICITY.md)。发现 N5a 裁切逐键输入会因禁用表单而丢失焦点，输入 `800` 实际只得到 `8`；现已在 Linux 修复，裁切坐标通过“应用裁切坐标”确认，输入保持焦点。一次性导入预算租约已移除，Snapshot 局部读取已复用；修订的最终验证已通过，已随 PR #29–#32 合并到 main@a09d741。Windows W1 的本机结果已追加到上方状态和交接第49节。
+
+最新代码复评与后续实施 plan：见 [R8 后的工程评审](ENGINEERING_REVIEW_R8.md)。N0–N2 已通过 PR #28 合并到 main@a38406f；N3 生命周期/操作所有权、N5a 导入Worker预算、N4 纯存储/查询、N5b 工程归档流式处理已完成Linux范围。86项前端（显式Linux Python、0跳过）、18项纯Python、12项真实React/纯Python UI和构建通过（含合并前修正回归）。256MiB受控归档样本的Python分配峰值从256.799MiB降至2.324MiB。Windows W1 已执行真实服务/VM交错、模型/Overlay/交付/完整归档与资源观测，并据实测完成交付打包/上传优化；桌面逐控件操作与完整MCP网络交错仍未覆盖。阶段结果、取舍与证据边界见工程评审第9节。
 
 设计参考：[Mesh Avatar Studio](https://github.com/shinshin86/mesh-avatar-studio)。安装与使用见 [环境说明](environment.md) 和 [Studio 使用说明](../studio/README.md)；历史验证记录见 [HANDOFF.md](HANDOFF.md)。
 
-本轮已按顺序合并：[N3 #29](https://github.com/linnnn89/live2d-maker/pull/29) → [N5a #30](https://github.com/linnnn89/live2d-maker/pull/30) → [N4 #31](https://github.com/linnnn89/live2d-maker/pull/31) → [N5b #32](https://github.com/linnnn89/live2d-maker/pull/32)。这些 PR 最初依次基于前一分支，现已逐项将 base 改为 main 并完成合并。Linux 范围已完成，后续转真实 Windows 执行 W1。
+本轮已按顺序合并：[N3 #29](https://github.com/linnnn89/live2d-maker/pull/29) → [N5a #30](https://github.com/linnnn89/live2d-maker/pull/30) → [N4 #31](https://github.com/linnnn89/live2d-maker/pull/31) → [N5b #32](https://github.com/linnnn89/live2d-maker/pull/32)。这些 PR 最初依次基于前一分支，现已逐项将 base 改为 main 并完成合并。Linux 范围已完成；Windows W1 实测结果见当前状态和第49节。
 
 后续代码架构、模块职责、产品功能与编辑器交互的更新建议，见 [架构与产品迭代计划](ARCHITECTURE_PRODUCT_PLAN.md)。建议基于代码阅读，按编辑反馈、能力接入和项目交付的优先级实施。
 

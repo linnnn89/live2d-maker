@@ -200,5 +200,7 @@ afterEvaluate {
 
 tasks.test {
 	useJUnitPlatform()
+	// Real PSD/native regression cases exceed Gradle's default 512 MiB test heap.
+	maxHeapSize = "2g"
 	systemProperty("psd2live.cubism.smoke", System.getProperty("psd2live.cubism.smoke", "false"))
 }

@@ -19,6 +19,31 @@ from tools.authoring_rig.studio_protocol import StudioError
 
 
 class StudioProjects(unittest.TestCase):
+    def test_chunked_base64_upload_preserves_bytes_and_rejects_partial_candidates(self):
+        from tools.authoring_rig.projects import decoded_upload, ARCHIVE_CHUNK_BYTES
+        from tools.authoring_rig.studio_protocol import StudioError
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary);catalog=root/'projects';target=root/'upload.psd'
+            original=bytes(range(256))*(ARCHIVE_CHUNK_BYTES//128+1)
+            encoded=base64.b64encode(original).decode()
+            real_decode=base64.b64decode
+            def bounded_decode(value,**options):
+                self.assertLessEqual(len(value),ARCHIVE_CHUNK_BYTES)
+                return real_decode(value,**options)
+            with patch.object(base64,'b64decode',bounded_decode):
+                self.assertEqual(decoded_upload(encoded,target),target)
+            self.assertEqual(target.read_bytes(),original)
+            invalid=encoded[:ARCHIVE_CHUNK_BYTES-4]+'AA=='+encoded[ARCHIVE_CHUNK_BYTES:]
+            for content in (invalid,encoded[:-1],encoded[:ARCHIVE_CHUNK_BYTES]+'!'):
+                with self.subTest(content_length=len(content)):
+                    with self.assertRaises(StudioError) as error:
+                        create_project(catalog,{'schemaVersion':1,'kind':'archive','name':'Rejected','data':content})
+                    self.assertEqual(error.exception.detail['code'],'INVALID_REQUEST')
+                    self.assertEqual(list(catalog.iterdir()),[])
+            with patch('tools.authoring_rig.projects.MAX_UPLOAD',2):
+                with self.assertRaises(StudioError) as error:decoded_upload(base64.b64encode(b'123').decode(),target)
+                self.assertEqual(error.exception.detail['code'],'REQUEST_SIZE')
+
     def test_real_project_archive_revisions_conflicts_and_interrupted_restore(self):
         with tempfile.TemporaryDirectory() as temporary:
             catalog=Path(temporary)/'projects'; source=Path(temporary)/'source.psd'

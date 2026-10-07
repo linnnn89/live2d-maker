@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test, after } from 'node:test';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -9,6 +9,7 @@ import { spawnSync } from 'node:child_process';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const output = mkdtempSync(path.join(tmpdir(), 'studio-settings-test-'));
+writeFileSync(path.join(output, 'package.json'), '{"type":"commonjs"}');
 after(() => rmSync(output, { recursive: true, force: true }));
 const compiled = spawnSync(process.execPath, [path.join(root, 'node_modules/typescript/bin/tsc'),
   '--target', 'ES2022', '--module', 'commonjs', '--strict', '--skipLibCheck', '--outDir', output,
