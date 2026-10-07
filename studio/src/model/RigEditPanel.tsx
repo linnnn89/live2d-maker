@@ -5,7 +5,7 @@ import type {Parameter} from '../viewer/ViewerAdapter';
 import {useWorkspace} from '../workspace/WorkspaceContext';
 
 export function RigEditPanel({parameters}:{parameters:Parameter[]}){
-  const {saved,selected,dirty,settingsPending,editingLocked,editor,setBusy,setError,setMessage,applySnapshot,setSelected}=useWorkspace();
+  const {saved,selected,dirty,settingsPending,editingLocked,beginOperation,setError,setMessage,applySnapshot,setSelected}=useWorkspace();
   const [target,setTarget]=useState(''),[parameter,setParameter]=useState('ParamAngleX'),[value,setValue]=useState('30'),[opacity,setOpacity]=useState('0.5');
   if(!saved)return null;
   const locked=editingLocked||dirty||settingsPending;
@@ -13,12 +13,13 @@ export function RigEditPanel({parameters}:{parameters:Parameter[]}){
   const targetId=meshes.some(c=>c.drawable===target)?target:meshes[0]?.drawable;
   const available=!!saved.project&&!!saved.build&&!saved.stale.base_rig&&saved.overlay.status!=='broken';
   async function submit(index?:number){
-    if(locked)return;editor.setBlocked(true);setBusy('正在保存模型关键形…');setError('');
+    if(locked)return;const operation=beginOperation('正在保存模型关键形…');if(!operation)return;setError('');
     try{
       const base={schemaVersion:1,revision:saved!.revision,settingsRevision:saved!.buildSettings!.revision,overlayRevision:saved!.overlayRevision};
-      applySnapshot(await api<Snapshot>('rig-edit',index===undefined?{...base,operation:'set-opacity',edit:{targetId,parameterId:parameter,value:Number(value),opacity:Number(opacity)}}:{...base,operation:'remove',index}));
+      const result=await api<Snapshot>('rig-edit',index===undefined?{...base,operation:'set-opacity',edit:{targetId,parameterId:parameter,value:Number(value),opacity:Number(opacity)}}:{...base,operation:'remove',index});
+      if(!operation.isCurrent())return;applySnapshot(result);
       setMessage('模型修改已保存；上次成功模型保留，更新模型后查看效果。修改前工程已自动保存为修订。');
-    }catch(e){setError(e instanceof Error?e.message:String(e));}finally{editor.setBlocked(false);setBusy('');}
+    }catch(e){if(operation.isCurrent())setError(e instanceof Error?e.message:String(e));}finally{operation.finish();}
   }
   return <details className="rig-edit-panel"><summary>模型关键形编辑</summary><p>持久修改指定部件在某一参数姿态的透明度。预览参数本身不会保存为关键形；提交后需更新模型，原生检查通过才替换预览。</p>
     {!available&&<p>请打开 Studio 工程，保存输入并更新模型；已有基线冲突时先查看证据，恢复兼容修订。</p>}

@@ -154,7 +154,7 @@ Agent 的已有草稿入口也应遵守同一操作门禁。未来增加工程�
 
 ## 6. 后续实施 plan
 
-状态：N0 核心草稿时序回归及 N1/N2 已实施并在 Linux 验证；N0 中宿主取消/资源所有权的扩展检查随 N3/N5 推进。其余实施项待开始，W1 待 PC 执行。按 PR 分步提交，每一步满足验收再推进；已有通过的保护作为回归基线，不重新实现一遍。
+状态：N0 核心草稿时序回归及 N1/N2 已通过 PR #28 合并；N3 的关闭句柄/Worker 所有权已完成 Linux 验证，应用操作收尾继续推进。N5a、N4、N5b 随后依次实施，W1 待 PC 执行。按阶段提交，每一步满足验收再推进；已有通过的保护作为回归基线，不重新实现一遍。
 
 | 顺序 / 建议 PR | 修改范围与具体产出 | 验收标准 | 环境边界 |
 | --- | --- | --- | --- |
@@ -212,3 +212,20 @@ Agent 的已有草稿入口也应遵守同一操作门禁。未来增加工程�
 - 截图保存在工作区外 `/tmp/live2d-n0-n2-evidence/`，未提交进仓库。验证不覆盖实际 Cubism/native、Windows CLI/Edge 或桌面 SDK；这些继续由 W1 执行。
 
 下一轮从 N3 中实际重复的操作收尾与关闭句柄开始，先用可控时序证明问题再抽取小范围用例；N5a 优先解决主线程大图解码和迟到资源分配。暂不一次性建立通用任务系统或并行迁移整条 Python/native 链路。
+
+## 9. N3 起的持续实施记录与 plan（2026-10-07）
+
+用户授权继续至规划的 Linux 范围完成，或确实需要切换真实 Windows 才能继续。基于 main@a38406f（PR #28 已合并），后续按以下顺序推进；本节逐步追加结果，不把尚未实施的项目标为完成。
+
+1. **N3a / 已验证**：`ArtworkClient.dispose` 成为关闭终态，失败 Worker 可被新 Worker 替换，但旧回调只认自己的实例。关闭时清空 handler、活动/排队任务；保留旧 client 的调用返回 `ABORTED`。每次 Workspace effect setup 创建新 client 和 Agent bridge，cleanup 关闭对应实例。旧 bridge 拒绝 inspect/apply/commit/capture，进行中的返回也不能冒充当前宿主结果；dispose 清除对 editor/render 的引用。已提交的保存可能完成，关闭不意味着回滚；重开后查询实际保存状态，不能盲重试。
+2. **N3b / 已验证**：`WorkspaceOperations` 只提供同步进入、当前所有者检查、门禁/进度和自身收尾；关闭释放引用。工程、姿态、关键形、交付、设置、IR 保存/重建/QA 和导入门禁共用；组件保留业务输入与原 CAS。先启动草稿保存，再同步加上操作门禁，避免保存新基线发布后至后续原生请求之间暴露空闲状态。交付响应确认后立即保存已成功的下载结果，快照失败单独显示并只重试读取。无队列、自动重试、后台调度或新的公开 Agent 权限。
+3. **N5a / 待实施**：把导入 decode/alpha/mask encode 移出主线程，明确独立任务预算与关闭释放；在 `arrayBuffer` 返回后检查任务是否还有效，避免已清理的 effect 创建迟到 URL。
+4. **N4 / 待实施**：先拆纯文件读写/锁/URL 原语与 Snapshot 查询，保留 `studio.py` 兼容导出。native/build 算法及原生 API 不变；Windows 真实接入留 W1。
+5. **N5b / 待实施**：工程 ZIP 分块读取、哈希与压缩；统一导出/导入大小规则并验证完整归档重开。涉及原生产物生成的交付路径若需修改，留 PC；不擅自删除历史。
+6. **W1 / 待 PC**：真实模型、CLI/桌面/native 集成和大型 CMO3 工程验收，沿用第 6 节的明确场景。
+
+N3a 的三个新增回归在修复前全部失败，分别复现关闭后重启、旧 error/message 影响替换 Worker、关闭后迟到统计改变；修复后通过。补充旧 bridge 读写/捕获拒绝、迟到成功/失败、保存已提交后关闭和 50 次任务生命周期检查。它们证明队列/handler/实例收尾，不等于浏览器整体堆或 GPU 已做长期内存测量。
+
+N3a 验收：前端 79 项，77 通过/原 Windows 路径 2 项跳过；构建通过。真实 React+纯 Python fixture 的 8 项 UI 回归通过，包括 StrictMode setup→cleanup→setup、真实 PNG Worker 捕获、卸载后旧 bridge/client 拒绝、重挂载捕获及旧 apply 拒绝。Browser plugin not available，沿用 Chromium/Playwright；桌面 1440×960、原窄屏用例390×844，页面身份/非空/无 Vite overlay/pageerror/交互与截图检查通过。证据 `/tmp/live2d-n3-evidence/`，不提交临时图片。未调用 native rebuild。
+
+N3b 验收：前端82项，80通过/原2项跳过，构建通过。三项操作回归覆盖同一tick重入、Agent保存/手势互斥、保存成功基线发布期间仍BUSY、关闭后的旧进度/成功/失败/finally不影响新操作。UI原8项通过，新交付用例通过，StrictMode用例增加同tick重复读取只发送一次请求与旧读取迟到不清除新宿主门禁。交付生成响应为协议fixture，未执行真实native导出；其接入验收仍由W1完成。

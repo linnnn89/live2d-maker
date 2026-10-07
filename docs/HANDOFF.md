@@ -397,3 +397,11 @@ N1 的设置草稿保留初始基线与本地三个数值，远端新快照只�
 前端 72 项中 70 通过、2 项因缺少固定路径 Windows Python 跳过；生产构建通过。纯 Python 工程回归 2 项通过。新增 test_studio_ui.py 以真实 React 页面+纯 Python 函数和 API route fixture 验证 7 项：设置 dirty/409/重读/放弃、干净同步与保存、设置保存后模拟 rebuild 失败、HEAD 恢复、A/B 修订恢复再保存、恢复后的读取失败单独重试、外部 HEAD 冲突说明保留。Chromium 桌面 1440×960/窄屏390×844，页面身份/非空/Vite overlay/pageerror/目标交互和截图检查通过；主动409/400为预期响应。Browser 插件不可用，沿用现有 Playwright；截图为 /tmp/live2d-n0-n2-evidence/，不提交临时证据。
 
 复跑：启动 studio 的 npm run dev 后，STUDIO_UI_URL=http://127.0.0.1:5173 python -m unittest tools.authoring_rig.tests.test_studio_ui -v。未设置 URL 时该独立 UI 套件明确跳过。Windows CLI、Kotlin/JAR、JPype、真实模型生成和桌面 SDK 没有改动或重新验收；PC W1 仍待进行。后续优先 N3 的具体操作收尾/关闭句柄及 N5a 主线程素材解码预算，先证明交错或资源问题再决定抽取范围。
+
+## 44. N3a：关闭终态与 Worker/Agent 宿主所有权（2026-10-07）
+
+基于 PR #28 已合并的 main@a38406f。三个确定性回归先失败后通过，复现 client dispose 后重启 Worker、崩溃 Worker 的旧回调影响替换实例、关闭后迟到统计改变。生产修改局限 ArtworkClient 和 workspace bridge/provider；关闭清空 handler 和队列，新请求返回 ABORTED，旧消息只能作用于原 Worker。Agent bridge 的旧引用与迟到返回失效，清除持有的 editor/render 引用；进行中的保存可能已经写入，关闭不能当作回滚或盲重试依据。React effect 每次 setup 创建新资源，支持 StrictMode cleanup/re-setup。
+
+前端79项（77通过/2因Windows路径跳过）、构建、真实UI8项通过。新UI用例使用StrictMode、实际PNG Worker捕获、卸载/保留旧引用/重挂载，旧apply拒绝且新草稿保持干净。50次模拟worker生命周期清空活动任务/队列/handler，不宣称整体堆/GPU测量。证据在工作区外/tmp/live2d-n3-evidence/。后续持续实施plan见工程评审第9节；native/Windows接口未改动。
+
+N3b 继续收敛到 WorkspaceOperations：同步进入、自己的isCurrent/block/update/finish，旧所有者无法结束新任务；无队列/自动重试。工程/姿态/关键形/交付/设置/保存/重建/QA/导入接上同一门禁。保存启动后同步block，提交的新基线仍处于operation，Agent不可在后续阶段插入写入。成功交付保留可下载结果，后续snapshot失败只提供读取重试。前端82项（80通过/2原路径跳过）和构建通过；原UI8项及新交付fixture用例通过，StrictMode附加验证同tick重复读取只请求一次、旧读取迟到不释放新宿主门禁。原生算法/接口未修改，真实交付接入留W1。

@@ -38,6 +38,11 @@ for (const name of ['png', 'AssetCache', 'ArtworkClient']) {
 const { decodeAsset, encodeFrame } = await import(pathToFileURL(path.join(output, 'artwork/png.mjs')));
 const { AssetCache } = await import(pathToFileURL(path.join(output, 'artwork/AssetCache.mjs')));
 const { ArtworkClient } = await import(pathToFileURL(path.join(output, 'artwork/ArtworkClient.mjs')));
+const bridgeSource = readFileSync(path.join(root, 'src/workspace/DraftBridge.ts'), 'utf8');
+const bridgeCode = ts.transpileModule(bridgeSource, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText
+  .replaceAll("from '../artwork/capture'", "from './artwork/capture.js'");
+writeFileSync(path.join(output, 'DraftBridge.mjs'), bridgeCode);
+const { createDraftBridge } = await import(pathToFileURL(path.join(output, 'DraftBridge.mjs')));
 const { MemoryBudget } = require(path.join(output,'artwork/MemoryBudget.js'));
 const { artworkKey } = require(path.join(output,'artwork/content.js'));
 const fixtures = JSON.parse(readFileSync(path.join(root, 'tests/fixtures/artwork.json')));
@@ -218,4 +223,123 @@ test('client keeps one active task, coalesces display updates, bounds captures a
   assert.equal(sent.filter(value=>value.kind==='ack').length,6);
   await assert.rejects(client.capture({...ir,metadata:{name:'x'.repeat(2*1024*1024)}}),{code:'MEMORY_BUDGET'});
   const closing=client.capture(ir);client.dispose();await assert.rejects(closing,{code:'ABORTED'});
+});
+
+function workerPort() {
+  return { onmessage: null, onerror: null, sent: [], terminations: 0,
+    postMessage(value) { this.sent.push(value); },
+    terminate() { this.terminations++; } };
+}
+
+test('disposing a client settles active and queued jobs and permanently closes retained references', async () => {
+  const port = workerPort(); let created = 0;
+  const client = new ArtworkClient(() => { created++; return port; });
+  const active = client.capture(fixtures.cases[0].ir).catch(error => error.code);
+  const queued = client.capture(fixtures.cases[0].ir).catch(error => error.code);
+  client.dispose(); client.dispose();
+  assert.deepEqual(await Promise.all([active, queued]), ['ABORTED', 'ABORTED']);
+  assert.equal(client.stats.activeJobs, 0); assert.equal(client.stats.queuedJobs, 0);
+  const retainedRender = client.render(fixtures.cases[0].ir).catch(error => error.code);
+  const retainedCapture = client.capture(fixtures.cases[0].ir).catch(error => error.code);
+  // Settle even the buggy implementation, so a failure never leaves the test hanging.
+  client.dispose();
+  assert.deepEqual(await Promise.all([retainedRender, retainedCapture]), ['ABORTED', 'ABORTED']);
+  assert.equal(created, 1); assert.equal(port.terminations, 1);
+});
+
+test('late callbacks from a failed worker cannot acknowledge, terminate or change its replacement', async () => {
+  const old = workerPort(), next = workerPort(), ports = [old, next];
+  const client = new ArtworkClient(() => ports.shift());
+  const failed = client.capture(fixtures.cases[0].ir).catch(error => error.code);
+  const lateMessage = old.onmessage, lateError = old.onerror;
+  old.onerror(); assert.equal(await failed, 'RENDER_FAILED');
+  const current = client.capture(fixtures.cases[0].ir).catch(error => ({ code: error.code }));
+  const sentBefore = next.sent.length;
+  lateMessage({ data: { id: old.sent[0].id, ok: true, value: {}, metrics: { compositions: 999 } } });
+  lateError();
+  assert.equal(next.sent.length, sentBefore); assert.equal(next.terminations, 0);
+  assert.equal(client.stats.activeJobs, 1); assert.equal(client.stats.compositions, undefined);
+  const value = { width: 1, height: 1, bounds: null, dataUrl: 'replacement' };
+  next.onmessage({ data: { id: next.sent[0].id, ok: true, value, metrics: { compositions: 1 } } });
+  assert.deepEqual(await current, value); assert.equal(client.stats.compositions, 1);
+  assert.equal(next.sent.filter(message => message.kind === 'ack').length, 1);
+  client.dispose();
+});
+
+test('callbacks already queued before disposal cannot change the closed client', async () => {
+  const port = workerPort(), client = new ArtworkClient(() => port);
+  const pending = client.capture(fixtures.cases[0].ir).catch(error => error.code);
+  const message = port.onmessage, error = port.onerror;
+  client.dispose();
+  const sentBefore = port.sent.length;
+  message({ data: { id: port.sent[0].id, ok: true, value: {}, metrics: { compositions: 999 } } }); error();
+  assert.equal(await pending, 'ABORTED'); assert.equal(port.sent.length, sentBefore);
+  assert.equal(port.terminations, 1); assert.equal(client.stats.compositions, undefined);
+});
+
+test('closed Agent bridges reject reads, writes and captures without touching the former host', async () => {
+  const c = editor(); let captures = 0;
+  const host = createDraftBridge(c, async () => { captures++; return {}; });
+  const token = c.getSnapshot();
+  host.dispose(); host.dispose();
+  for (const request of [
+    { schemaVersion: 1, operation: 'inspect' },
+    { schemaVersion: 1, operation: 'inspect', response: 'parts' },
+    { schemaVersion: 1, operation: 'apply', state: token,
+      commands: [{ type: 'set_opacity', partId: 'solid', opacity: 80 }] },
+    { schemaVersion: 1, operation: 'commit', state: token },
+  ]) {
+    const result = await host.bridge.execute(request);
+    assert.equal(result.ok, false); assert.equal(result.error.code, 'ABORTED'); assert.equal(result.state, null);
+  }
+  assert.equal((await host.bridge.capture({ schemaVersion: 1, state: token })).error.code, 'ABORTED');
+  assert.equal(captures, 0); assert.equal(c.getSnapshot().revision, token.revision);
+});
+
+test('closing a host suppresses both late capture success and failure while the new host remains usable', async () => {
+  for (const fails of [false, true]) {
+    const c = editor(); let resolve, reject;
+    const old = createDraftBridge(c, () => new Promise((yes, no) => { resolve = yes; reject = no; }));
+    const pending = old.bridge.capture({ schemaVersion: 1, state: c.getSnapshot() });
+    old.dispose();
+    const nextEditor = editor(), next = createDraftBridge(nextEditor, async () => ({ dataUrl: 'new' }));
+    if (fails) reject(new Error('old codec failed')); else resolve({ dataUrl: 'old' });
+    assert.equal((await pending).error.code, 'ABORTED');
+    const read = await next.bridge.execute({ schemaVersion: 1, operation: 'inspect' });
+    assert.equal(read.ok, true);
+    const current = await next.bridge.capture({ schemaVersion: 1, state: read.state });
+    assert.equal(current.ok, true); assert.equal(current.image.dataUrl, 'new');
+    next.dispose();
+  }
+});
+
+test('closing a bridge does not claim to roll back an already submitted save or publish its late result', async () => {
+  let resolve, writes = 0, savedCalls = 0;
+  const c = new DraftController(() => { writes++; return new Promise(yes => { resolve = yes; }); }, () => savedCalls++);
+  c.install(fixtures.cases[0].ir, 'base');
+  c.edit([{ type: 'set_opacity', partId: 'solid', opacity: 80 }]);
+  const host = createDraftBridge(c, async () => ({}));
+  const pending = host.bridge.execute({ schemaVersion: 1, operation: 'commit', state: c.getSnapshot() });
+  host.dispose();
+  resolve({ ir: c.getSnapshot().ir, revision: 'saved' });
+  const result = await pending;
+  assert.equal(result.ok, false); assert.equal(result.error.code, 'ABORTED'); assert.equal(result.state, null);
+  assert.equal(writes, 1); assert.equal(savedCalls, 1);
+  assert.equal((await host.bridge.execute({ schemaVersion: 1, operation: 'inspect' })).error.code, 'ABORTED');
+});
+
+test('repeated worker lifetimes leave no active jobs or attached callbacks', async () => {
+  let workers = 0;
+  for (let index = 0; index < 50; index++) {
+    const port = workerPort();
+    port.terminate = () => { port.terminations++; workers--; };
+    const client = new ArtworkClient(() => { workers++; return port; });
+    const first = client.capture(fixtures.cases[0].ir).catch(error => error.code);
+    const second = client.capture(fixtures.cases[0].ir).catch(error => error.code);
+    client.dispose();
+    assert.deepEqual(await Promise.all([first, second]), ['ABORTED', 'ABORTED']);
+    assert.equal(port.onmessage, null); assert.equal(port.onerror, null);
+    assert.equal(client.stats.activeJobs, 0); assert.equal(client.stats.queuedJobs, 0);
+    assert.equal(workers, 0);
+  }
 });

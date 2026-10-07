@@ -9,7 +9,7 @@
     "check": "tsc --noEmit",
     "draft": "node scripts/draft-cli.mjs",
     "protocol:generate": "node scripts/generate-protocol.mjs",
-    "test": "node --test tests/viewer-adapter.test.mjs tests/draft-session.test.mjs tests/artwork.test.mjs tests/protocol.test.mjs tests/recovery.test.mjs tests/bridge.test.mjs tests/settings-draft.test.mjs"
+    "test": "node --test tests/viewer-adapter.test.mjs tests/draft-session.test.mjs tests/artwork.test.mjs tests/protocol.test.mjs tests/recovery.test.mjs tests/bridge.test.mjs tests/settings-draft.test.mjs tests/workspace-operations.test.mjs"
   },
   "engines": {
     "node": "^20.19.0 || >=22.12.0"
