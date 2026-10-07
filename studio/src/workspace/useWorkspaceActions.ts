@@ -4,7 +4,7 @@ import { DraftController } from '../editor/DraftController';
 import type { EditCommand } from '../editor/contracts';
 import type { Snapshot } from '../protocol';
 import type { ProjectRevisions } from '../protocol/generated';
-import type { BuildSettings } from '../protocol/generated';
+import type { BuildSettings, BuildSettingsState } from '../protocol/generated';
 
 /** Owns open/save/native-operation gates; views use the same editor and saved baseline. */
 export function useWorkspaceActions() {
@@ -95,19 +95,20 @@ export function useWorkspaceActions() {
     setMessage('素材已导入；请 Rebuild 更新模型，再运行 Pose QA');
   }
   function retryOpen(){setError('');setBusy('正在打开工作区…');setOpenAttempt(value=>value+1);}
-  async function saveBuildSettings(settings: BuildSettings, settingsRevision: string, rebuild: boolean) {
-    if (!saved || editingLocked || dirty) return;
+  async function saveBuildSettings(settings: BuildSettings, settingsRevision: string, rebuild: boolean): Promise<BuildSettingsState | null> {
+    if (!saved || editingLocked || dirty) return null;
     editor.setBlocked(true); setBusy('正在保存构建设置…'); setError(''); setMessage('');
-    let settingsSaved = false;
+    let settingsSaved: BuildSettingsState | null = null;
     try {
       const result = await api<Snapshot>('build-settings', {schemaVersion:1, revision:saved.revision, settingsRevision, settings});
-      apply(result); settingsSaved = true;
+      apply(result); settingsSaved = result.buildSettings!;
       if (rebuild) { setBusy('正在按新设置重建模型…'); apply(await api<Snapshot>('rebuild')); }
       setMessage(rebuild ? '构建设置已保存并采用，预览已刷新' : '构建设置已保存；重建后采用');
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : String(failure));
       if (settingsSaved) { try { apply(await api<Snapshot>('snapshot')); } catch { /* Preserve the failure and last successful snapshot. */ } }
     } finally { editor.setBlocked(false); setBusy(''); }
+    return settingsSaved;
   }
   async function readBuildSettings() {
     if (editingLocked || dirty) return;
@@ -115,6 +116,12 @@ export function useWorkspaceActions() {
     try { apply(await api<Snapshot>('snapshot')); setMessage('已读取当前构建设置'); }
     catch (failure) { setError(failure instanceof Error ? failure.message : String(failure)); }
     finally { editor.setBlocked(false); setBusy(''); }
+  }
+  function applyProjectRevisions(revisions: ProjectRevisions) {
+    setSaved(previous => {
+      if (!previous?.project || previous.project.head === revisions.head) return previous;
+      return { ...previous, project: { ...previous.project, head: revisions.head } };
+    });
   }
   async function saveProject(head:string,message:string):Promise<ProjectRevisions|null> {
     if(!saved||editingLocked||settingsPending)return null;
@@ -124,6 +131,7 @@ export function useWorkspaceActions() {
       if(dirty){const result=await editor.execute({schemaVersion:1,operation:'commit',state:draft!});if(!result.ok)throw new Error(result.error.message);current=result.saved||current;}
       editor.setBlocked(true);
       const result=await api<ProjectRevisions>('project-save',{schemaVersion:1,revision:current.revision,settingsRevision:current.buildSettings!.revision,overlayRevision:current.overlayRevision,posesRevision:current.poses?.revision,head,message});
+      applyProjectRevisions(result);
       setMessage('工程修订已保存');return result;
     }catch(e){setError(e instanceof Error?e.message:String(e));return null;}finally{editor.setBlocked(false);setBusy('');}
   }
@@ -135,5 +143,5 @@ export function useWorkspaceActions() {
   }
   return {saved,applySnapshot:apply,editor,draft,ir,dirty,selected,setSelected,busy,message,error,setMessage,setError,editingLocked,
     showQa,setShowQa,showImport,openImport,closeImport,commitImport,retryOpen,action,edit,history,saveBuildSettings,readBuildSettings,
-    settingsPending,setSettingsPending,setBusy,saveProject,restoreProject};
+    settingsPending,setSettingsPending,setBusy,saveProject,restoreProject,applyProjectRevisions};
 }
