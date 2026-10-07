@@ -44,7 +44,7 @@ def snapshot(root):
                 write(root / "studio-state.json", state)
     build = state["latestBuild"]
     settings = load_settings(root)
-    built_settings = load_settings(root / build) if build else load_settings(root)
+    built_settings = load_settings(root / build) if build else settings
     previous = read(root / build / "build-ir.json") if build else read(root / "origin-ir.json")
     # Browser JSON serializes 484.0 as 484. Equal IR values still describe the same artwork.
     same_ir = data == previous
@@ -65,8 +65,8 @@ def snapshot(root):
         or ("signatureVersion" not in review and review.get("studioRevision") == report.get("revision"))))
     stale["review"] = stale["review"] or not qa_matches
     overlay = {"status": "not-loaded", "reasons": []}
+    inputs = overlay_inputs(root, state)
     if state["overlay"]:
-        inputs = overlay_inputs(root, state)
         evidence = read(root / "overlay-baseline.json")
         overlay = check_overlay_compatibility(read(root / "overlay.json"), data, evidence["objects"])
         applied = (model_matches and not stale["base_rig"] and report.get("overlayInputs") == inputs)
@@ -106,7 +106,7 @@ def snapshot(root):
                              "parts": len(data["parts"]), "head": metadata["head"]}
     from .poses import pose_state
     result["poses"] = pose_state(root)
-    result["overlayRevision"] = _canonical_hash(overlay_inputs(root, state))
+    result["overlayRevision"] = _canonical_hash(inputs)
     result["export"] = None
     if state.get("latestExport"):
         delivery = read(root / state["latestExport"] / "export-report.json")
@@ -125,7 +125,6 @@ def snapshot(root):
         with Image.open(artwork) as image:
             result["artworkBounds"] = image.getchannel("A").getbbox()
     if build:
-        report = read(root / build / "build-report.json")
         # Older successful builds have no bounds in their report. Derive them from
         # that build's IR, never from a newer import or an unsaved editing draft.
         model_bounds = (report["modelBounds"] if "modelBounds" in report
@@ -133,7 +132,6 @@ def snapshot(root):
         result["build"] = {**report, "modelBounds": model_bounds,
                            "modelUrl": file_url(root, root / build / report["modelFile"])}
     if qa:
-        review = read(root / qa / "review.json")
         result["qa"] = {"status": review["status"], "revision": review["studioRevision"],
                         "contactSheet": file_url(root, root / qa / "contact-sheet.png"),
                         "reviewUrl": file_url(root, root / qa / "review.json"), "poses": len(review["shots"]),
