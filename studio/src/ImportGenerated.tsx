@@ -1,24 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { encode } from 'fast-png';
 import { api } from './api';
 import type { ImportPreview as Preview, ArtworkIR } from './protocol';
 import type { AssetOrigin } from './protocol/generated';
 import {useWorkspace} from './workspace/WorkspaceContext';
-import {decodeAsset} from './artwork/png';
-import type {RasterAsset} from './artwork/contracts';
+import {ImportClient} from './assets/ImportClient';
+import type {SpriteInfo} from './assets/importTasks';
 import {ImportCanvas} from './assets/ImportCanvas';
-import {blankMask,maskFromPixels,alphaBounds} from './assets/mask';
-
-
-async function pngContent(file: File | null) {
-  if (!file || file.size > 16 * 1024 * 1024) throw new Error('请选择 PNG 文件，每个文件不超过 16 MB');
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error('文件读取失败，请重新选择'));
-    reader.onload = () => resolve(String(reader.result).split(',')[1]);
-    reader.readAsDataURL(file);
-  });
-}
+import {blankMask} from './assets/mask';
 
 export function ImportGenerated({ revision, ir, selectedId, onClose, onCommit }: {
   revision: string; ir: ArtworkIR; selectedId: string;
@@ -27,7 +15,7 @@ export function ImportGenerated({ revision, ir, selectedId, onClose, onCommit }:
   const {artwork}=useWorkspace(),{canvas,parts}=ir;
   const selected = parts.find(p => p.id === selectedId) || parts[0];
   const [generated, setGenerated] = useState<File | null>(null);
-  const [sprite,setSprite]=useState<{url:string;image:RasterAsset}|null>(null);
+  const [sprite,setSprite]=useState<({url:string}&SpriteInfo)|null>(null);
   const [loading,setLoading]=useState(false),[gesturing,setGesturing]=useState(false);
   const [mask, setMask] = useState(()=>blankMask(canvas.width,canvas.height));
   const [replace, setReplace] = useState(false);
@@ -45,36 +33,41 @@ export function ImportGenerated({ revision, ir, selectedId, onClose, onCommit }:
   const [error, setError] = useState('');
   const dialog = useRef<HTMLElement>(null);
   const maskLoad=useRef(0);
+  const imports=useRef<ImportClient|null>(null);
   useEffect(() => {
+    const client=new ImportClient();imports.current=client;
     const previous = document.activeElement as HTMLElement | null;
     dialog.current?.querySelector<HTMLInputElement>('input')?.focus();
-    return () => {maskLoad.current++;previous?.focus();};
+    return () => {client.dispose();if(imports.current===client)imports.current=null;maskLoad.current++;previous?.focus();};
   }, []);
+  const regionKey=cropEnabled?crop.join(','):'all';
   useEffect(()=>{
+    const client=imports.current,controller=new AbortController();
     let cancelled=false,url='';setSprite(null);
     if(!generated){setLoading(false);return;}
+    if(!client)return;
     setLoading(true);
     void (async()=>{
-      if(generated.size>16*1024*1024)throw new Error('素材 PNG 不得超过 16 MB');
-      const bytes=new Uint8Array(await generated.arrayBuffer());
-      if(bytes[25]!==6||bytes[24]!==8)throw new Error('素材须为 8 位 RGBA 透明 PNG');
-      const image=decodeAsset(bytes);if(!alphaBounds(image)||!image.data.some((value,index)=>index%4===3&&value===0))throw new Error('素材需有可见像素和透明背景');
-      url=URL.createObjectURL(generated);if(!cancelled){setSprite({url,image});setCrop([0,0,image.width,image.height]);}
+      const image=await client.inspect(generated,cropEnabled?crop:undefined,controller.signal);
+      // Cleanup can run while file reading/codec work is pending. Never allocate a late URL.
+      if(cancelled)return;
+      url=URL.createObjectURL(generated);setSprite({url,...image});
+      if(!cropEnabled)setCrop([0,0,image.width,image.height]);
     })().catch(e=>{if(!cancelled)setError(e instanceof Error?e.message:String(e));}).finally(()=>{if(!cancelled)setLoading(false);});
-    return ()=>{cancelled=true;if(url)URL.revokeObjectURL(url);};
-  },[generated]);
+    return ()=>{cancelled=true;controller.abort();if(url)URL.revokeObjectURL(url);};
+  },[generated,regionKey]);
   const placement=useMemo(()=>{
-    if(!sprite)return null;const region=cropEnabled?crop:[0,0,sprite.image.width,sprite.image.height];
-    const alpha=alphaBounds(sprite.image,region);const box=alpha?(fit?alpha:region):null;
-    return box?{url:sprite.url,width:sprite.image.width,height:sprite.image.height,sourceBox:box,fit}:null;
+    if(!sprite)return null;const region=cropEnabled?crop:[0,0,sprite.width,sprite.height];
+    const box=sprite.alpha?(fit?sprite.alpha:region):null;
+    return box?{url:sprite.url,width:sprite.width,height:sprite.height,sourceBox:box,fit}:null;
   },[sprite,fit,cropEnabled,crop]);
   const editable=useMemo(()=>mask.reduce((total,value)=>total+(value===255?1:0),0),[mask]);
   async function loadMask(file:File|null){
     const token=++maskLoad.current;setPreview(null);setError('');setLoading(true);
     try{
       if(!file||file.size>16*1024*1024)throw new Error('请选择不超过 16 MB 的 mask PNG');
-      const image=decodeAsset(new Uint8Array(await file.arrayBuffer()));
-      const value=maskFromPixels(image,canvas.width,canvas.height);if(maskLoad.current===token)setMask(value);
+      const client=imports.current;if(!client)return;
+      const value=await client.mask(file,canvas.width,canvas.height);if(maskLoad.current===token)setMask(value);
     }catch(e){if(maskLoad.current===token)setError(e instanceof Error?e.message:String(e));}
     finally{if(maskLoad.current===token)setLoading(false);}
   }
@@ -86,20 +79,21 @@ export function ImportGenerated({ revision, ir, selectedId, onClose, onCommit }:
     if (part) { setName(part.name); setBounds(part.geometry.bbox); }
   }
   async function preflight() {
+    const client=imports.current;if(!client)return;
     setBusy('正在检查素材与保护区…'); setError(''); setPreview(null);
     try {
       if (!name.trim() || !description.trim() || (origin==='ai'&&!prompt.trim())) throw new Error('请填写图层名称、素材来源说明；AI 素材还需生成提示词');
       if(!editable||editable===mask.length)throw new Error('请设置局部可编辑区，mask 须同时保留保护区和可编辑区');
       if (![...bounds, ...(cropEnabled ? crop : [])].every(Number.isInteger)) throw new Error('坐标必须为整数');
-      const generatedPng=await pngContent(generated);
-      const bytes=encode({width:canvas.width,height:canvas.height,channels:1,depth:8,data:mask});let binary='';
-      for(let offset=0;offset<bytes.length;offset+=16384)binary+=String.fromCharCode(...bytes.subarray(offset,offset+16384));
-      const maskPng=btoa(binary);
+      if(!generated)throw new Error('请选择 PNG 素材');
+      const {generatedPng,maskPng}=await client.prepare(generated,mask,canvas.width,canvas.height);
+      if(imports.current!==client)return;
       const source:AssetOrigin=origin==='ai'?{kind:'ai',description:description.trim(),prompt:prompt.trim()}:{kind:origin,description:description.trim()};
-      setPreview(await api<Preview>('import-preview', { revision, generatedPng, maskPng, name, origin:source, bounds,
-        replacePart: replace ? target : null, fit, spriteBounds: cropEnabled ? crop : null }));
-    } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
-    finally { setBusy(''); }
+      const result=await api<Preview>('import-preview', { revision, generatedPng, maskPng, name, origin:source, bounds,
+        replacePart: replace ? target : null, fit, spriteBounds: cropEnabled ? crop : null });
+      if(imports.current===client)setPreview(result);
+    } catch (e) { if(imports.current===client)setError(e instanceof Error ? e.message : String(e)); }
+    finally { if(imports.current===client)setBusy(''); }
   }
   async function commit() {
     if (!preview) return;
@@ -131,7 +125,7 @@ export function ImportGenerated({ revision, ir, selectedId, onClose, onCommit }:
     <div className="panel-heading"><h2 id="import-title">导入素材</h2><button disabled={!!busy||loading||gesturing} onClick={onClose}>关闭</button></div>
     <div className="import-content"><p className="muted">1 选素材 → 2 拖拽放置/缩放 → 3 绘制或载入可编辑区 → 4 对比并确认。原图和来源记录保留；导入后需重建模型。</p>
       <fieldset disabled={!!busy||loading||gesturing} className="import-fields">
-        <label>透明素材 PNG<input aria-label="透明素材 PNG" type="file" accept="image/png" onChange={e => changed(() => setGenerated(e.target.files?.[0] || null))}/><small>RGBA，含透明背景；每个文件 ≤ 16 MB。</small></label>
+        <label>透明素材 PNG<input aria-label="透明素材 PNG" type="file" accept="image/png" onChange={e => changed(() => {setGenerated(e.target.files?.[0] || null);setCropEnabled(false);})}/><small>RGBA，含透明背景；每个文件 ≤ 16 MB。</small></label>
         <label>素材来源<select aria-label="素材来源" value={origin} onChange={e=>changed(()=>setOrigin(e.target.value as AssetOrigin['kind']))}><option value="manual">手绘/人工制作</option><option value="external">外部素材</option><option value="ai">AI 生成</option></select><small>保留原图哈希和来源说明，AI 提示词单独记录。</small></label>
         <label>导入方式<select aria-label="导入方式" value={replace ? 'replace' : 'add'} onChange={e => changed(() => {
           const replacing = e.target.value === 'replace'; setReplace(replacing); if (replacing) selectTarget(target);

@@ -43,6 +43,20 @@ const bridgeCode = ts.transpileModule(bridgeSource, { compilerOptions: { target:
   .replaceAll("from '../artwork/capture'", "from './artwork/capture.js'");
 writeFileSync(path.join(output, 'DraftBridge.mjs'), bridgeCode);
 const { createDraftBridge } = await import(pathToFileURL(path.join(output, 'DraftBridge.mjs')));
+for (const [name, sourcePath] of [['importTasks', 'src/assets/importTasks.ts'], ['ImportClient', 'src/assets/ImportClient.ts']]) {
+  const code = ts.transpileModule(readFileSync(path.join(root, sourcePath), 'utf8'), {
+    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
+  }).outputText
+    .replaceAll("from '../artwork/png'", "from './artwork/png.mjs'")
+    .replaceAll("from '../artwork/contracts'", "from './artwork/contracts.js'")
+    .replaceAll("from '../artwork/MemoryBudget'", "from './artwork/MemoryBudget.js'")
+    .replaceAll("from '../protocol'", "from './protocol/index.js'")
+    .replaceAll("from './mask'", "from './assets/mask.js'")
+    .replaceAll("from 'fast-png'", `from ${JSON.stringify(pathToFileURL(path.join(root, 'node_modules/fast-png/lib/index.js')).href)}`);
+  writeFileSync(path.join(output, `${name}.mjs`), code);
+}
+const { processImport } = await import(pathToFileURL(path.join(output, 'importTasks.mjs')));
+const { ImportClient } = await import(pathToFileURL(path.join(output, 'ImportClient.mjs')));
 const { MemoryBudget } = require(path.join(output,'artwork/MemoryBudget.js'));
 const { artworkKey } = require(path.join(output,'artwork/content.js'));
 const fixtures = JSON.parse(readFileSync(path.join(root, 'tests/fixtures/artwork.json')));
@@ -342,4 +356,59 @@ test('repeated worker lifetimes leave no active jobs or attached callbacks', asy
     assert.equal(client.stats.activeJobs, 0); assert.equal(client.stats.queuedJobs, 0);
     assert.equal(workers, 0);
   }
+});
+
+test('import tasks preserve source pixels, cropped alpha and binary masks without retaining raster buffers', async () => {
+  const image = { width: 4, height: 4, bounds: null, data: new Uint8ClampedArray(64) };
+  image.data.set([30, 80, 100, 255], (1 * 4 + 1) * 4);
+  image.data.set([30, 80, 100, 128], (2 * 4 + 2) * 4);
+  const raw = bytes(encodeFrame(image).split(',')[1]), file = new Blob([raw]), memory = new MemoryBudget();
+  assert.deepEqual(await processImport({ kind: 'inspect', file }, memory), { width: 4, height: 4, alpha: [1, 1, 3, 3] });
+  assert.deepEqual(await processImport({ kind: 'inspect', file, crop: [0, 0, 2, 2] }, memory), { width: 4, height: 4, alpha: [1, 1, 2, 2] });
+  assert.equal((await processImport({ kind: 'inspect', file, crop: [0, 0, 1, 1] }, memory)).alpha, null);
+  const mask = blankMask(4, 4); rectangleMask(mask, 4, 4, [1, 1, 3, 3], true);
+  const prepared = await processImport({ kind: 'prepare', file, mask, width: 4, height: 4 }, memory);
+  assert.deepEqual(bytes(prepared.generatedPng), raw);
+  const restored = await processImport({ kind: 'mask', file: new Blob([bytes(prepared.maskPng)]), width: 4, height: 4 }, memory);
+  assert.deepEqual(restored, mask); assert.equal(memory.stats.usedBytes, 0);
+});
+
+test('import budgets reject before file reading or decoding and release leases on every failure', async () => {
+  let read = false;
+  await assert.rejects(processImport({ kind: 'inspect', file: { size: 16 * 1024 * 1024 + 1,
+    arrayBuffer() { read = true; } } }), { code: 'ASSET_FORMAT' });
+  assert.equal(read, false);
+  const raw = new Uint8Array(bytes(fixtures.assets['solid.png']));
+  new DataView(raw.buffer).setUint32(16, 4096); new DataView(raw.buffer).setUint32(20, 4096);
+  const memory = new MemoryBudget(64 * 1024 * 1024);
+  await assert.rejects(processImport({ kind: 'inspect', file: new Blob([raw]) }, memory), { code: 'MEMORY_BUDGET' });
+  assert.equal(memory.stats.usedBytes, 0);
+  await assert.rejects(processImport({ kind: 'mask', file: new Blob([bytes(fixtures.assets['solid.png'])]), width: 99, height: 99 }, memory), { code: 'ASSET_SIZE' });
+  assert.equal(memory.stats.usedBytes, 0);
+  await assert.rejects(processImport({ kind: 'inspect', file: new Blob([new Uint8Array(40)]) }, memory));
+  assert.equal(memory.stats.usedBytes, 0);
+});
+
+test('import cancellation terminates only its own task and old callbacks cannot affect the next task', async () => {
+  const old = workerPort(), next = workerPort(), ports = [old, next];
+  const client = new ImportClient(() => ports.shift()), file = new Blob(['png']), controller = new AbortController();
+  const cancelled = client.inspect(file, undefined, controller.signal).catch(error => error.code);
+  await assert.rejects(client.inspect(file), { code: 'BUSY' });
+  const oldMessage = old.onmessage, oldError = old.onerror;
+  controller.abort(); assert.equal(await cancelled, 'ABORTED'); assert.equal(old.terminations, 1);
+  const current = client.inspect(file); oldMessage({ data: { ok: true, value: 'old' } }); oldError();
+  assert.equal(next.terminations, 0);
+  const value = { width: 1, height: 1, alpha: null };
+  next.onmessage({ data: { ok: true, value } }); assert.deepEqual(await current, value);
+  assert.equal(next.terminations, 1); assert.equal(next.onmessage, null); assert.equal(next.onerror, null);
+  client.dispose(); await assert.rejects(client.inspect(file), { code: 'ABORTED' });
+});
+
+test('import mask preparation transfers a bounded copy while keeping the editable mask intact', async () => {
+  const port = workerPort(); let transferred;
+  port.postMessage = (job, transfer) => { transferred = structuredClone(job, { transfer }); };
+  const client = new ImportClient(() => port), mask = new Uint8Array([0, 255, 255, 0]);
+  const pending = client.prepare(new Blob(['png']), mask, 2, 2).catch(error => error.code);
+  assert.deepEqual([...mask], [0, 255, 255, 0]); assert.deepEqual([...transferred.mask], [...mask]);
+  client.dispose(); assert.equal(await pending, 'ABORTED'); assert.equal(port.terminations, 1);
 });
