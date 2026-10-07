@@ -6,6 +6,8 @@
 
 设计参考：[Mesh Avatar Studio](https://github.com/shinshin86/mesh-avatar-studio)。安装与使用见 [环境说明](environment.md) 和 [Studio 使用说明](../studio/README.md)；历史验证记录见 [HANDOFF.md](HANDOFF.md)。
 
+本轮待合并顺序：[N3 #29](https://github.com/linnnn89/live2d-maker/pull/29) → [N5a #30](https://github.com/linnnn89/live2d-maker/pull/30) → [N4 #31](https://github.com/linnnn89/live2d-maker/pull/31) → [N5b #32](https://github.com/linnnn89/live2d-maker/pull/32)。这些是依次基于前一分支的 PR；合并前一个后将下一个 base 改为 main。Linux 范围已完成，后续转真实 Windows 执行 W1。
+
 后续代码架构、模块职责、产品功能与编辑器交互的更新建议，见 [架构与产品迭代计划](ARCHITECTURE_PRODUCT_PLAN.md)。建议基于代码阅读，按编辑反馈、能力接入和项目交付的优先级实施。
 
 R1a 已完成浏览器预览适配器、参数按帧重绘和模型来源标识；Linux 前端构建、7 项适配器回归及 Chromium 交互检查通过。原生建模和 Windows 调用链的变更留待 PC 实测，见交接记录第 20 节。

@@ -425,3 +425,5 @@ pack_archive不再收集所有原始字节，1MiB块同时哈希/压缩，最后
 新归档3项通过，覆盖32MiB二进制受限读取、删除原项目重开保留源/修订/姿态/产物、容量/大小写拒绝、中断清理。八个32MiB受控可压缩文件的两个Linux进程观测：旧pack 1.688秒、Python峰值256.799MiB/RSS331.512MiB；流式1.670秒、Python峰值2.324MiB/RSS76.008MiB。不是实际CMO3或不可压缩纹理性能验收，不宣称整个应用总内存上限。
 
 最终前端86/86、纯Python18/18、真实UI10/10及构建通过。STUDIO_TEST_PYTHON可显式选择Linux解释器，默认Windows路径保留，原两项协议/旧身份迁移检查实际执行而不跳过。UI证据/tmp/live2d-final-evidence/；Windows/native、实际大模型/CMO3及GPU观测没有在云端执行。Linux实施到此，详细W1 plan见工程评审第9节：真实Agent prepare/edit/checkout/迟到结果，真实Rebuild/Overlay/导入/姿态/交付/归档重开及资源增长；取得真实证据后才继续native交付打包与上传副本优化。
+
+已提交但尚未合并：[N3 #29](https://github.com/linnnn89/live2d-maker/pull/29)、[N5a #30](https://github.com/linnnn89/live2d-maker/pull/30)、[N4 #31](https://github.com/linnnn89/live2d-maker/pull/31)、[N5b #32](https://github.com/linnnn89/live2d-maker/pull/32)。按此顺序合并并逐项将下一个 base 改为 main；各远端阶段文件树与本地已验证树一致。合入后在 PC 按 W1 验收，不把纯 Python/浏览器协议 fixture 的通过解释为 native 已通过。
