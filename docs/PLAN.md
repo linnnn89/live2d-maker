@@ -2,9 +2,13 @@
 
 更新于 2026-10-07。目标是完成 PSD 编辑、素材导入、Live2D 重建和验证这些软件功能。角色素材只作为测试样本，不要求逐类制作完整角色。
 
-最新代码复评与后续实施 plan：见 [R8 后的工程评审](ENGINEERING_REVIEW_R8.md)。N0–N2 已通过 PR #28 合并到 main@a38406f。N3a 已完成关闭 client/Agent bridge 与旧 Worker 回调隔离，77 项前端检查、8 项真实 React/纯 Python UI 验收和构建通过，另 2 项因 Windows Python 路径跳过。用户授权持续推进：N3b 小型操作所有者 → N5a 导入资源预算 → N4 纯存储/查询边界 → N5b 工程归档流式处理；Windows 原生接入 W1 待 PC。当前实施状态、取舍与验收见工程评审第 9 节。
+合并前追加审查：[N3–N5 冗余与复杂度审查](ENGINEERING_REVIEW_N3_N5_SIMPLICITY.md)。发现 N5a 裁切逐键输入会因禁用表单而丢失焦点，输入 `800` 实际只得到 `8`；现已在 Linux 修复，裁切坐标通过“应用裁切坐标”确认，输入保持焦点。一次性导入预算租约已移除，Snapshot 局部读取已复用；修订的最终验证已通过，正同步各 PR 并按授权合并。下一步仍为真实 Windows W1。
+
+最新代码复评与后续实施 plan：见 [R8 后的工程评审](ENGINEERING_REVIEW_R8.md)。N0–N2 已通过 PR #28 合并到 main@a38406f；N3 生命周期/操作所有权、N5a 导入Worker预算、N4 纯存储/查询、N5b 工程归档流式处理已完成Linux范围。86项前端（显式Linux Python、0跳过）、18项纯Python、12项真实React/纯Python UI和构建通过（含合并前修正回归）。256MiB受控归档样本的Python分配峰值从256.799MiB降至2.324MiB。下一步为PC W1：真实native Agent交错、模型/Overlay/交付/完整归档与大型项目资源观测；native交付打包本体的进一步优化待真实数据，不在云端修改。阶段结果、取舍和Windows具体plan见工程评审第9节。
 
 设计参考：[Mesh Avatar Studio](https://github.com/shinshin86/mesh-avatar-studio)。安装与使用见 [环境说明](environment.md) 和 [Studio 使用说明](../studio/README.md)；历史验证记录见 [HANDOFF.md](HANDOFF.md)。
+
+本轮待合并顺序：[N3 #29](https://github.com/linnnn89/live2d-maker/pull/29) → [N5a #30](https://github.com/linnnn89/live2d-maker/pull/30) → [N4 #31](https://github.com/linnnn89/live2d-maker/pull/31) → [N5b #32](https://github.com/linnnn89/live2d-maker/pull/32)。这些是依次基于前一分支的 PR；合并前一个后将下一个 base 改为 main。Linux 范围已完成，后续转真实 Windows 执行 W1。
 
 后续代码架构、模块职责、产品功能与编辑器交互的更新建议，见 [架构与产品迭代计划](ARCHITECTURE_PRODUCT_PLAN.md)。建议基于代码阅读，按编辑反馈、能力接入和项目交付的优先级实施。
 

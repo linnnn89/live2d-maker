@@ -2,7 +2,7 @@
 
 评审日期：2026-10-07。已 `fetch` 并快进对齐 PC 最新主线：`99f19082f0a05402e396a0a8455cb0a26b7a3f51`（PR #27，R8）。相对上次云端 R1c 提交 `7fef01a`，新增 23 个非合并提交，119 个文件发生变化。本文件中的位置和结论以该基线为准。
 
-初次交付为评审与 plan。后续已按用户授权完成 N0 核心时序回归、N1/N2 的 Linux 可验证范围，实施与验收见第 8 节。原生 Windows 验收记录来自 [HANDOFF.md](HANDOFF.md) 第 31–42 节，不计作本次重新执行。
+初次交付为评审与 plan。后续已按用户授权完成 N0–N2 并合并 PR #28，继续完成 N3、N5a、N4 和 N5b 工程归档的 Linux 范围，实施与验收见第 8–9 节。真实原生接入、交付生成本体的进一步资源修改和大型 CMO3 工程需要 PC 的 W1。原生 Windows 既有验收记录来自 [HANDOFF.md](HANDOFF.md) 第 31–42 节，不计作本次重新执行。
 
 ## 1. 结论与已完成工作的对齐
 
@@ -154,7 +154,7 @@ Agent 的已有草稿入口也应遵守同一操作门禁。未来增加工程�
 
 ## 6. 后续实施 plan
 
-状态：N0 核心草稿时序回归及 N1/N2 已通过 PR #28 合并；N3 的关闭句柄/Worker 所有权已完成 Linux 验证，应用操作收尾继续推进。N5a、N4、N5b 随后依次实施，W1 待 PC 执行。按阶段提交，每一步满足验收再推进；已有通过的保护作为回归基线，不重新实现一遍。
+状态：N0–N2 已通过 PR #28 合并；N3、N5a、N4 与 N5b 工程归档的 Linux 范围已实施并验收，详见第 9 节。W1 真实 Windows/native 集成与交付生成本体资源优化留 PC。按阶段提交，已有通过的保护作为回归基线，不重新实现一遍。
 
 | 顺序 / 建议 PR | 修改范围与具体产出 | 验收标准 | 环境边界 |
 | --- | --- | --- | --- |
@@ -217,11 +217,22 @@ Agent 的已有草稿入口也应遵守同一操作门禁。未来增加工程�
 
 用户授权继续至规划的 Linux 范围完成，或确实需要切换真实 Windows 才能继续。基于 main@a38406f（PR #28 已合并），后续按以下顺序推进；本节逐步追加结果，不把尚未实施的项目标为完成。
 
+Linux 实施与合并前修正验收已完成，以下四个 PR 按用户授权准备合并。按表中顺序评审/合并；每个后续 PR 以先前分支为 base，只包含本阶段增量。合并前一个后，将下一个 PR 的 base 改为 `main`，核对差异再继续。
+
+| 顺序 | 阶段 | PR | 当前 base |
+| --- | --- | --- | --- |
+| 1 | N3：生命周期与操作所有权 | [#29](https://github.com/linnnn89/live2d-maker/pull/29) | `main` |
+| 2 | N5a：导入 Worker 与资源预算 | [#30](https://github.com/linnnn89/live2d-maker/pull/30) | `codex/studio-n3-lifecycle` |
+| 3 | N4：纯存储与查询边界 | [#31](https://github.com/linnnn89/live2d-maker/pull/31) | `codex/studio-n5-import` |
+| 4 | N5b：流式归档与容量闭环 | [#32](https://github.com/linnnn89/live2d-maker/pull/32) | `codex/studio-n4-storage` |
+
+GitHub 上各阶段文件树与 Linux 已验证的本地文件树逐一核对一致。合并前追加审查发现裁切逐键输入回归，已修复，并简化一次性导入预算及重复查询；实际取舍和最终 86/18/12 验收见 [冗余与复杂度审查](ENGINEERING_REVIEW_N3_N5_SIMPLICITY.md)。N5a 原实施记录中的动态预算为初版设计，修正后由文件/像素上限约束单任务；共享美术缓存预算继续保留。下一项是本节末尾的 Windows W1。
+
 1. **N3a / 已验证**：`ArtworkClient.dispose` 成为关闭终态，失败 Worker 可被新 Worker 替换，但旧回调只认自己的实例。关闭时清空 handler、活动/排队任务；保留旧 client 的调用返回 `ABORTED`。每次 Workspace effect setup 创建新 client 和 Agent bridge，cleanup 关闭对应实例。旧 bridge 拒绝 inspect/apply/commit/capture，进行中的返回也不能冒充当前宿主结果；dispose 清除对 editor/render 的引用。已提交的保存可能完成，关闭不意味着回滚；重开后查询实际保存状态，不能盲重试。
 2. **N3b / 已验证**：`WorkspaceOperations` 只提供同步进入、当前所有者检查、门禁/进度和自身收尾；关闭释放引用。工程、姿态、关键形、交付、设置、IR 保存/重建/QA 和导入门禁共用；组件保留业务输入与原 CAS。先启动草稿保存，再同步加上操作门禁，避免保存新基线发布后至后续原生请求之间暴露空闲状态。交付响应确认后立即保存已成功的下载结果，快照失败单独显示并只重试读取。无队列、自动重试、后台调度或新的公开 Agent 权限。
 3. **N5a / 已实施**：导入 decode/alpha/crop/mask encode/Base64 转入一次性 Worker，每个 client 只允许一个活动任务、无队列/缓存，完成/错误/取消立即终止线程。复用PNG像素规则与MemoryBudget，为单任务提供384MiB受管codec预算，分配前检查16MiB文件/像素/尺寸/预算；主线程仅保存尺寸、alpha范围、URL和原可编辑mask，准备时只传输有界mask副本。effect取消检查在URL分配前，关闭后预检返回不发布。裁切变化重新检查源图；先用重算换取简单所有权，未增加decoded缓存。
 4. **N4 / 已实施**：`workspace_store.py` 提供原子JSON读写、内容revision、原写锁和资源URL，`workspace_query.py` 装配Snapshot与已保存模型证据；`studio.py` 保留兼容导出。工程/姿态/问题等纯模块直接依赖这两个边界，不反向借CLI/native入口拿文件能力。旧写锁/迁移/文件格式/签名规则保持；失败atomic replace清理自己的临时文件并保留原文件。open/save/import/rebuild/QA函数体经AST对照未变，原生编排调用点仍用兼容入口，未迁移native操作。
-5. **N5b / 待实施**：工程 ZIP 分块读取、哈希与压缩；统一导出/导入大小规则并验证完整归档重开。涉及原生产物生成的交付路径若需修改，留 PC；不擅自删除历史。
+5. **N5b / Linux 范围已验证**：工程 ZIP 以1MiB块读取、哈希并压缩，导入按块校验/落盘，只有≤16MiB manifest完整读取。统一文件数、单文件、展开总量（包含manifest）、manifest和上传限制，导出同样拒绝casefold冲突，防止生成自身不能导入的包。失败仅清理临时ZIP，保留项目/历史。纯交付文件清单改分块哈希；native `export_model` 本体仍未修改，进一步交付打包/上传Base64资源优化需要PC真实产物与增长数据。
 6. **W1 / 待 PC**：真实模型、CLI/桌面/native 集成和大型 CMO3 工程验收，沿用第 6 节的明确场景。
 
 N3a 的三个新增回归在修复前全部失败，分别复现关闭后重启、旧 error/message 影响替换 Worker、关闭后迟到统计改变；修复后通过。补充旧 bridge 读写/捕获拒绝、迟到成功/失败、保存已提交后关闭和 50 次任务生命周期检查。它们证明队列/handler/实例收尾，不等于浏览器整体堆或 GPU 已做长期内存测量。
@@ -232,4 +243,35 @@ N3b 验收：前端82项，80通过/原2项跳过，构建通过。三项操作�
 
 N5a验收：前端86项（84通过/原2项跳过）、构建通过。新增源像素/Base64/裁切alpha/二值mask一致性、预算在读取/解码前拒绝与失败释放、取消/旧回调隔离、mask传输副本回归。真实UI使用2048²透明PNG，尺寸超限后恢复、三次导入/取消、Worker裁切检查、二值mask加载/编码、真实纯Python预检/提交；完成后导入Worker计数0、关闭后素材URL计数0。宿主fixture另控迟到Worker返回，effect已清理后URL创建数0。主线程仍承担mask编辑及≤16MiB原mask，准备副本≤16MiB，浏览器SVG图片/GPU和HTTP Base64副本不在codec池；384MiB并非整体浏览器内存上限，未声称RSS已测。bundle入口由N3b的473.20kB降至437.62kB，新增182.25kB的导入Worker按任务加载；未加依赖。UI完整10项通过，证据/tmp/live2d-n5a-evidence/。
 
-N4验收：工程、Studio持久化、签名纯回归11项通过；新存储/查询4项通过，覆盖atomic replace/NaN拒绝后的原文件与tmp清理、竞争锁/异常释放、旧workspace身份迁移、原CLI `studio-open` 完整JSON响应相同。独立进程实际查询Snapshot后未加载studio/native编排模块。原生函数体AST保持，恢复中断测试在新store边界注入失败，既有checkpoint/恢复语义通过；UI完整10项复跑中。未改变lock文件协议或新增双重锁；默认历史保留。native生成、rig-edit实际引擎接入继续W1。
+N4验收：工程、Studio持久化、签名纯回归11项通过；新存储/查询4项通过，覆盖atomic replace/NaN拒绝后的原文件与tmp清理、竞争锁/异常释放、旧workspace身份迁移、原CLI `studio-open` 完整JSON响应相同。独立进程实际查询Snapshot后未加载studio/native编排模块。原生函数体AST保持，恢复中断测试在新store边界注入失败，既有checkpoint/恢复语义通过；UI完整10项通过。未改变lock文件协议或新增双重锁；默认历史保留。native生成、rig-edit实际引擎接入继续W1。
+
+### N5b 验收与实际资源观测
+
+新增3项纯归档回归通过：32MiB二进制fixture的流式写入与清单哈希，删除原工程/PSD后重开保留全部修订/姿态/产物；限制完整二进制`read_bytes`与ZIP整项`read`后仍可导出/导入；单文件/总量/manifest/数量/压缩上传/大小写冲突的拒绝；部分读取中断后ZIP/tmp/锁清理且项目与二进制保留。既有路径/哈希/恢复拒绝继续通过。fixture中的moc3是受控字节，不宣称真实模型已生成或通过SDK。
+
+资源观测使用八个32MiB可压缩二进制fixture（共256MiB，16个归档文件）和32²真实PSD工程，两个独立Linux进程对比N4版本的pack函数（PR #31，与观测时本地版本文件树一致）与本批流式函数，`tracemalloc`包围pack阶段，`resource.ru_maxrss`记录进程累计峰值：
+
+| 实现 | pack耗时（单次） | Python分配峰值 | 进程峰值RSS | ZIP大小 |
+| --- | --- | --- | --- | --- |
+| 原全量读取 | 1.688 s | 256.799 MiB | 331.512 MiB | 1,050,241 bytes |
+| 流式 | 1.670 s | 2.324 MiB | 76.008 MiB | 1,050,236 bytes |
+
+两次工程随机ID/时间不同，ZIP容器字节不要求相同；逐文件内容、SHA、引用与重开才是正确性验收。单次结果只证明该受控样本不再同时保留全部原始字节，不是大工程/不可压缩纹理的完整性能基准；真实CMO3/全部历史增长由W1补测。测试fixture可用`StreamingArchives.fixture`及`artifact(blocks=32)`重建，观测脚本在工作区外/tmp/live2d-archive-memory.py，未提交临时报表。
+
+参考并读取了[CPython 3.12.8 的ZipFile实现](https://github.com/python/cpython/blob/v3.12.8/Lib/zipfile/__init__.py)：标准`write`本身即用`open(...,'w')`与`copyfileobj`流式写入，本项目原先在调用ZIP前把所有文件读入列表才造成峰值。本轮直接复用标准流接口并同时计算清单哈希，没有添加归档库或自建格式。React/GitHub和可访问的Reddit索引取舍仍见第8节，未把不可访问的Reddit全文当作依据。
+
+### 最终 Linux 验收与复跑
+
+- 前端 **86/86通过、0跳过**：新增`STUDIO_TEST_PYTHON=/absolute/path/to/python`可显式选Linux解释器，保留默认Windows路径。显式配置不存在则失败，不能掩盖错配。原先两项纯CLI协议/迁移检查现已实际执行，非native启动测试。
+- 纯Python **18/18通过**：`python -m unittest tools.authoring_rig.tests.test_projects tools.authoring_rig.tests.test_studio tools.authoring_rig.tests.test_signatures tools.authoring_rig.tests.test_workspace_store tools.authoring_rig.tests.test_archive_streaming -v`。
+- 真实React **10/10通过**，`STUDIO_UI_URL=http://127.0.0.1:5173 python -m unittest tools.authoring_rig.tests.test_studio_ui -v`，使用既有Vite服务和纯Python/API fixture；Chromium桌面1440×960/原窄屏390×844、身份/非空/无overlay/pageerror/交互/截图检查通过，预期409/400注入已区分。截图/tmp/live2d-final-evidence/，Browser plugin not available。
+- `npm run build`通过，协议生成类型未变，无新增依赖；Vite的未来native config loader提示是原有未修改项。native export/keyform/open/save/import/rebuild/QA函数体已做AST对照，未改变原生编排算法。
+
+### 现在的 PC plan / W1
+
+Linux可独立验证的实施已完成；以下需要真实Windows及模型，云端不继续修改原生实现：
+
+1. 合入各阶段后，在真实PC跑现有Windows回归和真实PSD的Rebuild/Overlay/姿态/动态预览/两种交付；保存IR→重建、设置保存后失败、修订恢复/再次保存和导入后的门禁都要覆盖。确认成功模型保留、取消/关闭后旧回调不能影响新的显示。
+2. 复现native Agent prepare(A)→用户编辑/checkout(B)→迟到commit、关闭/重开与旧引擎基线；CAS应拒绝旧结果，新预览/错误状态保持。Linux草稿保护不能代替这个native交错验收。
+3. 用包含build/review/import/delivery/poses/全部修订的真实工程归档→删除原目录→重开，核对文件哈希、模型引用、QA与动态资源。测大PNG反复导入/取消、模型iframe反复开关、交付/ZIP时的实际进程与GPU增长；允许有界缓存平台，不凭单次RSS峰值叫作泄漏。
+4. 取得真实产物与内存证据后，再改`delivery.export_model`中全量文件打包与上传Base64副本。该函数涉及native准备、缓存、CMO3与交付发布，当前保留原实现；不要先引入multipart/后台job/历史删除系统。

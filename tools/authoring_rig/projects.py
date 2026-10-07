@@ -19,6 +19,10 @@ from .validator import validate_authoring_rig
 ID = re.compile(r"^[a-f0-9]{32}$")
 MAX_UPLOAD = 128 * 1024 * 1024
 MAX_EXPANDED = 1024 * 1024 * 1024
+MAX_ARCHIVE_FILES = 10000
+MAX_ENTRY_BYTES = 256 * 1024 * 1024
+MAX_MANIFEST_BYTES = 16 * 1024 * 1024
+ARCHIVE_CHUNK_BYTES = 1024 * 1024
 ROOT_FILES = {"authoring-rig.json", "origin-ir.json", "studio-state.json", "source.psd", "source.png",
               "build-settings.json", "overlay.json", "overlay-baseline.json", "project.json", "poses.json"}
 
@@ -261,32 +265,48 @@ def pack_archive(root):
             if file.is_file() and archive_path_allowed(relative):
                 if not file.resolve().is_relative_to(root): raise ValueError("Project contains an external linked file")
                 paths.append((relative, file))
-        if len(paths) > 10000 or sum(file.stat().st_size for _, file in paths) > MAX_EXPANDED: raise ValueError("Project exceeds archive limits")
+        if len(paths) > MAX_ARCHIVE_FILES or sum(file.stat().st_size for _, file in paths) > MAX_EXPANDED:
+            raise ValueError("Project exceeds archive limits")
+        if len({name.casefold() for name, _ in paths}) != len(paths):
+            raise ValueError("Project contains duplicate archive paths")
+        if any(file.stat().st_size > MAX_ENTRY_BYTES for _, file in paths):
+            raise ValueError("Project archive entry exceeds size limit")
         for file in (root / "project-revisions").glob("*/revision.json"): validate_capture(read(file), root)
-        files = [(relative, file.read_bytes()) for relative, file in paths]
-        manifest = {"format": "live2d-studio-project", "schemaVersion": 1,
-                    "files": {name: {"bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest()} for name, raw in files}}
+        manifest = {"format": "live2d-studio-project", "schemaVersion": 1, "files": {}}
         filename = uuid.uuid4().hex + ".studio-project.zip"
         temporary = output / (filename + ".tmp")
         try:
             with zipfile.ZipFile(temporary, "w", zipfile.ZIP_DEFLATED) as archive:
-                archive.writestr("manifest.json", json.dumps(manifest, ensure_ascii=False))
-                for name, raw in files: archive.writestr(name, raw)
+                expanded = 0
+                for name, file in sorted(paths):
+                    digest = hashlib.sha256(); size = 0
+                    with file.open("rb") as source, archive.open(name, "w") as target:
+                        while chunk := source.read(ARCHIVE_CHUNK_BYTES):
+                            size += len(chunk); expanded += len(chunk)
+                            if size > MAX_ENTRY_BYTES or expanded > MAX_EXPANDED:
+                                raise ValueError("Project exceeds archive limits")
+                            digest.update(chunk); target.write(chunk)
+                    manifest["files"][name] = {"bytes": size, "sha256": digest.hexdigest()}
+                raw_manifest = json.dumps(manifest, ensure_ascii=False).encode("utf-8")
+                if len(raw_manifest) > MAX_MANIFEST_BYTES or expanded + len(raw_manifest) > MAX_EXPANDED:
+                    raise ValueError("Project manifest exceeds archive limits")
+                archive.writestr("manifest.json", raw_manifest)
             if temporary.stat().st_size > MAX_UPLOAD: raise ValueError("Portable project archive exceeds the 128 MiB import limit")
             os.replace(temporary, output / filename)
         finally: temporary.unlink(missing_ok=True)
     from .workspace_store import file_url
-    return {"schemaVersion": 1, "url": file_url(root, output / filename), "filename": read(root / "project.json")["name"] + ".studio-project.zip", "files": len(files)}
+    return {"schemaVersion": 1, "url": file_url(root, output / filename), "filename": read(root / "project.json")["name"] + ".studio-project.zip", "files": len(paths)}
 
 
 def unpack_archive(raw, root):
     from .workspace_store import read
+    if len(raw) > MAX_UPLOAD: raise ValueError("Portable project archive exceeds the 128 MiB import limit")
     with zipfile.ZipFile(io.BytesIO(raw)) as archive:
         entries = archive.infolist()
         names = [entry.filename for entry in entries]
-        if len(names) != len(set(name.casefold() for name in names)) or len(names) > 10001 or sum(entry.file_size for entry in entries) > MAX_EXPANDED:
+        if len(names) != len(set(name.casefold() for name in names)) or len(names) > MAX_ARCHIVE_FILES + 1 or sum(entry.file_size for entry in entries) > MAX_EXPANDED:
             raise ValueError("Invalid or oversized project archive")
-        if archive.getinfo("manifest.json").file_size > 16 * 1024 * 1024 or any(entry.file_size > 256 * 1024 * 1024 for entry in entries):
+        if archive.getinfo("manifest.json").file_size > MAX_MANIFEST_BYTES or any(entry.file_size > MAX_ENTRY_BYTES for entry in entries):
             raise ValueError("Project archive entry exceeds size limit")
         manifest = json.loads(archive.read("manifest.json"))
         if manifest.get("format") != "live2d-studio-project" or manifest.get("schemaVersion") != 1:
@@ -298,10 +318,13 @@ def unpack_archive(raw, root):
             if name == "manifest.json": continue
             if not archive_path_allowed(name) or entry.is_dir() or (entry.external_attr >> 16) & 0o170000 == 0o120000:
                 raise ValueError("Invalid project archive entry")
-            data = archive.read(entry)
             expected = manifest["files"][name]
-            if expected != {"bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}: raise ValueError("Project archive checksum mismatch")
-            file = root / name; file.parent.mkdir(parents=True, exist_ok=True); file.write_bytes(data)
+            file = root / name; file.parent.mkdir(parents=True, exist_ok=True)
+            digest = hashlib.sha256(); size = 0
+            with archive.open(entry) as source, file.open("wb") as target:
+                while chunk := source.read(ARCHIVE_CHUNK_BYTES):
+                    size += len(chunk); digest.update(chunk); target.write(chunk)
+            if expected != {"bytes": size, "sha256": digest.hexdigest()}: raise ValueError("Project archive checksum mismatch")
     validate_capture(capture(root), root)
     validate_authoring_rig(read(root / "origin-ir.json"), root)
     metadata = read(root / "project.json")

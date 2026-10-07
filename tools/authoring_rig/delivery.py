@@ -27,8 +27,11 @@ def file_manifest(directory):
     for file in directory.rglob('*'):
         if file.is_file():
             if not file.resolve().is_relative_to(directory): raise ValueError('Export artifact contains an external link')
-            raw = file.read_bytes()
-            result[file.relative_to(directory).as_posix()] = {'bytes':len(raw),'sha256':hashlib.sha256(raw).hexdigest()}
+            digest = hashlib.sha256(); size = 0
+            with file.open('rb') as source:
+                while chunk := source.read(1024 * 1024):
+                    size += len(chunk); digest.update(chunk)
+            result[file.relative_to(directory).as_posix()] = {'bytes':size,'sha256':digest.hexdigest()}
     return result
 
 
