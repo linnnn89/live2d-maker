@@ -6,7 +6,7 @@ from .studio_protocol import StudioError, validate_protocol
 
 
 def edit_state(root, state):
-    from .studio import read, file_url
+    from .workspace_store import read, file_url
     result = {"edits": [], "changedModelFields": []}
     if state["overlay"]:
         overlay = read(root / "overlay.json"); overlay = overlay.get("rigEdits", overlay)

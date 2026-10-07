@@ -220,7 +220,7 @@ Agent 的已有草稿入口也应遵守同一操作门禁。未来增加工程�
 1. **N3a / 已验证**：`ArtworkClient.dispose` 成为关闭终态，失败 Worker 可被新 Worker 替换，但旧回调只认自己的实例。关闭时清空 handler、活动/排队任务；保留旧 client 的调用返回 `ABORTED`。每次 Workspace effect setup 创建新 client 和 Agent bridge，cleanup 关闭对应实例。旧 bridge 拒绝 inspect/apply/commit/capture，进行中的返回也不能冒充当前宿主结果；dispose 清除对 editor/render 的引用。已提交的保存可能完成，关闭不意味着回滚；重开后查询实际保存状态，不能盲重试。
 2. **N3b / 已验证**：`WorkspaceOperations` 只提供同步进入、当前所有者检查、门禁/进度和自身收尾；关闭释放引用。工程、姿态、关键形、交付、设置、IR 保存/重建/QA 和导入门禁共用；组件保留业务输入与原 CAS。先启动草稿保存，再同步加上操作门禁，避免保存新基线发布后至后续原生请求之间暴露空闲状态。交付响应确认后立即保存已成功的下载结果，快照失败单独显示并只重试读取。无队列、自动重试、后台调度或新的公开 Agent 权限。
 3. **N5a / 已实施**：导入 decode/alpha/crop/mask encode/Base64 转入一次性 Worker，每个 client 只允许一个活动任务、无队列/缓存，完成/错误/取消立即终止线程。复用PNG像素规则与MemoryBudget，为单任务提供384MiB受管codec预算，分配前检查16MiB文件/像素/尺寸/预算；主线程仅保存尺寸、alpha范围、URL和原可编辑mask，准备时只传输有界mask副本。effect取消检查在URL分配前，关闭后预检返回不发布。裁切变化重新检查源图；先用重算换取简单所有权，未增加decoded缓存。
-4. **N4 / 待实施**：先拆纯文件读写/锁/URL 原语与 Snapshot 查询，保留 `studio.py` 兼容导出。native/build 算法及原生 API 不变；Windows 真实接入留 W1。
+4. **N4 / 已实施**：`workspace_store.py` 提供原子JSON读写、内容revision、原写锁和资源URL，`workspace_query.py` 装配Snapshot与已保存模型证据；`studio.py` 保留兼容导出。工程/姿态/问题等纯模块直接依赖这两个边界，不反向借CLI/native入口拿文件能力。旧写锁/迁移/文件格式/签名规则保持；失败atomic replace清理自己的临时文件并保留原文件。open/save/import/rebuild/QA函数体经AST对照未变，原生编排调用点仍用兼容入口，未迁移native操作。
 5. **N5b / 待实施**：工程 ZIP 分块读取、哈希与压缩；统一导出/导入大小规则并验证完整归档重开。涉及原生产物生成的交付路径若需修改，留 PC；不擅自删除历史。
 6. **W1 / 待 PC**：真实模型、CLI/桌面/native 集成和大型 CMO3 工程验收，沿用第 6 节的明确场景。
 
@@ -231,3 +231,5 @@ N3a 验收：前端 79 项，77 通过/原 Windows 路径 2 项跳过；构建�
 N3b 验收：前端82项，80通过/原2项跳过，构建通过。三项操作回归覆盖同一tick重入、Agent保存/手势互斥、保存成功基线发布期间仍BUSY、关闭后的旧进度/成功/失败/finally不影响新操作。UI原8项通过，新交付用例通过，StrictMode用例增加同tick重复读取只发送一次请求与旧读取迟到不清除新宿主门禁。交付生成响应为协议fixture，未执行真实native导出；其接入验收仍由W1完成。
 
 N5a验收：前端86项（84通过/原2项跳过）、构建通过。新增源像素/Base64/裁切alpha/二值mask一致性、预算在读取/解码前拒绝与失败释放、取消/旧回调隔离、mask传输副本回归。真实UI使用2048²透明PNG，尺寸超限后恢复、三次导入/取消、Worker裁切检查、二值mask加载/编码、真实纯Python预检/提交；完成后导入Worker计数0、关闭后素材URL计数0。宿主fixture另控迟到Worker返回，effect已清理后URL创建数0。主线程仍承担mask编辑及≤16MiB原mask，准备副本≤16MiB，浏览器SVG图片/GPU和HTTP Base64副本不在codec池；384MiB并非整体浏览器内存上限，未声称RSS已测。bundle入口由N3b的473.20kB降至437.62kB，新增182.25kB的导入Worker按任务加载；未加依赖。UI完整10项通过，证据/tmp/live2d-n5a-evidence/。
+
+N4验收：工程、Studio持久化、签名纯回归11项通过；新存储/查询4项通过，覆盖atomic replace/NaN拒绝后的原文件与tmp清理、竞争锁/异常释放、旧workspace身份迁移、原CLI `studio-open` 完整JSON响应相同。独立进程实际查询Snapshot后未加载studio/native编排模块。原生函数体AST保持，恢复中断测试在新store边界注入失败，既有checkpoint/恢复语义通过；UI完整10项复跑中。未改变lock文件协议或新增双重锁；默认历史保留。native生成、rig-edit实际引擎接入继续W1。

@@ -40,7 +40,7 @@ class StudioProjects(unittest.TestCase):
             def interrupted(path,data):
                 if Path(path).name=='build-settings.json' and (root/'.project-transaction.json').exists():raise OSError('simulated interruption')
                 real_write(path,data)
-            with patch('tools.authoring_rig.studio.write',side_effect=interrupted),self.assertRaises(OSError):restore_project(root,request)
+            with patch('tools.authoring_rig.workspace_store.write',side_effect=interrupted),self.assertRaises(OSError):restore_project(root,request)
             self.assertTrue((root/'.project-transaction.json').exists());self.assertFalse((root/'.studio.lock').exists())
             recover_project(root)
             restored=snapshot(root)

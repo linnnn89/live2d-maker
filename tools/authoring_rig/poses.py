@@ -16,7 +16,7 @@ def validate_library(library):
 
 
 def load_library(root):
-    from .studio import read
+    from .workspace_store import read
     path = Path(root) / "poses.json"
     library = read(path) if path.exists() else {"schemaVersion": 1, "items": []}
     validate_library(library)
@@ -30,7 +30,8 @@ def pose_state(root):
 
 def update_poses(root, payload):
     validate_protocol("PoseRequest", payload)
-    from .studio import locked, snapshot, read, write
+    from .workspace_store import locked, read, write
+    from .workspace_query import snapshot
     root = Path(root).resolve(strict=True)
     with locked(root):
         library = load_library(root)
