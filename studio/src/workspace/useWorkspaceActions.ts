@@ -117,6 +117,12 @@ export function useWorkspaceActions() {
     catch (failure) { setError(failure instanceof Error ? failure.message : String(failure)); }
     finally { editor.setBlocked(false); setBusy(''); }
   }
+  function applyProjectRevisions(revisions: ProjectRevisions) {
+    setSaved(previous => {
+      if (!previous?.project || previous.project.head === revisions.head) return previous;
+      return { ...previous, project: { ...previous.project, head: revisions.head } };
+    });
+  }
   async function saveProject(head:string,message:string):Promise<ProjectRevisions|null> {
     if(!saved||editingLocked||settingsPending)return null;
     setBusy('正在保存工程修订…');setError('');
@@ -125,6 +131,7 @@ export function useWorkspaceActions() {
       if(dirty){const result=await editor.execute({schemaVersion:1,operation:'commit',state:draft!});if(!result.ok)throw new Error(result.error.message);current=result.saved||current;}
       editor.setBlocked(true);
       const result=await api<ProjectRevisions>('project-save',{schemaVersion:1,revision:current.revision,settingsRevision:current.buildSettings!.revision,overlayRevision:current.overlayRevision,posesRevision:current.poses?.revision,head,message});
+      applyProjectRevisions(result);
       setMessage('工程修订已保存');return result;
     }catch(e){setError(e instanceof Error?e.message:String(e));return null;}finally{editor.setBlocked(false);setBusy('');}
   }
@@ -136,5 +143,5 @@ export function useWorkspaceActions() {
   }
   return {saved,applySnapshot:apply,editor,draft,ir,dirty,selected,setSelected,busy,message,error,setMessage,setError,editingLocked,
     showQa,setShowQa,showImport,openImport,closeImport,commitImport,retryOpen,action,edit,history,saveBuildSettings,readBuildSettings,
-    settingsPending,setSettingsPending,setBusy,saveProject,restoreProject};
+    settingsPending,setSettingsPending,setBusy,saveProject,restoreProject,applyProjectRevisions};
 }

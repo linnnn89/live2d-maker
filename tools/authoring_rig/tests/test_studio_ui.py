@@ -38,6 +38,7 @@ class StudioUi(unittest.TestCase):
         self.requests = []
         self.errors = []
         self.fail_rebuild = False
+        self.fail_revisions = 0
         self.playwright = sync_playwright().start()
         self.addCleanup(self.playwright.stop)
         self.browser = self.playwright.chromium.launch(headless=True)
@@ -48,6 +49,9 @@ class StudioUi(unittest.TestCase):
 
     def dispatch(self, operation, payload):
         if operation == "project-revisions":
+            if self.fail_revisions:
+                self.fail_revisions -= 1
+                raise StudioError("WORKSPACE_FAILED", "Fixture revision read failed", "project")
             return revision_list(self.root)
         if operation == "project-save":
             return save_project(self.root, payload)
@@ -164,3 +168,74 @@ class StudioUi(unittest.TestCase):
         expect(self.page.locator(".build-settings summary")).not_to_contain_text("未保存")
         self.assertEqual(snapshot(self.root)["buildSettings"]["settings"]["atlasSize"], 1024)
         self.assertEqual(self.requests.count("build-settings"), 1)
+
+    def project(self):
+        self.page.get_by_text("工程保存与修订", exact=True).click()
+        expect(self.page.get_by_role("button", name="保存项目修订", exact=True)).to_be_enabled()
+        return self.page.locator(".project-panel")
+
+    def save_revision(self, name):
+        self.page.get_by_label("修订说明", exact=True).fill(name)
+        self.page.get_by_role("button", name="保存项目修订", exact=True).click()
+        row = self.page.locator(".project-panel li").filter(has_text=name)
+        expect(row).to_contain_text("当前保存修订")
+        return row
+
+    def test_restore_current_head_restores_saved_artwork_and_lists_automatic_backup(self):
+        changed = json.loads(json.dumps(self.initial["ir"]))
+        changed["parts"][0]["appearance"]["opacity"] = 180
+        save_workspace(self.root, {"revision": self.initial["revision"], "ir": changed})
+        self.open()
+        panel = self.project()
+        panel.get_by_role("button", name="恢复此修订", exact=True).click()
+        expect(panel.locator("li").filter(has_text="恢复前自动保存")).to_be_visible()
+        expect(panel.locator("li").filter(has_text="导入 PSD")).to_contain_text("当前保存修订")
+        self.assertEqual(snapshot(self.root)["ir"], self.initial["ir"])
+        self.assertEqual(len(revision_list(self.root)["revisions"]), 2)
+
+    def test_save_restore_save_keeps_head_and_revision_list_consistent(self):
+        self.open()
+        panel = self.project()
+        self.save_revision("Revision B")
+        expect(self.page.get_by_role("button", name="保存项目修订", exact=True)).to_be_enabled()
+        panel.locator("li").filter(has_text="导入 PSD").get_by_role("button", name="恢复此修订").click()
+        expect(panel.locator("li").filter(has_text="恢复前自动保存")).to_be_visible()
+        expect(panel.locator("li").filter(has_text="导入 PSD")).to_contain_text("当前保存修订")
+        expect(panel.locator("li").filter(has_text="Revision B")).not_to_contain_text("当前保存修订")
+        self.save_revision("Revision C")
+        current = revision_list(self.root)
+        self.assertEqual(len(current["revisions"]), 4)
+        self.assertEqual(next(r["message"] for r in current["revisions"] if r["id"] == current["head"]), "Revision C")
+        self.evidence("project-restored-and-resaved-desktop")
+
+    def test_restore_success_read_failure_retries_only_the_read(self):
+        self.open()
+        panel = self.project()
+        self.fail_revisions = 1
+        panel.get_by_role("button", name="恢复此修订", exact=True).click()
+        expect(self.page.get_by_text("已恢复修订；恢复前状态保留为新修订", exact=True)).to_be_visible()
+        expect(panel.get_by_role("alert")).to_contain_text("已完成的工程操作仍然有效")
+        expect(self.page.get_by_role("button", name="保存项目修订", exact=True)).to_be_disabled()
+        self.assertEqual(len(revision_list(self.root)["revisions"]), 2)
+        panel.get_by_role("button", name="读取修订记录", exact=True).click()
+        expect(panel.locator("li").filter(has_text="恢复前自动保存")).to_be_visible()
+        expect(panel.get_by_role("alert")).to_have_count(0)
+        self.assertEqual(self.requests.count("project-restore"), 1)
+        self.assertEqual(self.requests.count("project-revisions"), 3)
+        self.assertEqual(len(revision_list(self.root)["revisions"]), 2)
+
+    def test_external_project_head_conflict_preserves_input_until_explicit_read(self):
+        self.open()
+        panel = self.project()
+        current = snapshot(self.root)
+        save_project(self.root, {"schemaVersion": 1, "revision": current["revision"],
+            "settingsRevision": current["buildSettings"]["revision"], "head": current["project"]["head"], "message": "Other page"})
+        self.page.get_by_label("修订说明", exact=True).fill("My pending revision")
+        panel.get_by_role("button", name="保存项目修订", exact=True).click()
+        expect(self.page.get_by_role("alert")).to_contain_text("Saved project head changed")
+        expect(self.page.get_by_label("修订说明", exact=True)).to_have_value("My pending revision")
+        panel.get_by_role("button", name="读取修订记录", exact=True).click()
+        expect(panel.locator("li").filter(has_text="Other page")).to_contain_text("当前保存修订")
+        panel.get_by_role("button", name="保存项目修订", exact=True).click()
+        expect(panel.locator("li").filter(has_text="My pending revision")).to_contain_text("当前保存修订")
+        self.assertEqual(len(revision_list(self.root)["revisions"]), 3)
