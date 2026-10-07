@@ -2,6 +2,8 @@
 
 更新于 2026-10-07。目标是完成 PSD 编辑、素材导入、Live2D 重建和验证这些软件功能。角色素材只作为测试样本，不要求逐类制作完整角色。
 
+最新代码复评与后续实施 plan：见 [R8 后的工程评审](ENGINEERING_REVIEW_R8.md)，基于 `main@99f1908`。下一轮按 N0 Agent/用户交错与取消契约 → N1 设置草稿保护 → N2 修订状态闭环 → N3 操作用例统一推进；后续 N5a 导入资源预算、N4 存储/查询边界、N5b 归档流式处理。Windows 原生时序与资源验收列为 W1。当前均为计划，尚未实施。
+
 设计参考：[Mesh Avatar Studio](https://github.com/shinshin86/mesh-avatar-studio)。安装与使用见 [环境说明](environment.md) 和 [Studio 使用说明](../studio/README.md)；历史验证记录见 [HANDOFF.md](HANDOFF.md)。
 
 后续代码架构、模块职责、产品功能与编辑器交互的更新建议，见 [架构与产品迭代计划](ARCHITECTURE_PRODUCT_PLAN.md)。建议基于代码阅读，按编辑反馈、能力接入和项目交付的优先级实施。

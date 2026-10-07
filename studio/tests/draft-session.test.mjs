@@ -62,6 +62,42 @@ test('stale tokens fail after edits, undo and discard; effective no-op retains t
   s.undo(edited); assert.throws(() => s.redo(edited), { code: 'DRAFT_CONFLICT' });
   const undone = s.inspect(); s.discard(undone); assert.throws(() => s.apply(undone, [hide]), { code: 'DRAFT_CONFLICT' });
 });
+test('a delayed agent proposal keeps its original token after manual edits and undo', async () => {
+  const { c } = controller();
+  const read = await request(c, 'inspect');
+  const original = structuredClone(read.state.ir);
+  let finish;
+  const computed = new Promise(resolve => { finish = resolve; });
+  const agent = computed.then(commands => c.execute({
+    schemaVersion: 1, operation: 'apply', state: read.state, commands,
+  }));
+  c.edit([{ ...opacity, opacity: 160 }]);
+  const manual = c.getSnapshot();
+  finish([{ ...opacity, opacity: 80 }]);
+  assert.equal((await agent).error.code, 'DRAFT_CONFLICT');
+  assert.equal(c.getSnapshot(), manual);
+  await request(c, 'undo');
+  assert.deepEqual(c.getSnapshot().ir, original);
+  const repeated = await c.execute({ schemaVersion: 1, operation: 'apply', state: read.state, commands: [opacity] });
+  assert.equal(repeated.error.code, 'DRAFT_CONFLICT');
+  assert.deepEqual(c.getSnapshot().ir, original);
+});
+test('competing agent proposals and a retried completed proposal cannot apply twice', async () => {
+  const { c } = controller();
+  const read = await request(c, 'inspect');
+  const firstRequest = { schemaVersion: 1, operation: 'apply', state: read.state, commands: [opacity] };
+  const results = await Promise.all([
+    c.execute(firstRequest),
+    c.execute({ ...firstRequest, commands: [{ ...opacity, opacity: 80 }] }),
+  ]);
+  assert.equal(results[0].ok, true);
+  assert.equal(results[1].error.code, 'DRAFT_CONFLICT');
+  const winner = c.getSnapshot();
+  assert.equal(winner.ir.parts[0].appearance.opacity, 120);
+  assert.equal(winner.history.undoSteps, 1);
+  assert.equal((await c.execute(firstRequest)).error.code, 'DRAFT_CONFLICT');
+  assert.equal(c.getSnapshot(), winner);
+});
 test('landmark add, change, removal and polygon changes produce reversible field diffs', () => {
   const s = new DraftSession(fixture(), 'base', 'draft');
   s.apply(s.inspect(), [{ type: 'set_landmark', partId: 'face', name: 'iris', point: [12, 34] },
