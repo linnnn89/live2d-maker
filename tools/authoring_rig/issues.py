@@ -3,7 +3,8 @@ import re
 
 
 def model_issues(view, root, state):
-    from .studio import read, model_record_matches, overlay_inputs
+    from .workspace_store import read
+    from .workspace_query import model_record_matches, overlay_inputs
     from .build_settings import load_settings, settings_record_matches
     issues = []
     classifications = view.get("build", {}).get("classifications", []) if view.get("build") else []

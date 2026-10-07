@@ -17,7 +17,7 @@ from .validator import validate_authoring_rig
 
 
 def overlay_revision(root, state):
-    from .studio import overlay_inputs
+    from .workspace_query import overlay_inputs
     return _canonical_hash(overlay_inputs(root, state))
 
 
@@ -33,7 +33,7 @@ def file_manifest(directory):
 
 
 def cached_artifact(root, state, key):
-    from .studio import read
+    from .workspace_store import read
     relative = state.get('exportCache',{}).get(key)
     if not relative: return None
     if not isinstance(relative,str) or not re.fullmatch(r'export-builds/[a-f0-9]{32}',relative):

@@ -411,3 +411,9 @@ N3b 继续收敛到 WorkspaceOperations：同步进入、自己的isCurrent/bloc
 ImportClient每次任务创建独立Worker，只有一个active、无队列/缓存；完成/错误/取消后清空handler并terminate，旧回调不会影响后来任务。素材decode/alpha/crop、mask decode/PNG encode/Base64移出主线程；decode前沿用像素/文件上限并预留codec预算，失败释放lease。主线程不再保存RGBA副本，只保留尺寸/alpha/URL及原mask；预检传输mask副本不损坏编辑输入。已清理的effect不创建URL，取消后预检不发新请求或发布旧返回。源图裁切用重新检查而非新缓存，保持所有权简单。独立384MiBcodec预算不是浏览器/GPU整体上限；HTTP Base64副本仍待真实增长数据评估。
 
 前端86项（84通过/2原路径跳过）、构建通过，入口bundle437.62kB（原473.20kB），新Worker182.25kB按任务加载。2048²真实PNG、尺寸拒绝后恢复、反复取消、裁切、mask预检和纯Python提交通过，完成后importWorker0/关闭后spriteURL0；可控迟到fixture验证cleanup后URL创建0。未改原生建模。完整UI复跑结果与后续N4/N5b见工程评审第9节。
+
+## 46. N4：纯工作区存储与 Snapshot 查询（2026-10-07）
+
+workspace_store.py提取原子JSON读写、内容revision、原锁和URL；workspace_query.py装配Snapshot、模型匹配与Overlay证据。studio.py兼容导出保持原CLI/native入口，工程/姿态/问题等纯模块改依赖store/query；原生导出和rig-edit编排导入未迁移。失败atomic replace清理自己的tmp，原文件保留；不增加锁层、不改格式/签名。open/save/settings/import/rebuild/QA函数体经AST与前一提交对比一致。
+
+纯工程/持久化/签名11项及新store/query4项通过；原CLI studio-open JSON与直接query一致，身份迁移仍服从旧锁，实际独立进程Snapshot查询无需加载studio或native编排。中断恢复的失败注入改到实际store边界，恢复语义通过。完整UI复跑及后续N5b结果追加工程评审第9节，Windows/native接入仍待W1。

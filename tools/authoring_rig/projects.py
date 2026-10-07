@@ -34,14 +34,14 @@ def project_root(catalog, project_id):
     root = (catalog / project_id).resolve(strict=True)
     if root.parent != catalog or root.is_symlink():
         raise StudioError("INVALID_REQUEST", "Project is outside its catalog", "project")
-    from .studio import read
+    from .workspace_store import read
     if read(root / "studio-state.json").get("projectId") != project_id:
         raise StudioError("INVALID_REQUEST", "Project identity mismatch", "project")
     return root
 
 
 def summary(root):
-    from .studio import read
+    from .workspace_store import read
     metadata = read(root / "project.json")
     data = read(root / "authoring-rig.json")
     return {"id": root.name, "name": metadata["name"], "updatedAt": metadata["updatedAt"],
@@ -69,7 +69,8 @@ def decoded_upload(value):
 
 def create_project(catalog, payload):
     validate_protocol("ProjectCreateRequest", payload)
-    from .studio import open_workspace, read, write
+    from .studio import open_workspace
+    from .workspace_store import read, write
     catalog = Path(catalog).resolve(); catalog.mkdir(parents=True, exist_ok=True)
     project_id = uuid.uuid4().hex
     raw = decoded_upload(payload["data"])
@@ -114,7 +115,7 @@ def check_state_paths(state):
 
 
 def capture(root):
-    from .studio import read
+    from .workspace_store import read
     data = read(root / "authoring-rig.json"); validate_authoring_rig(data, root)
     state = read(root / "studio-state.json"); check_state_paths(state)
     from .poses import load_library
@@ -124,7 +125,7 @@ def capture(root):
 
 
 def checkpoint(root, message, expected=None):
-    from .studio import read, revision, write
+    from .workspace_store import read, revision, write
     value = capture(root)
     if expected:
         if expected["revision"] != revision(value["ir"]):
@@ -150,7 +151,7 @@ def checkpoint(root, message, expected=None):
 
 
 def revision_list(root):
-    from .studio import read
+    from .workspace_store import read
     root = Path(root).resolve(strict=True)
     metadata = read(root / "project.json")
     records = []
@@ -162,7 +163,7 @@ def revision_list(root):
 
 def save_project(root, payload):
     validate_protocol("ProjectSaveRequest", payload)
-    from .studio import locked
+    from .workspace_store import locked
     root = Path(root).resolve(strict=True)
     with locked(root): checkpoint(root, payload["message"], payload)
     return revision_list(root)
@@ -184,7 +185,7 @@ def validate_capture(value, root):
 
 def apply_transaction(root, transaction):
     """The next CLI entry completes an interrupted restore once the workspace lock is released."""
-    from .studio import write
+    from .workspace_store import write
     validate_capture(transaction["capture"], root)
     value = transaction["capture"]
     write(root / "authoring-rig.json", value["ir"])
@@ -199,7 +200,7 @@ def apply_transaction(root, transaction):
 
 
 def recover_project(root):
-    from .studio import locked, read
+    from .workspace_store import locked, read
     root = Path(root)
     if (root / ".project-transaction.json").exists():
         with locked(root): apply_transaction(root, read(root / ".project-transaction.json"))
@@ -207,7 +208,8 @@ def recover_project(root):
 
 def restore_project(root, payload):
     validate_protocol("ProjectRestoreRequest", payload)
-    from .studio import locked, read, write, revision, snapshot
+    from .workspace_store import locked, read, write, revision
+    from .workspace_query import snapshot
     root = Path(root).resolve(strict=True)
     with locked(root):
         current = capture(root)
@@ -248,7 +250,7 @@ def archive_path_allowed(name):
 
 
 def pack_archive(root):
-    from .studio import read, locked
+    from .workspace_store import read, locked
     root = Path(root).resolve(strict=True)
     with locked(root):
         capture(root)
@@ -273,12 +275,12 @@ def pack_archive(root):
             if temporary.stat().st_size > MAX_UPLOAD: raise ValueError("Portable project archive exceeds the 128 MiB import limit")
             os.replace(temporary, output / filename)
         finally: temporary.unlink(missing_ok=True)
-    from .studio import file_url
+    from .workspace_store import file_url
     return {"schemaVersion": 1, "url": file_url(root, output / filename), "filename": read(root / "project.json")["name"] + ".studio-project.zip", "files": len(files)}
 
 
 def unpack_archive(raw, root):
-    from .studio import read
+    from .workspace_store import read
     with zipfile.ZipFile(io.BytesIO(raw)) as archive:
         entries = archive.infolist()
         names = [entry.filename for entry in entries]
