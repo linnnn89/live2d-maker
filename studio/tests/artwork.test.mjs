@@ -362,31 +362,27 @@ test('import tasks preserve source pixels, cropped alpha and binary masks withou
   const image = { width: 4, height: 4, bounds: null, data: new Uint8ClampedArray(64) };
   image.data.set([30, 80, 100, 255], (1 * 4 + 1) * 4);
   image.data.set([30, 80, 100, 128], (2 * 4 + 2) * 4);
-  const raw = bytes(encodeFrame(image).split(',')[1]), file = new Blob([raw]), memory = new MemoryBudget();
-  assert.deepEqual(await processImport({ kind: 'inspect', file }, memory), { width: 4, height: 4, alpha: [1, 1, 3, 3] });
-  assert.deepEqual(await processImport({ kind: 'inspect', file, crop: [0, 0, 2, 2] }, memory), { width: 4, height: 4, alpha: [1, 1, 2, 2] });
-  assert.equal((await processImport({ kind: 'inspect', file, crop: [0, 0, 1, 1] }, memory)).alpha, null);
+  const raw = bytes(encodeFrame(image).split(',')[1]), file = new Blob([raw]);
+  assert.deepEqual(await processImport({ kind: 'inspect', file }), { width: 4, height: 4, alpha: [1, 1, 3, 3] });
+  assert.deepEqual(await processImport({ kind: 'inspect', file, crop: [0, 0, 2, 2] }), { width: 4, height: 4, alpha: [1, 1, 2, 2] });
+  assert.equal((await processImport({ kind: 'inspect', file, crop: [0, 0, 1, 1] })).alpha, null);
   const mask = blankMask(4, 4); rectangleMask(mask, 4, 4, [1, 1, 3, 3], true);
-  const prepared = await processImport({ kind: 'prepare', file, mask, width: 4, height: 4 }, memory);
+  const prepared = await processImport({ kind: 'prepare', file, mask, width: 4, height: 4 });
   assert.deepEqual(bytes(prepared.generatedPng), raw);
-  const restored = await processImport({ kind: 'mask', file: new Blob([bytes(prepared.maskPng)]), width: 4, height: 4 }, memory);
-  assert.deepEqual(restored, mask); assert.equal(memory.stats.usedBytes, 0);
+  const restored = await processImport({ kind: 'mask', file: new Blob([bytes(prepared.maskPng)]), width: 4, height: 4 });
+  assert.deepEqual(restored, mask);
 });
 
-test('import budgets reject before file reading or decoding and release leases on every failure', async () => {
+test('import file and pixel limits reject before reading or decoding', async () => {
   let read = false;
   await assert.rejects(processImport({ kind: 'inspect', file: { size: 16 * 1024 * 1024 + 1,
     arrayBuffer() { read = true; } } }), { code: 'ASSET_FORMAT' });
   assert.equal(read, false);
   const raw = new Uint8Array(bytes(fixtures.assets['solid.png']));
-  new DataView(raw.buffer).setUint32(16, 4096); new DataView(raw.buffer).setUint32(20, 4096);
-  const memory = new MemoryBudget(64 * 1024 * 1024);
-  await assert.rejects(processImport({ kind: 'inspect', file: new Blob([raw]) }, memory), { code: 'MEMORY_BUDGET' });
-  assert.equal(memory.stats.usedBytes, 0);
-  await assert.rejects(processImport({ kind: 'mask', file: new Blob([bytes(fixtures.assets['solid.png'])]), width: 99, height: 99 }, memory), { code: 'ASSET_SIZE' });
-  assert.equal(memory.stats.usedBytes, 0);
-  await assert.rejects(processImport({ kind: 'inspect', file: new Blob([new Uint8Array(40)]) }, memory));
-  assert.equal(memory.stats.usedBytes, 0);
+  new DataView(raw.buffer).setUint32(16, 4097); new DataView(raw.buffer).setUint32(20, 4096);
+  await assert.rejects(processImport({ kind: 'inspect', file: new Blob([raw]) }), { code: 'IMAGE_SIZE' });
+  await assert.rejects(processImport({ kind: 'mask', file: new Blob([bytes(fixtures.assets['solid.png'])]), width: 99, height: 99 }), { code: 'ASSET_SIZE' });
+  await assert.rejects(processImport({ kind: 'inspect', file: new Blob([new Uint8Array(40)]) }));
 });
 
 test('import cancellation terminates only its own task and old callbacks cannot affect the next task', async () => {
