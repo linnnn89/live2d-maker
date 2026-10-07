@@ -217,7 +217,7 @@ Agent 的已有草稿入口也应遵守同一操作门禁。未来增加工程�
 
 用户授权继续至规划的 Linux 范围完成，或确实需要切换真实 Windows 才能继续。基于 main@a38406f（PR #28 已合并），后续按以下顺序推进；本节逐步追加结果，不把尚未实施的项目标为完成。
 
-Linux 实施与验收已完成，已提交以下四个 PR，尚未合并。按表中顺序评审/合并；每个后续 PR 以先前分支为 base，只包含本阶段增量。合并前一个后，将下一个 PR 的 base 改为 `main`，核对差异再继续。
+Linux 实施与合并前修正验收已完成，以下四个 PR 按用户授权准备合并。按表中顺序评审/合并；每个后续 PR 以先前分支为 base，只包含本阶段增量。合并前一个后，将下一个 PR 的 base 改为 `main`，核对差异再继续。
 
 | 顺序 | 阶段 | PR | 当前 base |
 | --- | --- | --- | --- |
@@ -226,7 +226,7 @@ Linux 实施与验收已完成，已提交以下四个 PR，尚未合并。按�
 | 3 | N4：纯存储与查询边界 | [#31](https://github.com/linnnn89/live2d-maker/pull/31) | `codex/studio-n5-import` |
 | 4 | N5b：流式归档与容量闭环 | [#32](https://github.com/linnnn89/live2d-maker/pull/32) | `codex/studio-n4-storage` |
 
-GitHub 上各阶段文件树与 Linux 已验证的本地文件树逐一核对一致。下一项是本节末尾的 Windows W1；当前不继续改需要真实 native/模型证据的代码。
+GitHub 上各阶段文件树与 Linux 已验证的本地文件树逐一核对一致。合并前追加审查发现裁切逐键输入回归，已修复，并简化一次性导入预算及重复查询；实际取舍和最终 86/18/12 验收见 [冗余与复杂度审查](ENGINEERING_REVIEW_N3_N5_SIMPLICITY.md)。N5a 原实施记录中的动态预算为初版设计，修正后由文件/像素上限约束单任务；共享美术缓存预算继续保留。下一项是本节末尾的 Windows W1。
 
 1. **N3a / 已验证**：`ArtworkClient.dispose` 成为关闭终态，失败 Worker 可被新 Worker 替换，但旧回调只认自己的实例。关闭时清空 handler、活动/排队任务；保留旧 client 的调用返回 `ABORTED`。每次 Workspace effect setup 创建新 client 和 Agent bridge，cleanup 关闭对应实例。旧 bridge 拒绝 inspect/apply/commit/capture，进行中的返回也不能冒充当前宿主结果；dispose 清除对 editor/render 的引用。已提交的保存可能完成，关闭不意味着回滚；重开后查询实际保存状态，不能盲重试。
 2. **N3b / 已验证**：`WorkspaceOperations` 只提供同步进入、当前所有者检查、门禁/进度和自身收尾；关闭释放引用。工程、姿态、关键形、交付、设置、IR 保存/重建/QA 和导入门禁共用；组件保留业务输入与原 CAS。先启动草稿保存，再同步加上操作门禁，避免保存新基线发布后至后续原生请求之间暴露空闲状态。交付响应确认后立即保存已成功的下载结果，快照失败单独显示并只重试读取。无队列、自动重试、后台调度或新的公开 Agent 权限。
