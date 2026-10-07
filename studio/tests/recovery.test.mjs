@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test, after } from 'node:test';
-import { mkdtempSync, rmSync, symlinkSync, existsSync, readFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, symlinkSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -8,6 +8,7 @@ import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
 const root=fileURLToPath(new URL('..',import.meta.url)),repo=path.dirname(root);
 const output=mkdtempSync(path.join(tmpdir(),'studio-recovery-test-'));
+writeFileSync(path.join(output, 'package.json'), '{"type":"commonjs"}');
 symlinkSync(path.join(root,'node_modules'),path.join(output,'node_modules'),'junction');
 after(()=>rmSync(output,{recursive:true,force:true}));
 const compile=spawnSync(process.execPath,[path.join(root,'node_modules/typescript/bin/tsc'),

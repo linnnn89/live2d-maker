@@ -18,6 +18,10 @@ export function ImportCanvas({ir,client,bounds,onBounds,mask,onMask,placement,re
   const target=ir.parts.find(part=>part.id===replaceId),targetBox=target?.geometry.bbox;
   const working=useRef(mask);if(!gesture.current)working.current=mask;
   useEffect(()=>{
+    const node=overlay.current;
+    return ()=>{if(node){node.width=0;node.height=0;}};
+  },[]);
+  useEffect(()=>{
     const node=overlay.current;if(!node)return;const scale=Math.min(1,1024/Math.max(width,height));
     node.width=Math.max(1,Math.round(width*scale));node.height=Math.max(1,Math.round(height*scale));
     const ctx=node.getContext('2d');if(!ctx)return;const image=ctx.createImageData(node.width,node.height);

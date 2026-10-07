@@ -92,9 +92,17 @@ class StreamingArchives(unittest.TestCase):
                 self.assertFalse((root / ".studio.lock").exists())
                 self.assertTrue(artifact.is_file())
             asset = next((root / "assets").glob("*.png"))
-            shutil.copyfile(asset, root / "assets" / "A.png"); shutil.copyfile(asset, root / "assets" / "a.png")
-            with self.assertRaisesRegex(ValueError, "duplicate archive paths"):
-                projects.pack_archive(root)
+            upper = root / "assets" / "A.png"
+            lower = root / "assets" / "a.png"
+            shutil.copyfile(asset, upper)
+            shutil.copyfile(asset, lower)
+            # Windows cannot hold both spellings on disk; exercise the same
+            # enumeration contract without depending on filesystem case rules.
+            paths = [path for path in root.rglob("*") if path.name not in ("A.png", "a.png")]
+            paths.extend([upper, lower])
+            with patch.object(Path, "rglob", return_value=iter(paths)):
+                with self.assertRaisesRegex(ValueError, "duplicate archive paths"):
+                    projects.pack_archive(root)
             self.assertEqual(list(output.glob("*.zip")), [])
 
     def test_interrupted_archive_cleans_partial_output_and_retains_project(self):

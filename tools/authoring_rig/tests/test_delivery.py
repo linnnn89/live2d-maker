@@ -7,6 +7,7 @@ import sys
 import tempfile
 import unittest
 import zipfile
+from unittest.mock import patch
 from pathlib import Path
 from PIL import Image
 from psd_tools import PSDImage
@@ -57,6 +58,20 @@ class NativeDelivery(unittest.TestCase):
             note=copy.deepcopy(view['ir']);note['parts'][0]['geometry']['landmarks']={'note':[20,20]}
             current=save_workspace(work,{'revision':view['revision'],'ir':note})
             annotated=command('studio-model-export',request(current,target='playable',exportMotions=False));self.assertTrue(annotated['reused'])
+            from tools.authoring_rig.delivery import export_model
+            real_read_bytes=Path.read_bytes
+            def bounded_delivery(file):
+                if file.is_relative_to(work/'export-builds') and file.suffix.lower() in ('.png','.psd','.moc3','.cmo3'):
+                    raise AssertionError('Delivery read an entire binary resource')
+                return real_read_bytes(file)
+            with patch.object(Path,'read_bytes',bounded_delivery):
+                streamed=export_model(work,request(current))
+            self.assertTrue(streamed['reused'])
+            self.assertEqual(streamed['modelSha256'],editor['modelSha256'])
+            self.assertEqual([item for item in streamed['files'] if item['name']!='export-report.json'],
+                             [item for item in editor['files'] if item['name']!='export-report.json'])
+            # Keep the selected playable package as the portable-project fixture.
+            annotated=command('studio-model-export',request(current,target='playable',exportMotions=False))
             archive=pack_archive(work);data=(work/'downloads'/Path(archive['url']).name).read_bytes()
             imported=create_project(catalog,{'schemaVersion':1,'kind':'archive','name':'Delivery copy','data':base64.b64encode(data).decode()})
             clone=project_root(catalog,imported['project']['id']);cloned=snapshot(clone)

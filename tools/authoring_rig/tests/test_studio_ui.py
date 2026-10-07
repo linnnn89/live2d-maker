@@ -433,9 +433,12 @@ class StudioUi(unittest.TestCase):
             expect(dialog.get_by_role("button", name="检查导入", exact=True)).to_be_enabled()
             self.assertEqual(self.page.evaluate("importWorkers"), 0)
             self.assertEqual(self.page.evaluate("spriteUrls.size"), 1)
+            self.page.evaluate("window.closedImportCanvases = [...document.querySelectorAll('.import-stage canvas')]")
             dialog.get_by_role("button", name="取消", exact=True).click()
             expect(dialog).to_have_count(0)
             self.assertEqual(self.page.evaluate("spriteUrls.size"), 0)
+            self.assertTrue(self.page.evaluate("closedImportCanvases.length === 2 && closedImportCanvases.every(c => c.width === 0 && c.height === 0)"))
+            self.page.evaluate("delete window.closedImportCanvases")
 
         self.page.get_by_role("button", name="导入素材", exact=True).click()
         dialog = self.page.get_by_role("dialog", name="导入素材", exact=True)

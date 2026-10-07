@@ -226,14 +226,14 @@ Linux 实施与合并前修正验收已完成，以下四个 PR 已按用户授�
 | 3 | N4：纯存储与查询边界 | [#31](https://github.com/linnnn89/live2d-maker/pull/31) | `codex/studio-n5-import` |
 | 4 | N5b：流式归档与容量闭环 | [#32](https://github.com/linnnn89/live2d-maker/pull/32) | `codex/studio-n4-storage` |
 
-GitHub 上各阶段文件树与 Linux 已验证的本地文件树逐一核对一致。合并前追加审查发现裁切逐键输入回归，已修复，并简化一次性导入预算及重复查询；实际取舍和最终 86/18/12 验收见 [冗余与复杂度审查](ENGINEERING_REVIEW_N3_N5_SIMPLICITY.md)。N5a 原实施记录中的动态预算为初版设计，修正后由文件/像素上限约束单任务；共享美术缓存预算继续保留。下一项是本节末尾的 Windows W1。
+GitHub 上各阶段文件树与 Linux 已验证的本地文件树逐一核对一致。合并前追加审查发现裁切逐键输入回归，已修复，并简化一次性导入预算及重复查询；实际取舍和最终 86/18/12 验收见 [冗余与复杂度审查](ENGINEERING_REVIEW_N3_N5_SIMPLICITY.md)。N5a 原实施记录中的动态预算为初版设计，修正后由文件/像素上限约束单任务；共享美术缓存预算继续保留。本节末尾已追加 Windows W1 本机执行结果。
 
 1. **N3a / 已验证**：`ArtworkClient.dispose` 成为关闭终态，失败 Worker 可被新 Worker 替换，但旧回调只认自己的实例。关闭时清空 handler、活动/排队任务；保留旧 client 的调用返回 `ABORTED`。每次 Workspace effect setup 创建新 client 和 Agent bridge，cleanup 关闭对应实例。旧 bridge 拒绝 inspect/apply/commit/capture，进行中的返回也不能冒充当前宿主结果；dispose 清除对 editor/render 的引用。已提交的保存可能完成，关闭不意味着回滚；重开后查询实际保存状态，不能盲重试。
 2. **N3b / 已验证**：`WorkspaceOperations` 只提供同步进入、当前所有者检查、门禁/进度和自身收尾；关闭释放引用。工程、姿态、关键形、交付、设置、IR 保存/重建/QA 和导入门禁共用；组件保留业务输入与原 CAS。先启动草稿保存，再同步加上操作门禁，避免保存新基线发布后至后续原生请求之间暴露空闲状态。交付响应确认后立即保存已成功的下载结果，快照失败单独显示并只重试读取。无队列、自动重试、后台调度或新的公开 Agent 权限。
 3. **N5a / 已实施**：导入 decode/alpha/crop/mask encode/Base64 转入一次性 Worker，每个 client 只允许一个活动任务、无队列/缓存，完成/错误/取消立即终止线程。复用PNG像素规则与MemoryBudget，为单任务提供384MiB受管codec预算，分配前检查16MiB文件/像素/尺寸/预算；主线程仅保存尺寸、alpha范围、URL和原可编辑mask，准备时只传输有界mask副本。effect取消检查在URL分配前，关闭后预检返回不发布。裁切变化重新检查源图；先用重算换取简单所有权，未增加decoded缓存。
 4. **N4 / 已实施**：`workspace_store.py` 提供原子JSON读写、内容revision、原写锁和资源URL，`workspace_query.py` 装配Snapshot与已保存模型证据；`studio.py` 保留兼容导出。工程/姿态/问题等纯模块直接依赖这两个边界，不反向借CLI/native入口拿文件能力。旧写锁/迁移/文件格式/签名规则保持；失败atomic replace清理自己的临时文件并保留原文件。open/save/import/rebuild/QA函数体经AST对照未变，原生编排调用点仍用兼容入口，未迁移native操作。
 5. **N5b / Linux 范围已验证**：工程 ZIP 以1MiB块读取、哈希并压缩，导入按块校验/落盘，只有≤16MiB manifest完整读取。统一文件数、单文件、展开总量（包含manifest）、manifest和上传限制，导出同样拒绝casefold冲突，防止生成自身不能导入的包。失败仅清理临时ZIP，保留项目/历史。纯交付文件清单改分块哈希；native `export_model` 本体仍未修改，进一步交付打包/上传Base64资源优化需要PC真实产物与增长数据。
-6. **W1 / 待 PC**：真实模型、CLI/桌面/native 集成和大型 CMO3 工程验收，沿用第 6 节的明确场景。
+6. **W1 / Windows 实测及定向修复已执行**：真实模型、CLI/native、Studio 与工程交付结果见本节末尾。Compose 逐控件操作和完整 MCP 网络迟到交错仍未覆盖，保留明确边界。
 
 N3a 的三个新增回归在修复前全部失败，分别复现关闭后重启、旧 error/message 影响替换 Worker、关闭后迟到统计改变；修复后通过。补充旧 bridge 读写/捕获拒绝、迟到成功/失败、保存已提交后关闭和 50 次任务生命周期检查。它们证明队列/handler/实例收尾，不等于浏览器整体堆或 GPU 已做长期内存测量。
 
@@ -267,11 +267,43 @@ N4验收：工程、Studio持久化、签名纯回归11项通过；新存储/查
 - 真实React **10/10通过**，`STUDIO_UI_URL=http://127.0.0.1:5173 python -m unittest tools.authoring_rig.tests.test_studio_ui -v`，使用既有Vite服务和纯Python/API fixture；Chromium桌面1440×960/原窄屏390×844、身份/非空/无overlay/pageerror/交互/截图检查通过，预期409/400注入已区分。截图/tmp/live2d-final-evidence/，Browser plugin not available。
 - `npm run build`通过，协议生成类型未变，无新增依赖；Vite的未来native config loader提示是原有未修改项。native export/keyform/open/save/import/rebuild/QA函数体已做AST对照，未改变原生编排算法。
 
-### 现在的 PC plan / W1
+### PC 执行清单 / W1
 
-Linux可独立验证的实施已完成；以下需要真实Windows及模型，云端不继续修改原生实现：
+以下是 Linux 结束时交接给 PC 的执行清单；Windows 本次结果和未覆盖项追加在后：
 
 1. 合入各阶段后，在真实PC跑现有Windows回归和真实PSD的Rebuild/Overlay/姿态/动态预览/两种交付；保存IR→重建、设置保存后失败、修订恢复/再次保存和导入后的门禁都要覆盖。确认成功模型保留、取消/关闭后旧回调不能影响新的显示。
 2. 复现native Agent prepare(A)→用户编辑/checkout(B)→迟到commit、关闭/重开与旧引擎基线；CAS应拒绝旧结果，新预览/错误状态保持。Linux草稿保护不能代替这个native交错验收。
 3. 用包含build/review/import/delivery/poses/全部修订的真实工程归档→删除原目录→重开，核对文件哈希、模型引用、QA与动态资源。测大PNG反复导入/取消、模型iframe反复开关、交付/ZIP时的实际进程与GPU增长；允许有界缓存平台，不凭单次RSS峰值叫作泄漏。
-4. 取得真实产物与内存证据后，再改`delivery.export_model`中全量文件打包与上传Base64副本。该函数涉及native准备、缓存、CMO3与交付发布，当前保留原实现；不要先引入multipart/后台job/历史删除系统。
+4. 取得真实产物与内存证据后，再改`delivery.export_model`中全量文件打包与上传Base64副本。该函数涉及native准备、缓存、CMO3与交付发布，Linux交接时保留原实现；不要先引入multipart/后台job/历史删除系统。
+
+### W1 Windows 实测与定向修复（2026-10-07）
+
+从干净 main@615d0b8 fetch 后确认 origin/HEAD 为 main，以 fast-forward 对齐 8647b83；本轮源代码保存在 codex/windows-w1-acceptance。使用项目 Python 3.10.11、Node 24.19.0、既有 JDK 21/Gradle 9.6.1、Edge 154.0.4258.62 和本地 Cubism SDK；按锁文件安装 Studio 依赖，观测用 psutil 7.2.2 仅装入项目 Python。未下载模型权重或替换全局环境。
+
+实际 Edge 页面连接真实 Vite/Python/当前源码 JAR，无 native 请求 fixture：ds.psd 的24层模型完成 Save IR→Rebuild、人/Agent 草稿交替、ParamAngleX=30/ArtMeshFace opacity=0.4 Overlay、像素变化、保存姿态、16姿态QA、可播放/编辑器两种交付。交付 ZIP 逐项哈希一致，编辑器交付复用同一 native 缓存；包含4个动态动作与物理，实际播放/暂停/单步/归零后截图和时间变化正确。已有15条 CMO3 回读警告保留，QA通过不表示这些美术偏差已消除。
+
+贴图尺寸保存为1024后，Overlay基线冲突导致重建拒绝；保存状态不再显示未保存，旧模型/基线保留，刷新后错误可追踪。恢复有效修订并再次保存通过。透明PNG+保护mask预检外部变化/可见像素均为0，导入后保留旧模型并禁用QA；已有Overlay拓扑不兼容时重建拒绝，恢复有效修订可继续。另建无Overlay的真实工程，导入后25层模型实际重建及16姿态QA通过。切换应用JAR指纹后，旧工程继续 needs-review 并保留旧模型，不自动迁移基线。
+
+实际原生服务回归使用ds.psd：prepare(A)后调用桌面VM的真实图层可见性编辑(B)，迟到commit由实际VM CAS拒绝，B的预览/状态及历史保留；HEAD变化及checkout后旧candidate均拒绝。另一个新回归先关闭旧 ViewModelAgentWorkspace、再挂接新实例，复现旧实例仍能删除新预览图层；修复关闭终态读写、项目捕获/安装入口及预览发布，并用historyLock串行化close与发布。旧实例snapshot、checkpoint和删除均拒绝，新模型不变。共新增2项自动化测试，其他情形扩展既有测试。
+
+完整工程包含build/review/import/delivery/poses和6个修订，182个清单文件；先下载并逐文件验SHA，保留可恢复测试备份后物理删除原测试目录，再通过真实页面导入归档。新工程ID、逐文件哈希（身份文件除外）、16姿态QA、姿态库、修订数量和新的模型/交付资源URL均核对，交付动态再次播放通过。测试目录均在out内；未删除个人工程。
+
+在真实数据测量之后实施两项局部流式优化：delivery逐文件复制并哈希，ZIP读取已选定的预览文件；JSON报告与native准备/缓存/发布契约保持。create_project在临时目录按1MiB的Base64字符块严格解码落盘，保持128MiB上限、填充/字符验证、归档路径与SHA验证，全部通过才发布。无需multipart、后台job或额外归档库。
+
+| 观测范围（单次独立进程） | 原实现 | 流式实现 |
+| --- | --- | --- |
+| 24.39MiB真实编辑器交付，Python分配峰值 | 47.140MiB | 13.412MiB（降低71.5%） |
+| 同一交付耗时 | 1.042s | 1.032s |
+| 同一交付进程峰值RSS | 79.68MiB | 60.48MiB |
+| 94.06MiB真实工程归档上传，Python解码/导入分配峰值 | 219.934MiB | 5.308MiB（降低97.6%） |
+| 同一上传耗时 | 1.978s | 2.099s |
+
+两次交付清单、模型SHA及选定文件逐项相同；ZIP容器元数据不要求相同。上传测量在Base64字符串已准备后开始，不包括浏览器/Node/HTTP/JSON持有的副本，也不是全流程RSS上限。真实归档包约94MiB、展开约155MiB，属于本次样本，未测到1GiB工程上限。
+
+48次4096²PNG导入/取消发现实际GPU显存线性增长，即使Worker/URL计数已为0：114.4→616.0MiB。定位到卸载的canvas仍保留bitmap，ArtworkCanvas与ImportCanvas卸载时将尺寸置0；同场景复测114.9→133.9MiB，首次4次132.9MiB，此后44次仅增加约1MiB；后续12次动态iframe开关157.2→154.8MiB。计数取Windows GPUPerformanceCounters中本次Edge GPU进程的DedicatedUsage。全体浏览器/driver RSS仍会因缓存波动，未称作总内存无增长或长期无泄漏。Worker/PNG URL归零，390px页面无横向溢出。
+
+验证记录：前端86项全部实际执行，临时模块类型修复后仅离线CLI一项仍失败，修复CLI同根问题后该组19/19通过，其余已通过项未重复跑；构建通过。Kotlin最终全量215项、0失败/0错误、1项可选nunif集成因未配置而跳过，native Cubism smoke实际初始化RTX 5070 Ti；新增真实PSD生命周期测试使512MiB默认测试堆不足，将测试任务堆设为2GiB后全量通过。之后扩展真实VM CAS/checkout的既有服务组6/6定向通过。Python全量52项曾有1个Windows大小写fixture失败，修正为显式枚举两种拼写后工程/归档6/6、流式交付2/2、最终React UI12/12通过；新增上传回归包含大分块、错误中间填充、非法字符、截断、大小上限及不发布残片。没有第三次不变的Python全量重跑。
+
+Windows CommonJS问题来自本机TEMP上级package.json的type=module，编译输出在临时目录内明确声明commonjs；CLI同样处理，未修改用户的package.json。参考[Node官方package类型规则](https://github.com/nodejs/node/blob/main/doc/api/packages.md)及[HTML标准canvas尺寸重置规则](https://html.spec.whatwg.org/multipage/canvas.html)。
+
+证据在out/w1-windows/（acceptance.json、真实页面截图、工程ZIP、前后资源测量），日志为out/w1-*.log；不提交测试产物/二进制/个人配置。Compose应用使用源码JAR启动并检查实际窗口，首轮截图正常但UIA只暴露Pane；最终JAR再次启动已确认PID/标题且无stderr错误，窗口为最小化状态未抓取最终截图，未执行逐控件操作。原生交错验证在真实服务/VM API层进行，未涵盖完整MCP网络传输中的关闭/重开迟到响应。没有打开Cubism Editor或生成新的Windows安装包；这些边界继续保留，不能由构建或服务测试代替。

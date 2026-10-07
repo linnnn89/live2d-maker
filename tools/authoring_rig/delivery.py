@@ -117,34 +117,47 @@ def export_model(root,payload):
         for relative in references:
             file=(directory/'native'/relative).resolve(strict=True)
             if not file.is_relative_to((directory/'native').resolve()):raise ValueError('Export resource outside bundle')
-            files[relative]=file.read_bytes()
+            files[relative]=file
         if payload['target']=='editor':
-            cmo=next((directory/'native').glob('*.cmo3'));files[cmo.name]=cmo.read_bytes()
-            files['artwork.psd']=(directory/'artwork.psd').read_bytes()
-        moc_sha=hashlib.sha256(files[model['FileReferences']['Moc']]).hexdigest()
+            cmo=next((directory/'native').glob('*.cmo3'));files[cmo.name]=cmo
+            files['artwork.psd']=directory/'artwork.psd'
         identifier=uuid.uuid4().hex;delivery=root/'deliveries'/identifier;delivery.mkdir(parents=True)
+        # Copy/hash one resource at a time. ZIP reads this immutable selection,
+        # so package bytes, preview bytes and reported hashes always correspond.
+        preview=delivery/'model';preview.mkdir()
+        selected={}
+        for name,source in files.items():
+            file=preview/name;file.parent.mkdir(parents=True,exist_ok=True)
+            digest=hashlib.sha256();size=0
+            with file.open('wb') as target:
+                if isinstance(source,bytes):
+                    target.write(source);digest.update(source);size=len(source)
+                else:
+                    with source.open('rb') as resource:
+                        while chunk:=resource.read(1024*1024):
+                            target.write(chunk);digest.update(chunk);size+=len(chunk)
+            selected[name]={'bytes':size,'sha256':digest.hexdigest()}
+        moc_sha=selected[model['FileReferences']['Moc']]['sha256']
         package_manifest={'format':'live2d-studio-model-export','schemaVersion':1,'target':payload['target'],
                           'artworkRevision':revision(data),'builtArtworkRevision':cache['builtArtworkRevision'],
                           'modelInputSignature':cache['modelInputSignature'],'buildSettings':settings,'runtime':runtime,
                           'overlayRevision':payload['overlayRevision'],'modelSha256':moc_sha,
-                          'files':{name:{'bytes':len(raw),'sha256':hashlib.sha256(raw).hexdigest()} for name,raw in files.items()},
+                          'files':dict(selected),
                           'warnings':cache['warnings']}
-        files['export-report.json']=json.dumps(package_manifest,ensure_ascii=False,indent=2).encode()
-        # Serve precisely the selected package, not the cache (which also contains omitted motions/editor files).
-        preview=delivery/'model';preview.mkdir()
-        for name,raw in files.items():
-            file=preview/name;file.parent.mkdir(parents=True,exist_ok=True);file.write_bytes(raw)
+        raw_report=json.dumps(package_manifest,ensure_ascii=False,indent=2).encode()
+        (preview/'export-report.json').write_bytes(raw_report)
+        selected['export-report.json']={'bytes':len(raw_report),'sha256':hashlib.sha256(raw_report).hexdigest()}
         output=root/'downloads';output.mkdir(exist_ok=True);filename=identifier+'.model.zip';temporary=output/(filename+'.tmp')
         try:
             with zipfile.ZipFile(temporary,'w',zipfile.ZIP_DEFLATED) as archive:
-                for name,raw in files.items():archive.writestr(name,raw)
+                for name in selected:archive.write(preview/name,name)
             os.replace(temporary,output/filename)
         finally:temporary.unlink(missing_ok=True)
         project_name=read(root/'project.json')['name'] if (root/'project.json').exists() else data.get('metadata',{}).get('name','model')
         report={'schemaVersion':1,'target':payload['target'],'url':file_url(root,output/filename),
                 'modelUrl':file_url(root,preview/model_path.name),
                 'filename':project_name+('.cmo3.zip' if payload['target']=='editor' else '.model.zip'),
-                'files':[{'name':name,'bytes':len(raw),'sha256':hashlib.sha256(raw).hexdigest()} for name,raw in files.items()],
+                'files':[{'name':name,**record} for name,record in selected.items()],
                 'warnings':cache['warnings'],'cacheId':directory.name,'reused':reused,'buildSettings':settings,
                 'physics':bool(model['FileReferences'].get('Physics')),'motions':sum(len(group) for group in model['FileReferences'].get('Motions',{}).values()),
                 'modelSha256':moc_sha,'modelInputSignature':model_input_signature(data),'overlayRevision':payload['overlayRevision']}

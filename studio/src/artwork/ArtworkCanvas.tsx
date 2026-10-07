@@ -12,6 +12,11 @@ export function ArtworkCanvas({ ir, client, source }: Props) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const [result, setResult] = useState<{ identity: string; message: string; failed: boolean } | null>(null);
   useEffect(() => {
+    const node = canvas.current;
+    // Detached canvases may retain their GPU bitmap until browser GC runs.
+    return () => { if (node) { node.width = 0; node.height = 0; } };
+  }, []);
+  useEffect(() => {
     let cancelled = false;
     const scheduled = requestAnimationFrame(() => {
       void client.render(ir).then(frame => {

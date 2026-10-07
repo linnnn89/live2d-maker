@@ -10,6 +10,7 @@ import ts from 'typescript';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const output = mkdtempSync(path.join(tmpdir(), 'studio-artwork-test-'));
+writeFileSync(path.join(output, 'package.json'), '{"type":"commonjs"}');
 symlinkSync(path.join(root, 'node_modules'), path.join(output, 'node_modules'), 'junction');
 after(() => rmSync(output, { recursive: true, force: true }));
 const compiled = spawnSync(process.execPath, [path.join(root, 'node_modules/typescript/bin/tsc'),

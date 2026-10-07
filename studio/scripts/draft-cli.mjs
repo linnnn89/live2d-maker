@@ -9,6 +9,7 @@ import ts from 'typescript';
 
 const temporary = mkdtempSync(join(tmpdir(), 'studio-draft-'));
 try {
+  writeFileSync(join(temporary, 'package.json'), '{"type":"commonjs"}');
   const require = createRequire(import.meta.url);
   for (const name of ['editor/contracts', 'editor/commands', 'editor/DraftSession', 'protocol/index', 'protocol/generated']) {
     mkdirSync(join(temporary, name.split('/')[0]), { recursive: true });

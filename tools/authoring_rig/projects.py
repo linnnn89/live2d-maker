@@ -62,10 +62,28 @@ def list_projects(catalog):
     return {"schemaVersion": 1, "projects": sorted(projects, key=lambda entry: entry["updatedAt"], reverse=True)}
 
 
-def decoded_upload(value):
+def decoded_upload(value, target=None):
     if not isinstance(value, str) or len(value) > (MAX_UPLOAD + 2) // 3 * 4:
         raise StudioError("REQUEST_SIZE", "Upload exceeds 128 MiB", "project")
-    try: raw = base64.b64decode(value, validate=True)
+    try:
+        if target is not None:
+            size = 0
+            with Path(target).open('wb') as output:
+                # Base64 chunks must end on quartet boundaries. Padding is
+                # legal only in the final chunk, just as for one strict decode.
+                for offset in range(0, len(value), ARCHIVE_CHUNK_BYTES):
+                    chunk = value[offset:offset + ARCHIVE_CHUNK_BYTES]
+                    if offset + len(chunk) < len(value) and '=' in chunk:
+                        raise ValueError('Base64 padding before the final chunk')
+                    raw = base64.b64decode(chunk, validate=True)
+                    size += len(raw)
+                    if size > MAX_UPLOAD:
+                        raise StudioError("REQUEST_SIZE", "Upload exceeds 128 MiB", "project")
+                    output.write(raw)
+            return Path(target)
+        raw = base64.b64decode(value, validate=True)
+    except StudioError:
+        raise
     except ValueError as error: raise StudioError("INVALID_REQUEST", "Invalid base64 upload", "project") from error
     if len(raw) > MAX_UPLOAD: raise StudioError("REQUEST_SIZE", "Upload exceeds 128 MiB", "project")
     return raw
@@ -77,18 +95,17 @@ def create_project(catalog, payload):
     from .workspace_store import read, write
     catalog = Path(catalog).resolve(); catalog.mkdir(parents=True, exist_ok=True)
     project_id = uuid.uuid4().hex
-    raw = decoded_upload(payload["data"])
     with tempfile.TemporaryDirectory(prefix=".project-import-", dir=catalog) as temporary:
         temp = Path(temporary)
         root = temp / "workspace"
+        source = decoded_upload(payload["data"], temp / ("input.psd" if payload["kind"] == "psd" else "input.zip"))
         if payload["kind"] == "psd":
-            source = temp / "input.psd"; source.write_bytes(raw)
             report = inspect_psd(source)
             if report["issues"]:
                 return {"schemaVersion": 1, "status": "unsupported", "project": None, "issues": report["issues"]}
             open_workspace(root, source_psd=source)
         else:
-            unpack_archive(raw, root)
+            unpack_archive(source, root)
         state = read(root / "studio-state.json")
         state.update(workspaceId=project_id, projectId=project_id, source="source.psd" if (root / "source.psd").exists() else "imported artwork")
         write(root / "studio-state.json", state)
@@ -300,8 +317,9 @@ def pack_archive(root):
 
 def unpack_archive(raw, root):
     from .workspace_store import read
-    if len(raw) > MAX_UPLOAD: raise ValueError("Portable project archive exceeds the 128 MiB import limit")
-    with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+    size = raw.stat().st_size if isinstance(raw, Path) else len(raw)
+    if size > MAX_UPLOAD: raise ValueError("Portable project archive exceeds the 128 MiB import limit")
+    with zipfile.ZipFile(raw if isinstance(raw, Path) else io.BytesIO(raw)) as archive:
         entries = archive.infolist()
         names = [entry.filename for entry in entries]
         if len(names) != len(set(name.casefold() for name in names)) or len(names) > MAX_ARCHIVE_FILES + 1 or sum(entry.file_size for entry in entries) > MAX_EXPANDED:
