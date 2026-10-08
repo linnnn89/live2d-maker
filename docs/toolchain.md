@@ -13,9 +13,10 @@
 | viewer | `live2d-viewer/shot.py`、`qa.py`、`sheet.py`、`grid.py` | 按参数和镜位渲染、生成联系表 |
 | See-through | `see-through/` | 可选单图拆层；推理环境独立安装 |
 | MCP 代理 | `psd2live/mcp_proxy.py` | 连接 PSD2Live 的 MCP 接口 |
+| Windows MCP 诊断 | `check-mcp.ps1 [-TimeoutSeconds 10]` | 检查本仓环境、地址与真实代理握手；返回退出码 |
 | Windows MCP 调用 | `model-mcp.ps1` | 从 Java Preferences 读取本机凭据后调用本地 MCP |
 
-`start-psd2live.ps1` 启动便携桌面应用并等待端口 23871。`check-mcp.ps1` 仍写死了另一个工程的绝对路径，不能当作本仓通用诊断入口；MCP 配置以 [MCP 文档](../psd2live/docs/zh/agent/MCP_AUTHORING.md) 为准。
+`start-psd2live.ps1` 启动便携桌面应用并等待端口 23871。`check-mcp.ps1` 从脚本所在仓库解析项目 Python 和 Proxy，不依赖当前工作目录，也不自动启动应用。它通过 `scripts/check_mcp.py` 完成 initialize、initialized 与 tools/list，超时后结束本次 Proxy；凭据读取复用代理，输出不包含 Token。退出码 0 表示握手通过，1 表示离线/握手失败/超时，2 表示本仓环境或配置不完整。默认地址为 `http://127.0.0.1:23871/mcp`；可使用现有 `PSD2LIVE_MCP_ENDPOINT`、`PSD2LIVE_MCP_TOKEN` 进程环境配置。MCP 配置以 [MCP 文档](../psd2live/docs/zh/agent/MCP_AUTHORING.md) 为准。
 
 ## 应用与资源选择
 

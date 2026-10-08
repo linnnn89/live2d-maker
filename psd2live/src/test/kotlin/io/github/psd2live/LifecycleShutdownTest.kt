@@ -63,13 +63,14 @@ class LifecycleShutdownTest {
 		val workspace = ViewModelAgentWorkspace(viewModel)
 		viewModel.attachAgentWorkspace(workspace)
 
-		val service = AgentMcpService(workspace, AgentMcpConfig(port = 24991))
+		val service = AgentMcpService(workspace, AgentMcpConfig(port = 0))
 		val info = service.start()
-		assertTrue(info.endpoint.contains("24991"))
+		assertTrue(java.net.URI(info.endpoint).port > 0)
 
 		// Both close calls should be clean and idempotent
 		service.close()
 		service.close()
+		assertFailsWith<IllegalStateException> { service.start() }
 		workspace.close()
 		workspace.close()
 		viewModel.close()
