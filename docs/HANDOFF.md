@@ -449,3 +449,15 @@ main从615d0b8快进到origin/main@8647b83，实施在codex/windows-w1-acceptanc
 前端86项最终均验证、构建通过；Kotlin全量215项0失败0错误1可选nunif跳过，Cubism实际GPU初始化；测试堆2GiB解决真实PSD案例的默认512MiB不足。扩展后的服务组6/6通过。Python全量52项的1个Windows大小写fixture已定向修正；工程/归档6、交付2及最终真实React UI12项通过。新增自动化测试仅2项。完整事实、命令范围、资源表和失败原因见[R8第9节](ENGINEERING_REVIEW_R8.md#w1-windows-实测与定向修复2026-10-07)。
 
 证据out/w1-windows/与out/w1-*.log，仅隔离测试工程；本轮依赖恢复为锁定npm包和项目Python内psutil。Compose源码应用实际启动/窗口检查通过，但UIA仅Pane，逐控件交互及完整MCP网络的迟到关闭/重开未覆盖；未做Cubism Editor人工验收或Windows安装包发布。随仓/portable二进制没有替换，Studio本机优先使用新构建源码JAR；复现应先构建当前源码。本轮源码与文档对应 [Windows W1 PR #33](https://github.com/linnnn89/live2d-maker/pull/33)。
+
+## 50. Windows 工具：MCP 诊断与服务终态（2026-10-08）
+
+同步后 main/origin/main 同为 b56e2d6。用户明确要求修工具，停止模型效果修正；本批整理至从主线开始的 codex/windows-tools，不包含未合并 Q1 PR #34。模型仅作隔离测试夹具，原角色 PSD 不变。
+
+实测旧 check-mcp.ps1 因另一工程的 D:\live2Dchat 路径而报告项目 Python 缺失；其 ReadLine 位于 WaitForExit 之前，超时不能约束握手读取。现从 PSScriptRoot 解析路径，通过标准库诊断调用现有 Proxy，复用凭据解码，验证服务身份与非空工具列表，超时结束本次子进程，返回 0/1/2；输出不包含凭据。另复现 AgentMcpService.close 后 start 仍成功、再次 close 不清理的问题；start 增加终态检查，启动/关闭共用同步锁，重开使用新实例。
+
+修复前既有服务关闭测试加入“关闭后 start 必须失败”断言，实际失败；修复后 LifecycleShutdownTest 3/3 与新增 HTTP 场景 1/1 通过。HTTP 场景使用真实 PSD/native preview、真实随机端口、MCP compact asset/remove：请求停在工作区写入前，关闭旧工作区、在同一 VM 重开并启动新服务，再放行旧请求；收到 isError/closed，新 VM 对象、删除状态和工作区历史保持，新连接 inspect 正常。Windows 上再从非仓库工作目录运行实际 PowerShell→项目 Python→stdio Proxy→新源码 HTTP 服务，握手退出 0 且无凭据泄露。
+
+新增 Python 集成测试 1/1，通过带空格的搬迁目录、真实 Proxy 和本地 HTTP fixture 覆盖握手成功/EOF DELETE、错误服务拒绝、0.3秒超时收尾与离线；本机默认地址的实际诊断返回 OFFLINE/退出1。Gradle 离线编译与源码 JAR 构建通过；新自动化测试共2项，未重跑无关完整套件或安装依赖。日志 out/windows-tools-lifecycle-before.log 与 out/windows-tools-lifecycle-after.log，JUnit XML 在 psd2live/build/test-results/test/。
+
+本批验证覆盖真实网络迟到请求跨工作区关闭/重开；测试保留旧 HTTP 服务以便确定性放行请求，未声称覆盖 GUI 窗口关闭导致的传输取消、Compose 逐控件或 Cubism Editor。源码 JAR 已构建，随仓/portable 二进制未替换，未发布安装包。
