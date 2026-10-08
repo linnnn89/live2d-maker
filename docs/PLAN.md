@@ -1,12 +1,16 @@
 # 开发计划与当前状态
 
-更新于 2026-10-07。目标是完成 PSD 编辑、素材导入、Live2D 重建和验证这些软件功能。角色素材只作为测试样本，不要求逐类制作完整角色。
+更新于 2026-10-08。目标是完成 PSD 编辑、素材导入、Live2D 重建和验证这些软件功能。角色素材只作为测试样本，不要求逐类制作完整角色。
+
+**当前后续计划**：基于已合并的 main@b56e2d6（Windows W1 / PR #33）及用户提供的上游研究，见 [上游方案复评与后续迭代计划](NEXT_ITERATION_PLAN_2026-10-08.md)。近期目标是“参数范围适配的少量 QA + 现有闭眼变体通路”，之后按实际缺陷选择 landmark、局部关键形或其他优化。该文区分已有能力、待实施改动及云端/Windows 边界；以下保留历史阶段记录。
+
+**Q1 当前进展**：Python QA 已改为读取实际构建参数范围，去重默认状态并记录未覆盖项，支持无头发参数/单眼模型。原创单眼素材与导入/左右侧映射已在 Linux 验证，真实 Cubism 效果留到 Windows；具体步骤见 [Q1 / V1 单眼样例](QA_SINGLE_EYE.md)，实施范围见后续计划第8节。
 
 **当前 Windows 结果**：已从 main@615d0b8 快进对齐 origin/main@8647b83，并在本机执行 W1。真实 PSD 的重建、Overlay、16 姿态 QA、动态预览、两种交付、失败恢复、透明 PNG 导入及完整归档重开已实测；修复了关闭后的原生 Agent 工作区仍能写入、Windows 临时 CommonJS 模块受上级 package.json 影响，以及反复取消导入的 canvas GPU 资源增长。取得真实产物数据后完成交付文件与上传 Base64 的流式处理，未增加后台任务、格式或历史清理。详细结果、资源测量和验证边界见 [R8 第9节 Windows 实测](ENGINEERING_REVIEW_R8.md#w1-windows-实测与定向修复2026-10-07)及 [HANDOFF 第49节](HANDOFF.md)。Compose 桌面已启动并检查窗口，逐控件操作及完整 MCP 网络迟到交错尚未覆盖；不能把服务/VM 回归称为这两项已通过。
 
 合并前追加审查：[N3–N5 冗余与复杂度审查](ENGINEERING_REVIEW_N3_N5_SIMPLICITY.md)。发现 N5a 裁切逐键输入会因禁用表单而丢失焦点，输入 `800` 实际只得到 `8`；现已在 Linux 修复，裁切坐标通过“应用裁切坐标”确认，输入保持焦点。一次性导入预算租约已移除，Snapshot 局部读取已复用；修订的最终验证已通过，已随 PR #29–#32 合并到 main@a09d741。Windows W1 的本机结果已追加到上方状态和交接第49节。
 
-最新代码复评与后续实施 plan：见 [R8 后的工程评审](ENGINEERING_REVIEW_R8.md)。N0–N2 已通过 PR #28 合并到 main@a38406f；N3 生命周期/操作所有权、N5a 导入Worker预算、N4 纯存储/查询、N5b 工程归档流式处理已完成Linux范围。86项前端（显式Linux Python、0跳过）、18项纯Python、12项真实React/纯Python UI和构建通过（含合并前修正回归）。256MiB受控归档样本的Python分配峰值从256.799MiB降至2.324MiB。Windows W1 已执行真实服务/VM交错、模型/Overlay/交付/完整归档与资源观测，并据实测完成交付打包/上传优化；桌面逐控件操作与完整MCP网络交错仍未覆盖。阶段结果、取舍与证据边界见工程评审第9节。
+前一轮工程评审与实施记录：见 [R8 后的工程评审](ENGINEERING_REVIEW_R8.md)。N0–N2 已通过 PR #28 合并到 main@a38406f；N3 生命周期/操作所有权、N5a 导入Worker预算、N4 纯存储/查询、N5b 工程归档流式处理已完成Linux范围。86项前端（显式Linux Python、0跳过）、18项纯Python、12项真实React/纯Python UI和构建通过（含合并前修正回归）。256MiB受控归档样本的Python分配峰值从256.799MiB降至2.324MiB。Windows W1 已执行真实服务/VM交错、模型/Overlay/交付/完整归档与资源观测，并据实测完成交付打包/上传优化；桌面逐控件操作与完整MCP网络交错仍未覆盖。阶段结果、取舍与证据边界见工程评审第9节。
 
 设计参考：[Mesh Avatar Studio](https://github.com/shinshin86/mesh-avatar-studio)。安装与使用见 [环境说明](environment.md) 和 [Studio 使用说明](../studio/README.md)；历史验证记录见 [HANDOFF.md](HANDOFF.md)。
 
@@ -62,7 +66,7 @@ viewer 通过 URL 的 `model` / `vendor` 参数加载资源，一页一个模型
 
 `live2d-viewer/qa.py` 输出姿态 PNG、联系表和 `review.json`，保存 spec、哈希、实际参数与镜位。未知或越界参数、空渲染均失败；失败会更新报告，不继承上次的成功状态。
 
-独立 viewer 的默认 fixture 有 14 个姿态；Studio 根据当前模型生成 16 个姿态，头发项取自导出的 CDI。两者使用不同 spec，数量不能互换。静态姿态检查不等于物理播放或美术验收。
+独立 viewer 的默认 fixture 有 14 个姿态；Studio Q1 根据当前构建报告的参数范围生成少量姿态，并对默认状态去重，不再固定为16或要求头发参数。`review.json` 的 `spec.coverage` 记录采样/未采样参数和不适用动作；单一 neutral 只算加载/渲染检查。两者使用不同 spec，数量不能互换。静态姿态检查不等于物理播放或美术验收。
 
 ### P2 视觉坐标校准
 
@@ -74,7 +78,7 @@ viewer 通过 URL 的 `model` / `vendor` 参数加载资源，一页一个模型
 
 PSD → IR → PSD 在 ds/tml 共 46 个图层上验证 RGBA、名称、位置、层序和合成图零差；PNG 清单路径也已验证。图层改名、重排后 ID 保持稳定。外部软件移除 XMP 时，不能保证恢复自定义 ID，应保留原 IR。
 
-当前 `polygon` 会裁切 alpha；默认矩形不改变素材，收缩再扩张可从保留的原 PNG 恢复。`landmarks` 只保存标记，不驱动绑定。PSD2Live 仍通过图层名称分类，IR 的 semantic 不是独立的绑定编辑入口。
+当前 `polygon` 会裁切 alpha；默认矩形不改变素材，收缩再扩张可从保留的原 PNG 恢复。`landmarks` 只保存标记，不驱动绑定。PSD2Live 默认通过图层名称分类；IR 的显式 `semantic.override` 已通过稳定部件/源图层映射传入原生分类，可覆盖部件类型与左右侧，但不承载 parameter/keyform/deformer 编辑。
 
 ### P4 失效判断与 Overlay
 
