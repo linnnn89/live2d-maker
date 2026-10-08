@@ -96,6 +96,8 @@ mask 默认全图保护。使用“矩形可编辑区”或连续画笔开放局
 - `studio-rebuild --workspace <目录>`
 - `studio-qa --workspace <目录> --port 5173`：须有正在运行的 Studio dev server，负责本地资源路径。
 
+Pose QA 按当前构建报告的参数范围选择少量姿态，支持无头发参数和单侧眼睛；相同默认状态只渲染一次，截图数量不固定为16。原始 `review.json` 中的 `spec.coverage` 说明未覆盖动作；`neutral-only` 只代表加载/渲染检查，外观仍需人工判断。旧构建报告没有参数范围时须重新 Rebuild。单眼闭眼素材和 Windows 操作步骤见 [Q1 / V1 单眼样例](../docs/QA_SINGLE_EYE.md)。
+
 默认无 Overlay，界面明确显示“未载入”。可同时设置 `STUDIO_OVERLAY` 与 `STUDIO_OVERLAY_BASELINE`，在新工作区归档既有 Overlay 及其原始 native-base.json。重建调用 `native-replay` 比较完整原生签名，`needs-review`/`broken` 明确失败并保留旧模型，绝不自动忽略 Overlay 或批准其应用。只有成功构建匹配当前 IR、Overlay 和 baseline 文件哈希时，快照才显示原生应用后的 `ok`；否则使用保守预检或对应的失败报告。失败原因在刷新后保留，QA 入口关闭；编辑后恢复数值相等的原 IR，可重新对应原成功模型/QA，JSON 的整数与等值浮点写法不会单独造成失效。旧的附带 Overlay 构建报告没有输入哈希时，须重新 Rebuild 一次。模型关键形与问题面板提供原基线/失败证据查看、定位和受限编辑撤回，不提供绕过兼容检查。
 
 存在 `psd2live/build/libs/psd2live-0.7.1.jar` 时，使用该源码应用 JAR 和原便携 JVM/依赖；否则用便携版。Overlay baseline 必须来自相同运行时。UI 已实测源码 JAR 的无 Overlay 闭环，以及附带 ArtMesh geometry/opacity Overlay 的成功应用、IR 轮廓变化拒绝、目标缺失拒绝、刷新保留与恢复；固定镜位像素对照确认指定 X+30 姿态生效，并运行 16 姿态 QA。其他 Overlay owner/channel、journal、physics 组合尚未在 Studio 逐项视觉验收。

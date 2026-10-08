@@ -449,3 +449,11 @@ main从615d0b8快进到origin/main@8647b83，实施在codex/windows-w1-acceptanc
 前端86项最终均验证、构建通过；Kotlin全量215项0失败0错误1可选nunif跳过，Cubism实际GPU初始化；测试堆2GiB解决真实PSD案例的默认512MiB不足。扩展后的服务组6/6通过。Python全量52项的1个Windows大小写fixture已定向修正；工程/归档6、交付2及最终真实React UI12项通过。新增自动化测试仅2项。完整事实、命令范围、资源表和失败原因见[R8第9节](ENGINEERING_REVIEW_R8.md#w1-windows-实测与定向修复2026-10-07)。
 
 证据out/w1-windows/与out/w1-*.log，仅隔离测试工程；本轮依赖恢复为锁定npm包和项目Python内psutil。Compose源码应用实际启动/窗口检查通过，但UIA仅Pane，逐控件交互及完整MCP网络的迟到关闭/重开未覆盖；未做Cubism Editor人工验收或Windows安装包发布。随仓/portable二进制没有替换，Studio本机优先使用新构建源码JAR；复现应先构建当前源码。本轮源码与文档对应 [Windows W1 PR #33](https://github.com/linnnn89/live2d-maker/pull/33)。
+
+## 50. Q1：按模型参数选择 QA 姿态（2026-10-08，云端部分）
+
+基于 main@b56e2d6，用户确认[上游方案复评与后续计划](NEXT_ITERATION_PLAN_2026-10-08.md)后开始实施。`qa_workspace` 复用当前构建报告的参数范围，通过纯函数生成端点、眼嘴约定动作、少量转头组合，并去重默认状态；不再要求头发参数。`review.json` 的 `spec.coverage` 说明采样/未采样参数、不适用动作及 neutral-only 范围。缺少范围的旧构建要求重建，未改变显式 spec 的错误处理或 HTTP 协议。
+
+新增原创单眼素材生成脚本与 [PC 操作说明](QA_SINGLE_EYE.md)。纯 Python 验证素材导入保护区零差、4→5层 PSD、明确左侧语义映射、工作区 QA 报告保存和失败后清除当前 QA。23项相关回归通过、0跳过，其中7项新增；工作区测试替换渲染调用，没有执行真实 Cubism/native。只修改 Python 和文档，没有新增队列、通用规则引擎、缓存或原生接口。
+
+下一步在 Windows 用当前源码 JAR 构建单眼和 ds 样例，检查闭眼层与原睫毛/眼白/虹膜的组合及转头姿态，再决定 V1 是否需要定向修正。尚未验证单眼 MOC3 效果，未修改眼睛绑定、landmark、网格或超分代码。
