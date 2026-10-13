@@ -1,6 +1,6 @@
 # MCP 接口契约：合并工具层与分支契约
 
-本页描述 PSD2Live MCP 的接口契约。**当前默认工具面只对外暴露 10 个合并工具**（`inspect`、`deform`、`form`、`rig`、`view`、`parameter`、`asset`、`physics`、`appearance`、`revision`，用 `request.mode` 选择分支），完整清单与字段差异见第 5 节；第 1–4 节记录这些分支背后的细粒度契约，其中的工具名（`project_get_state`、`view_render_model`、`asset_import_png` 等）**已不再对外注册**，仅用于说明各分支的语义。写工具统一用 `state` 传并发边界，不暴露 `task_id`。后续设计见 [AGENT_DESIGN.md](AGENT_DESIGN.md)，变形器与参数规范见 [DEFORMER_AND_PARAMETER_SPEC.md](../spec/DEFORMER_AND_PARAMETER_SPEC.md)，PSD 图层规范见 [PSD_LAYER_SPEC.md](../spec/PSD_LAYER_SPEC.md)，工程格式见中文摘要 [PROJECT_FORMAT.md](../spec/PROJECT_FORMAT.md) 或英文正文 [PROJECT_FORMAT.md](../../en/spec/PROJECT_FORMAT.md)，使用流程见 [USER_GUIDE.md](../guide/USER_GUIDE.md)，历史调研见 [AGENT_RESEARCH_2026-09-13.md](archive/AGENT_RESEARCH_2026-09-13.md)。接口按组合使用，不存在固定制作顺序：改名不需要绘画流程，绘画不绑定某个生成器，几何合法不等于视觉合格。
+本页描述 PSD2Live MCP 的接口契约。**当前默认工具面只对外暴露 10 个合并工具**（`inspect`、`deform`、`form`、`rig`、`view`、`parameter`、`asset`、`physics`、`appearance`、`revision`；其中 `view/parameter/asset/physics/revision` 用 `request.mode` 选择分支），完整清单与字段差异见第 5 节；第 1–4 节记录这些分支背后的细粒度契约，其中的工具名（`project_get_state`、`view_render_model`、`asset_import_png` 等）**已不再对外注册**，仅用于说明各分支的语义。写工具统一用 `state` 传并发边界，不暴露 `task_id`。后续设计见 [AGENT_DESIGN.md](AGENT_DESIGN.md)，变形器与参数规范见 [DEFORMER_AND_PARAMETER_SPEC.md](../spec/DEFORMER_AND_PARAMETER_SPEC.md)，PSD 图层规范见 [PSD_LAYER_SPEC.md](../spec/PSD_LAYER_SPEC.md)，工程格式见中文摘要 [PROJECT_FORMAT.md](../spec/PROJECT_FORMAT.md) 或英文正文 [PROJECT_FORMAT.md](../../en/spec/PROJECT_FORMAT.md)，使用流程见 [USER_GUIDE.md](../guide/USER_GUIDE.md)，历史调研见 [AGENT_RESEARCH_2026-09-13.md](archive/AGENT_RESEARCH_2026-09-13.md)。接口按组合使用，不存在固定制作顺序：改名不需要绘画流程，绘画不绑定某个生成器，几何合法不等于视觉合格。
 
 ## 1. 发现与视图
 
@@ -170,6 +170,35 @@ Part 组织树用于归组和同绘制顺序时的排序，独立绘制顺序通
 应用**不再提供** `agent_get_workflow` 工具与 `hair-separation` prompt，也不再打包 `src/main/resources/mcp/workflows/` 知识文件：`installAuthoringTools()` 在注册合并工具前会移除全部旧工具与 prompts，服务端也不再声明 prompts 能力。服务端只保留 `instructions` 这一层常驻约束。
 
 需要作业指导时请查阅仓库文档：[Agent 设计](AGENT_DESIGN.md)（工具收敛、建模流程与验收）、[PSD 图层规范](../spec/PSD_LAYER_SPEC.md)、[变形器与参数规范](../spec/DEFORMER_AND_PARAMETER_SPEC.md)、[用户指南](../guide/USER_GUIDE.md)。
+
+### 局部修正示例：闭眼线的一端位置不合适
+
+以下按 `main@930d02b` 的 `AgentAuthoringTools.kt` 字段核对，是调用示意，**尚未在 PC 对实际素材执行**；坐标、参数轴和幅度必须来自当前工程，不能作为所有眼睛的修复配方。
+
+1. `inspect` 用 `{"scope":"objects","query":"eyelash"}` 找目标，按实际返回的 `target` 调用 `{"target":"mesh:<实际 id>"}`；搜索无结果时查 `layers` 的名称和分类，不猜 ID。记录本次观察的 `state=A`、直接 `axes`、`channels` 与 `inherited`。
+2. 用 `inspect` 的 `parameters` 范围，配合 `view` 的 `poses`，在固定 `canvas_rect` 下查看睁眼、半闭、闭眼，再选一个转头姿态。观察眼白与虹膜裁剪、闭眼线和父级运动。标准参数列表里有 EyeOpen，不代表当前对象已有闭眼绑定。
+3. 若目标**直接几何轴只有** `ParamEyeLOpen`，且包含 0，可在这个关键形上做小范围修改。下面仅表示把归一化坐标右侧的一小片向上移 0.01；坐标单位是目标的固定输入 bounds，不是截图像素。若对象还直接绑定其他轴，`key` 必须完整列出；父级的转头轴只用于观察，不能混入局部 key。
+
+```json
+{
+  "state":"<观察时的 A>",
+  "changes":[{
+    "target":"mesh:<实际 id>",
+    "key":{"ParamEyeLOpen":0},
+    "operations":[{
+      "type":"translate","delta":[0,-0.01],
+      "selection":{"center":[0.85,0.5],"radius":0.25,"feather":0.5}
+    }]
+  }]
+}
+```
+
+上面的参数传给 `deform`，不是 `view`，也不包在 `request` 中。`view`、`revision` 等适配工具则按第 5 节使用 `request.mode`。已有关键形可直接改；需要新中间关键形时才考虑 `form.seed`，需要独立运动层时才考虑 `rig`，不默认增加 Warp。
+
+4. 修改成功后记录返回的新 `state`，用 `view` 的 `compare` 在相同裁区、姿态比较改前/改后，并观察相邻开合状态及父级转头。局部形状改善不证明所有姿态合格；静态截图也不证明物理播放正确。结果不合适时按第 7 节使用 `revision.restore`，不要靠反向位移猜测恢复。
+5. 若观察 A 后用户已编辑成 B，迟到的编辑仍带 A，让既有 stale-head 检查拒绝。重新读取 B、观察并调整方案，不能只换成 B 的 state 重发；恢复历史也遵守当前 HEAD 边界，不能覆盖用户的新编辑。
+
+这条流程直接复用现有工具与历史，不需要额外任务队列、参数能力图谱或整模型点数组。素材缺失、分类错误或源画不符合目标时，应先处理对应输入；不能用局部形变替代缺失的绘图。
 
 ## 7. 事务、历史与长任务
 
