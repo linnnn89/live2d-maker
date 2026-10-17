@@ -17,7 +17,7 @@ fallback: [{on: 配准或落位不成立, to: route-art-repair.md#诊断, max_re
 ## 判定树
 
 1. **眼三层重切**（eyewhite→irides→eyelash 顺序与判据）→ 取 [deep-live2d-eye-hair-recipes.md](deep-live2d-eye-hair-recipes.md)（[index.md](index.md)）。睫毛混入下眼线会在闭眼时撕裂，重切时按配方过滤。
-2. **嘴部素材重制/换件** → 风格以用户参考图为准，不盲搬贴图分量；落位前报素材宽高比与 seam 偏差（配方 [deep-live2d-psd2live-mouth-pipeline.md](deep-live2d-psd2live-mouth-pipeline.md)），随后走 [pb-mouth-geometry-repair.md](pb-mouth-geometry-repair.md) 或 [pb-mouth-layer-crossfade.md](pb-mouth-layer-crossfade.md)。
+2. **嘴部素材重制/换件** → 风格以用户参考图为准；先同尺度比较素材与目标，按当前轮廓配置判断落位，不默认套用旧案例的 seam 和宽高比（配方 [deep-live2d-psd2live-mouth-pipeline.md](deep-live2d-psd2live-mouth-pipeline.md)），随后按连续形变或绘图切换目标选择 [pb-mouth-geometry-repair.md](pb-mouth-geometry-repair.md) 或 [pb-mouth-layer-crossfade.md](pb-mouth-layer-crossfade.md)。
 3. **与原版参考图对齐**（脸/发/饰大小位置差异）→ 先配准量化再动手；Live2D 专用配方取 [deep-live2d-reference-alignment.md](deep-live2d-reference-alignment.md)，通用地标与素材换装补充取 [deep-alignment-registration-and-metrics.md](deep-alignment-registration-and-metrics.md) / [deep-alignment-asset-swap-fitting.md](deep-alignment-asset-swap-fitting.md)。整组刚性平移优先；参考图必须未被二次缩放/截边；裁切图用地标配定，不用轮廓 IoU。若症状是“刘海偏高/偏低、发际线不齐、拉高/拉低试试”，按 [index.md](index.md) 取 `scripts/hairline_probe.py` 生成逐列探针与试改证据；脚本只负责测量，不取代用户的美术终裁。
 4. **素材落位** → 同一取景取用；跨取景先解平移量再搬；落位后必报锚点偏差（配方 [deep-live2d-eye-hair-recipes.md](deep-live2d-eye-hair-recipes.md) 落位节）。
 5. **前后发切分/层次美术** → 归属规则查 [route-model-repair.md](route-model-repair.md) 分支 4，美术重切在本篇。

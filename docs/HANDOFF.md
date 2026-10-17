@@ -450,7 +450,30 @@ main从615d0b8快进到origin/main@8647b83，实施在codex/windows-w1-acceptanc
 
 证据out/w1-windows/与out/w1-*.log，仅隔离测试工程；本轮依赖恢复为锁定npm包和项目Python内psutil。Compose源码应用实际启动/窗口检查通过，但UIA仅Pane，逐控件交互及完整MCP网络的迟到关闭/重开未覆盖；未做Cubism Editor人工验收或Windows安装包发布。随仓/portable二进制没有替换，Studio本机优先使用新构建源码JAR；复现应先构建当前源码。本轮源码与文档对应 [Windows W1 PR #33](https://github.com/linnnn89/live2d-maker/pull/33)。
 
-## 50. Q1：按模型参数选择 QA 姿态（2026-10-08，云端部分）
+## 50. Windows 工具：MCP 诊断与服务终态（2026-10-08）
+
+同步后 main/origin/main 同为 b56e2d6。用户明确要求修工具，停止模型效果修正；本批整理至从主线开始的 codex/windows-tools，不包含未合并 Q1 PR #34。模型仅作隔离测试夹具，原角色 PSD 不变。
+
+实测旧 check-mcp.ps1 因硬编码另一工程的绝对路径而报告项目 Python 缺失；其 ReadLine 位于 WaitForExit 之前，超时不能约束握手读取。现从 PSScriptRoot 解析路径，通过标准库诊断调用现有 Proxy，复用凭据解码，验证服务身份与非空工具列表，超时结束本次子进程，返回 0/1/2；输出不包含凭据。另复现 AgentMcpService.close 后 start 仍成功、再次 close 不清理的问题；start 增加终态检查，启动/关闭共用同步锁，重开使用新实例。
+
+修复前既有服务关闭测试加入“关闭后 start 必须失败”断言，实际失败；修复后 LifecycleShutdownTest 3/3 与新增 HTTP 场景 1/1 通过。HTTP 场景使用真实 PSD/native preview、真实随机端口、MCP compact asset/remove：请求停在工作区写入前，关闭旧工作区、在同一 VM 重开并启动新服务，再放行旧请求；收到 isError/closed，新 VM 对象、删除状态和工作区历史保持，新连接 inspect 正常。Windows 上再从非仓库工作目录运行实际 PowerShell→项目 Python→stdio Proxy→新源码 HTTP 服务，握手退出 0 且无凭据泄露。
+
+新增 Python 集成测试 1/1，通过带空格的搬迁目录、真实 Proxy 和本地 HTTP fixture 覆盖握手成功/EOF DELETE、错误服务拒绝、0.3秒超时收尾与离线；本机默认地址的实际诊断返回 OFFLINE/退出1。Gradle 离线编译与源码 JAR 构建通过；新自动化测试共2项，未重跑无关完整套件或安装依赖。日志 out/windows-tools-lifecycle-before.log 与 out/windows-tools-lifecycle-after.log，JUnit XML 在 psd2live/build/test-results/test/。
+
+本批验证覆盖真实网络迟到请求跨工作区关闭/重开；测试保留旧 HTTP 服务以便确定性放行请求，未声称覆盖 GUI 窗口关闭导致的传输取消、Compose 逐控件或 Cubism Editor。源码 JAR 已构建，随仓/portable 二进制未替换，未发布安装包。
+
+
+## 51. 教程评审 U0/U1：制作知识校准与素材依赖提示（2026-10-13）
+
+在 main@930d02b 上实施，完整 plan 与结果见 [教程评审第 8 节](LIVE2D_TUTORIAL_REVIEW_2026-10-13.md)。制作深参考与其上层操作手册统一按当前轮廓实现说明，分开连续几何嘴和纯贴图切换，保留旧角色尺寸/画风为案例；MCP_AUTHORING 增加直接轴、父级、同镜位局部修正及 revision A→B 的示意，不增加工具。
+
+Python issues.py 增加两类非阻断 warning：虹膜缺可匹配眼白、牙齿/舌头缺口腔主体。只依赖未过期构建实际生成的 drawable 与采用后的分类；同侧/NONE 眼白、口腔任意侧回退与原生规则一致。空层不算依赖，拆分部件按源 ID 去重，分类变更后不沿用旧提示。沿用现有定位按钮和协议，不改 IR、历史、导出门禁或原生算法；未构建时不猜测原生拆分后的缺项。
+
+新增 5 项回归及关联的存储/查询、保存/导入、签名与纯 stale 用例合计 23 项通过。真实 Python 工作区 fixture 验证 override、旧报告失效、重复查询不改文件；分类报告为可控 fixture，不宣称真实原生生成。初次测试中一个既有混合用例的原生段因缺少 JPype 失败，随后明确选择纯 Python 范围，无原生环境安装。技能结构检查最终 0 失败/0 警告；第50节的机器绝对路径改成等义描述以符合已有文档规则。
+
+未运行 Windows、Cubism 或 GUI 验收；新 MCP 示例只核对字段，未在实际素材执行。原 Q1 #34 未修改、未合并。下一步在 PC 完成 Q1 验收后接 U2；U3/U4 依据实际编辑阻碍再选择，云端不提前修改 Kotlin 形变或网格。
+
+## 52. Q1：按模型参数选择 QA 姿态（2026-10-08，云端部分）
 
 基于 main@b56e2d6，用户确认[上游方案复评与后续计划](NEXT_ITERATION_PLAN_2026-10-08.md)后开始实施。`qa_workspace` 复用当前构建报告的参数范围，通过纯函数生成端点、眼嘴约定动作、少量转头组合，并去重默认状态；不再要求头发参数。`review.json` 的 `spec.coverage` 说明采样/未采样参数、不适用动作及 neutral-only 范围。缺少范围的旧构建要求重建，未改变显式 spec 的错误处理或 HTTP 协议。
 

@@ -116,7 +116,9 @@ class AgentMcpService(
 	lateinit var connectionInfo: AgentMcpConnectionInfo
 		private set
 
+	@Synchronized
 	fun start(): AgentMcpConnectionInfo {
+		check(!isClosed.get()) { "Agent MCP service is closed; create a new service" }
 		check(engine == null) { "Agent MCP service is already running" }
 		val started = embeddedServer(CIO, host = config.host, port = config.port) {
 			configureAgentMcp(workspace, config.token, config.maxRequestBodyBytes)
@@ -141,6 +143,7 @@ class AgentMcpService(
 		}
 	}
 
+	@Synchronized
 	override fun close() {
 		if (!isClosed.compareAndSet(false, true)) return
 		runCatching {

@@ -51,9 +51,12 @@ build-psd2live.bat test
 python\Scripts\python.exe -m tools.authoring_rig --help
 python\Scripts\python.exe live2d-viewer\check_runtime.py
 python\Scripts\python.exe skills\live2d-studio\scripts\check_routing.py
+powershell -NoProfile -ExecutionPolicy Bypass -File .\check-mcp.ps1 -TimeoutSeconds 10
 ```
 
 构建脚本使用本地 JDK/Gradle，默认任务是 `jar`，首次解析 Maven/插件依赖需要网络。不要把 portable 的 Java 运行时当作源码构建 JDK。
+
+MCP 诊断使用本仓 Python 和现有 stdio 代理，不启动桌面应用。退出码 0 为实际握手通过，1 为离线、握手失败或超时，2 为环境/配置问题；超时范围为 1–60 秒。路径、地址及凭据配置见 [toolchain.md](toolchain.md)。
 
 Studio 优先加载 `psd2live/build/libs/psd2live-0.7.1.jar`；没有开发构建时，原生 CLI 使用随仓应用 JAR。切换运行时后 Overlay baseline 要重新建立。原 portable 桌面程序继续使用上游应用，本仓扩展通过 Studio/CLI 或源码构建使用。
 

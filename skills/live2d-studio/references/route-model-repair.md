@@ -18,9 +18,9 @@ fallback: [{on: 根因分支不成立, to: route-model-repair.md#诊断, max_ret
 
 先复现：[pb-render-compare.md](pb-render-compare.md) 建基线。然后按症状收敛：
 
-1. **部件不跟参数/跟着别的部件走/该摆不随** → 先查语义标签，不先改美术（取 [deep-live2d-psd2live-semantics.md](deep-live2d-psd2live-semantics.md)，见 [index.md](index.md)）。一次像素差渲染即可证实/证伪；若需重导出修正标签，走 [pb-export-and-audit-tags.md](pb-export-and-audit-tags.md)。
+1. **部件不跟参数/跟着别的部件走/该摆不随** → 先检查实际分类、对象直接轴与父级继承，再隔离部件观察有效参数范围。参数存在不证明有绑定，整图无明显变化也不证明绑定缺失。语义取 [deep-live2d-psd2live-semantics.md](deep-live2d-psd2live-semantics.md)（见 [index.md](index.md)）；若确需修正标签后导出，走 [pb-export-and-audit-tags.md](pb-export-and-audit-tags.md)。
 2. **形状与美术不符**（眼白溢出、虹膜非圆、多余色块）→ 转 [route-art-repair.md](route-art-repair.md)（眼三层重切配方 [deep-live2d-eye-hair-recipes.md](deep-live2d-eye-hair-recipes.md)）。
-3. **嘴部双线/"像小胡子"/开合不符** → 先分辨：原画/切片自带双线→转 [route-art-repair.md](route-art-repair.md)；否则按选择条件：几何/汇聚线错误→[pb-mouth-geometry-repair.md](pb-mouth-geometry-repair.md)；图层重叠/透明度过渡错误→[pb-mouth-layer-crossfade.md](pb-mouth-layer-crossfade.md)。机制公式取 [deep-live2d-psd2live-mouth-pipeline.md](deep-live2d-psd2live-mouth-pipeline.md)。
+3. **嘴部双线/"像小胡子"/开合不符** → 先确认当前轮廓配置、实际唇层与几何/透明度。原画自带双线→转 [route-art-repair.md](route-art-repair.md)；连续形变或落位错误→[pb-mouth-geometry-repair.md](pb-mouth-geometry-repair.md)；明确需要两图透明度过渡→[pb-mouth-layer-crossfade.md](pb-mouth-layer-crossfade.md)。不能仅凭 mouth_open 不透明就判为交叉淡入问题；机制取 [deep-live2d-psd2live-mouth-pipeline.md](deep-live2d-psd2live-mouth-pipeline.md)。
 4. **层次穿透**（长发穿胸等）→ z 序与前后发归属：后发最底、前发最上，规则见 SKILL 引用的规范正文。
 5. **脸/发/饰大小位置与原版不一致** → 转 [route-art-repair.md](route-art-repair.md)（先配准量化，取 [deep-live2d-reference-alignment.md](deep-live2d-reference-alignment.md)）。
 6. **模型好、仅本软件显示错**（整块空白/碎片错位）→ 转 [route-runtime-integration.md](route-runtime-integration.md)。
