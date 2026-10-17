@@ -2,6 +2,32 @@
 import re
 
 
+def _material_issues(parts, classifications):
+    """Advise on the generated base rig, using DrawableBuilder's mask matching rules."""
+    layers = [layer for layer in classifications if layer.get("drawable")]
+    eye_sides = {layer["side"] for layer in layers if layer["semanticTag"] == "EYEWHITE"}
+    # Mouth masking ultimately falls back to any mouth, regardless of side/variant.
+    has_mouth = any(layer["semanticTag"] in ("MOUTH", "MOUTH_OPEN") for layer in layers)
+    names = {part["id"]: part["name"] for part in parts}
+    issues = {}
+    for layer in layers:
+        tag = layer["semanticTag"]
+        if tag == "IRIDES" and layer["side"] not in eye_sides and "NONE" not in eye_sides:
+            code = "MISSING_EYEWHITE"
+            advice = "虹膜部件缺少同侧或通用眼白作为裁剪来源；请检查眼白分类、左右侧或补充素材。"
+        elif tag in ("TOOTH_T", "TOOTH_B", "TONGUE") and not has_mouth:
+            code = "MISSING_MOUTH_APERTURE"
+            advice = "口腔内部件缺少嘴部主体作为裁剪来源；请检查 MOUTH / MOUTH_OPEN 分类或补充素材，闭嘴线不能作为口腔裁剪来源。"
+        else:
+            continue
+        part_id = layer["partId"]
+        # One source part may be split into several native components.
+        issues[(part_id, code)] = {"code": code, "severity": "warning", "stage": "classification",
+            "partId": part_id, "message": f"当前基础模型中，图层 {names[part_id]} 的{advice} 此提示不阻止继续编辑或导出。",
+            "action": "select-part"}
+    return list(issues.values())
+
+
 def model_issues(view, root, state):
     from .workspace_store import read
     from .workspace_query import model_record_matches, overlay_inputs
@@ -35,4 +61,6 @@ def model_issues(view, root, state):
                          "action": "show-overlay" if state["overlay"] else "rebuild"}
                 if parameter: issue["field"] = parameter.group(1)
                 issues.append(issue)
+    if current:
+        issues.extend(_material_issues(view["ir"]["parts"], classifications))
     return issues

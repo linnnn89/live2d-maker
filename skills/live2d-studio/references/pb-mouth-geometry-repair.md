@@ -17,14 +17,14 @@ touches: [source, export]
 
 ## 步骤
 
-1. 复核位置量：`mouth_close` 垂直中心是否 == `bounds.top + 0.48*h` 的 seam；素材宽高比是否与原版一致（错件判据见深参考）。
-2. 调整 `mouth_close` 落位使垂直中心命中 seam（位置类修复）；素材错件 → 回 [route-art-repair.md](route-art-repair.md) 换件，不硬塞。
-3. 重建 PSD → [pb-export-and-audit-tags.md](pb-export-and-audit-tags.md)（R-b）。
+1. 先读实际 mouthOutlineEnabled、生成唇层、直接参数轴和父级，再固定镜位查看 MouthForm × MouthOpen。`top + 0.48*h` 仅是几何基准，曲线与表情还会影响最终形状；不能直接要求独立唇线中心等于它。
+2. 绑定存在而局部形状不合适时，先按 [MCP 契约第 6 节](../../../psd2live/docs/zh/agent/MCP_AUTHORING.md) 使用已有关键形/局部形变。确认源素材错位时才调整落位；素材错件 → 回 [route-art-repair.md](route-art-repair.md)。
+3. 模型编辑沿用原生历史；源素材修改才重建 PSD。导出走 [pb-export-and-audit-tags.md](pb-export-and-audit-tags.md)（R-b），不强制每次局部修正都重切素材。
 
 ## 完成判据（fixture 化，P4/P5）
 
-- 闭嘴态双线消失：两水平边缘间距 ≤ 阈值（阈值随 fixture 渲染规格固定存档；占位 `TODO(实测)`——已知参考：seam 偏差 4.9px@1024 画布即现明显双线）。
-- 嘴部包围盒高/画布宽 ≤ fixture 阈值（占位 `TODO(实测)`；参考：正常 4~5px vs 异常 9px@1024）。
+- 闭合线与目标一致，中间姿态和 MouthForm 表达合理，转头时不脱离；不存在非预期的重复绘制。
+- 若需要量化阈值，从当前素材、配置和取景建立基线；旧案例的 4–5 px 或 48% 中心不能直接作为通过条件。
 - 复测用 [pb-render-compare.md](pb-render-compare.md) 同镜位对比图。
 
 ## 回滚

@@ -1,81 +1,66 @@
 # 嘴部双图层：机制、量化诊断与修复配方（PSD2Live）
 
+2026-10-13 按 `main@930d02b` 源码校准。第 1–3 节是当前机制与选择依据；第 4–6 节保留旧角色案例，原记录未注明完整引擎版本和配置，不能当作当前所有模型的验收规则。本轮只核对文档与源码，未在 PC 重新渲染案例。
+
 ## 1. 机制（源码位置，先读这几处）
 
-- `core/RigBuilder.kt`
-  - `buildChannels()`：决定每个 drawable 的不透明度网格。PRESET 类型下只有 `MOUTH_CLOSE -> scalarGrid(MOUTH_OPEN, [0,1]) { 1 - it }`、`TOOTH_T/B`/`TONGUE -> [0, 0.15, 1]` 的快速淡入；**`MOUTH` / `MOUTH_OPEN` 落到 `else -> null`，即永远不透明，没有渐显**。
-  - `mouthWholePoint()`：张嘴形变。`seamY = aperture.top + aperture.height * 0.48`；闭嘴时 `verticalScale = (1.25px / aperture.height)`，水平只收缩到 `0.92`。`aperture` 来自 `mouthApertureFor(layer)`＝`mouth`/`mouth_open` 层的 alpha 包围盒。
-  - `mouthAxes()`：嘴部密集关键形轴（MouthForm 9 档 × MouthOpen 33 档）。
-- 规范：`psd2live/docs/zh/spec/PSD_LAYER_SPEC.md` §2（嘴与口腔系统）。
-- 语义别名：`mouth` / `mouth_open` / `open mouth` / `张嘴`… → MOUTH_OPEN；`mouth_close` / `闭嘴` / `口閉じ` → MOUTH_CLOSE。
+源码位于 `psd2live/src/main/kotlin/io/github/psd2live/core/`：
 
-### 由机制直接推出的两条结论
+- `DrawableBuilder.buildChannels()` 决定不透明度。PRESET 的 MOUTH_CLOSE 按 `1 - ParamMouthOpenY` 淡出；TOOTH_T/B、TONGUE 在开合 0→0.15 间淡入。PRESET 的 MOUTH / MOUTH_OPEN 没有该透明度通道，但这不等于闭嘴一定残留可见线条。
+- `MouthRigGenerator.mouthWholePoint()` 决定几何形状。汇聚基准为 `aperture.top + 0.48 * aperture.height`，最终形状还受 MouthForm、嘴部曲线和开合影响，不能只对齐一个固定中心值就宣称修复。
+- `exactClose=true` 时闭合缩放为 0；否则使用 `(1.25 / height).coerceIn(0.018, 0.12)`。因此“所有闭嘴都压成 1.25 px 残带”不成立。
+- `Model.kt` 的 `mouthOutlineEnabled` 默认 true。非 meshOnly 构建会经 `MouthLipLayers`、`DrawableBuilder` 与 `MouthRigGenerator` 处理口腔轮廓、嘴唇和精确闭合；独立唇层也是检查对象。配置不同，旧双图层结果不可直接套用。
+- MouthForm × MouthOpen 已有 9 × 33 个关键形。嘴形检查应覆盖两个维度，不需要先新增参数；参数定义本身也不能证明有可见动作。
 
-1. **闭嘴态不是“隐藏张嘴层”，而是“把张嘴层压成 1.25px 的线”**。所以只要还有一条独立的闭嘴唇线图层，闭嘴时就会出现“唇线 + 压扁残带”两条线。
-2. **压扁的汇聚点是 48% 处，而不是美术里唇线所在的位置**。放唇线图层时必须按 `top + 0.48*h` 对齐，否则双线／“小胡子”。
+语义名称和别名以 `LayerClassifier.kt` 为准；分类报告中的 `semanticTag/type/side/parameter` 应来自当前构建。老文档的 `RigBuilder.buildChannels()` 已移至 DrawableBuilder，RigBuilder 的部分转发函数不代表实现仍集中在那里。
 
 ## 2. 量化诊断（先复现，再改）
 
-1. 读**模型自身**的关键形：绕开 viewer 补丁，`Object.getPrototypeOf(model).getDrawableOpacity` 与页面里那份分别取值，逐 `ParamMouthOpenY` 打印两张嘴图层的 raw / patched 不透明度。健康值应当是互补的（`mouth_open`：0→1 快速上升；`mouth_close`：1→0）。若看到 `mouth_open` 恒为 1，双线的根因就已确认。
-2. 隔离渲染：把除两张嘴图层以外的 drawable 不透明度置 0，逐档截图，量“嘴部并集”的 bbox 高宽。判据：闭嘴态并集高应≈单条唇线（4~5px@1024），实测 9px 即含残带。
-3. 对齐核算（不用开浏览器就能算）：
-   ```
-   seam = mouth_open_bounds.top + 0.48 * mouth_open_bounds.height
-   偏差 = seam - mouth_close_center_y     # |偏差| 应 <= 1~2px
-   ```
-   两个 bounds 都取 **alpha 包围盒**（可见像素），不是 PSD 图层框。
-4. 素材保真：量原版全张素材的宽高比与张嘴形变随参数的走向（原版近圆 1.08:1；若手里的是 2:1 的扁件，说明拿错了同名贴图分量）。
-5. `export/*.psd2live.json` 的 `warnings` 值得读：`ArtMeshMouthClose 默认姿态与 PSD 有明显偏差：期望 Bounds(...) 实际 Bounds(...)` 通常只是闭嘴水平 0.92 收缩造成的，**不是** bug；不要为了消掉它去改对齐。
+1. 确认实际源码/JAR、构建设置、源素材和 Overlay 是否与报告匹配。旧模型或旧截图不能解释新配置的效果。
+2. 用当前对象的直接轴、通道及父级链检查绑定，固定画布裁区比较闭合、半开、张开；再查看几个 MouthForm 值和一个转头姿态。Agent 的局部修正示例见 [MCP 契约第 6 节](../../../psd2live/docs/zh/agent/MCP_AUTHORING.md)。
+3. 怀疑双线时，分别查看口腔主体、独立闭嘴线、生成的唇层。读模型实际几何和透明度，不在 viewer 中覆盖 getter 来隐藏缺陷。MOUTH_OPEN 的不透明度恒为 1，单独不能证明双线根因。
+4. 确有重复绘制，再判断是位置错误、源素材不符、生成唇层重复，还是应采用独立绘图切换。对比同镜位的全脸和局部图，不能只凭 alpha 包围盒大小判断好坏。
 
-## 3. 修复配方（按代价从低到高）
+## 3. 修复配方（按目标选择）
 
-### A. 对齐（最小改动，先做这个）
-把 `mouth_close` 唇线的垂直中心摆到 `mouth_open` 包围盒的 48% 处（或整体平移张嘴素材使其 seam 落到唇线中心）。改哪个看代价：用户平时看到的是**闭嘴态**，所以优先保闭嘴态的原始落位。
-- **限制**：张嘴素材压扁后宽度≈素材宽 ×0.92。若原版张嘴比闭口线宽得多（例 57 vs 35），压扁残带会横向伸出唇线两侧几像素——对齐能消掉“上下两条线”，消不掉这条细横带。要彻底消掉必须做 B/C。
+| 目标 | 配置与处理 | 必须保留的区别 |
+|---|---|---|
+| 连续嘴形与开合 | 保留 MOUTH / MOUTH_OPEN 的几何，先检查当前轮廓设置、嘴唇与局部关键形 | 不要求主体在闭合时透明，也不要求独立 MOUTH_CLOSE 图层 |
+| 连续几何之外，还要主体渐显 | 确有需要时使用 `type=TOGGLE`、`tag=MOUTH_OPEN`、`parameter=ParamMouthOpenY` | 保留嘴部形变，并改变透明度；不是纯贴图切换 |
+| 两张独立绘图做纯透明度交叉淡入 | 确定不需要口腔形变时，张嘴图可用 `type=TOGGLE`、`tag=UNKNOWN`、`parameter=ParamMouthOpenY`，闭嘴图沿用对应淡出 | UNKNOWN 会改变语义、局部几何、父级选择及作为口腔蒙版的资格；需重新检查继承运动和牙齿/舌头裁剪 |
 
-### B. 换回真正的最大张口素材
-用原版模型渲染出来的那张卡（不是图集里同名的其它变体），落位后再复算 seam。素材保真度决定“开合角度/幅度”是否与原版一致。
+`type` 决定透明度来源，`tag` 决定语义绑定与几何路径，两者不能互相代替。UNKNOWN 不是通用修复开关；Studio 当前交付检查会拒绝未知分类，不能把这条原生配置示例承诺为 Studio 可交付方案，也不能为迁就它放宽交付规则。
 
-### C. 在模型里做交叉淡入（推荐终态）
-```
-PipelineConfig.layerOverrides["<嘴部张嘴层的 layer id>"] = LayerClassificationOverride(
-    type      = LayerType.TOGGLE,       # 不透明度来源 → 参数值本身（线性恒等映射 scalarGrid(param,[0,1]){it}，非硬开关）
-    tag       = SemanticTag.UNKNOWN,     # 关键：设 UNKNOWN 才能避开口腔压缩网格
-    side      = Side.NONE,
-    parameter = "ParamMouthOpenY",
-    switchId  = 0)
-```
-- **`tag` 必须设 `UNKNOWN`，不能设 `MOUTH_OPEN`**：`MOUTH_OPEN` 会触发口腔压缩网格（mouthWholeGrid），导致 UV 包围盒缩到 23×16、张嘴渲染只剩 15×11（正常应 54×50 / 36×34）——张嘴变成小圆嘴。`UNKNOWN` 让该层不参与口腔形变，只做线性透明度交叉淡入，才是正确的"纯交叉淡入"。
-- `override` 按 `layer.source.id.raw` 索引（`Analyzer.withOverride`）；key 对不上时导出结果毫无变化，所以**必须先读回 psd2live.json** 确认该层已变成 `type=toggle` 且 `tag=unknown`。
-- 用 jpype 构造：`J('io.github.psd2live.core.LayerType').TOGGLE` 等枚举直接传参，map 用 `java.util.LinkedHashMap`；现有 `copy_config()` 反射重建配置，把新字段一并塞进去。
-- 效果：闭嘴态张嘴层不透明度 0（干净单唇线，无残带）；张嘴过程两层互补淡入（线性，与原版 2.1 的纯交叉淡入机制一致）。
+上表是原生 `PipelineConfig.layerOverrides` 的配置语义，**不是可直接发送的 MCP JSON**。使用实际暴露的工具契约；Studio 的语义 override 当前只传 tag/side，不等于已有 type/parameter 编辑入口。修改后核对导出报告与实际动作，不能只检查 override 字段写入成功。
 
-### 不要做的事
-- 只在 `preview.html` 里 monkey-patch `getDrawableOpacity`：模型没变，换任何运行时都露馅。
-- 为了“闭嘴干净”把 `mouth_close` 直接删掉、只留 `mouth_open`：压扁后是一条“素材宽 ×0.92”的粗线（原版闭口线往往窄得多），闭口形制不对，等于用另一个形状错误换掉双线问题。
+素材错位时优先修正确认过的位置；素材不是预期嘴形时再换素材。删除闭嘴图或保留闭嘴图都取决于当前生成唇层与美术目标，不能无条件要求保留两张图。
 
-## 4. 验收指标（写进结论的必须是这些数）
+## 4. 验收指标（当前原则与历史样例）
 
-| 指标 | 取法 | 判据 |
-| --- | --- | --- |
-| 闭嘴态嘴部并集高 | 仅两张嘴层可见渲染，alpha bbox | 4~5px@1024，且无双层错位 |
-| 闭嘴态层错位 | 唇线中心 vs 压扁张嘴层中心 | ≤1~2px |
-| 张嘴幅面 | `ParamMouthOpenY=1` 的 bbox 宽/高 | 与原版渲染同尺度一致（比例、以及相对脸宽） |
-| `mouth_open` 不透明度曲线 | `Object.getPrototypeOf(model).getDrawableOpacity` 逐档取值 | 0→1 单调，闭嘴态为 0 |
-| 模型自身标签 | 重导后的 psd2live.json | tag 未变、override 生效 |
+当前验收：闭合线符合用户目标、中间过渡合理、开口和嘴角随 MouthForm 正常变化、口腔内部件裁剪正确、转头继承正确。修改前后用同一取景和参数比较，保存/重开后复查。视觉效果与原生导出均在 PC 验收。
 
-出图：同一取景、同一组参数档（0 / 0.25 / 0.5 / 0.75 / 1.0）的隔离嘴部放大条图 + 全脸（遮住其它部件）对照图。
+旧角色记录可帮助定位同类问题，但数值只属于该案例：
+
+| 历史观察 | 当时用于判断什么 | 不应推广为什么 |
+|---|---|---|
+| 1024 画布嘴部并集高 9 px，参考单线约 4–5 px | 查找额外残带 | 所有模型都必须是 4–5 px |
+| 唇线与 `top + 0.48*h` 偏差约 4.9 px | 定位旧双图层错位 | 当前所有轮廓必须对齐 48% 中心 |
+| 原素材宽高比约 1.08:1，错件约 2.10:1 | 识别同一角色拿错素材 | 宽嘴本身不合法 |
+| 某次保留 MOUTH_OPEN 后开口明显缩小 | 提示检查该素材与旧配置的形变组合 | 使用 MOUTH_OPEN 必然缩小或必须改 UNKNOWN |
+| 原版 2.1 使用两图交叉淡入 | 复现该模型的表达方式 | 当前模型都应采用这条路线 |
+
+只在目标就是纯交叉淡入时检查互补透明度；连续形变嘴不采用这个判据。源图 alpha bounds、PSD 图层框、生成后几何边界各有用途，不混用为同一种尺寸。
 
 ## 5. 嘴部美术风格判据（日系动漫）
 
-用户给的参考图/原游戏美术风格 ≠ 贴图分量素材。贴图里的 comp4（37×6 直线）和 comp8（60×31 宽扁）是**写实/复古像素风格**，不符合日系动漫嘴形。日系动漫嘴形特征：
-- **闭嘴**：柔和弧线（嘴角微扬，微笑弧），不是直线
-- **张嘴**：小圆口/椭圆口（旋转前画宽>高的椭圆，长轴沿面部横轴，旋转后长轴跟脸倾斜；直径约 20~25px@1024），不是宽扁椭圆（2:1+）
-- **颜色**：细线深棕/深灰，口腔暗红，外圈浅粉，不用粗重黑线
+旧案例要求弧线闭嘴、小圆口/椭圆口、深棕细线与暗红口腔，因此对当时的直线、宽扁素材进行了替换。这是用户给定参考的风格目标，不是所有日系动漫或所有模型的规范。
 
-**落位前必看用户给的参考图**：如果参考图是弧线+圆口，就按该风格重制美术（用 PIL 贝塞尔曲线画弧线、ellipse 画圆口），不要直接搬贴图分量。判断方法：把素材放大 6 倍与参考图并排比，形状差异一目了然。
+当前做法是先用同尺度参考确认嘴形、线宽、颜色和表情。宽嘴、直线嘴、正圆口均可能符合其他角色；没有相应需求，不额外重绘或强制改变比例。
 
 ## 6. 面部倾斜与嘴部定位（多源计算）
+
+以下保留旧角色的配准方法与数值。其权重、尺寸、倾斜方向和椭圆偏好仅适用于当时参考，不是自动应用到新角色的规则。当前问题不涉及参考配准时，无需执行本节。
+
 
 嘴部不应水平放置——脸往往有轻微倾斜。用多源特征点计算嘴部倾斜角：
 1. **眉心重心 E**：`eyebrow_all.png` 的 alpha 加权重心（α>30）
