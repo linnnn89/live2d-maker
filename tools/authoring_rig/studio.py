@@ -17,6 +17,7 @@ from .validator import validate_authoring_rig
 from .studio_protocol import StudioError, validate_protocol
 from .binding import build_configuration, classification_audit
 from .build_settings import load_settings, settings_signature
+from .qa_specs import build_pose_spec
 
 # Compatibility exports for existing CLI/native callers.
 from .workspace_store import read, write, revision, locked, file_url
@@ -287,24 +288,10 @@ def qa_workspace(root, port):
         state = read(root / "studio-state.json")
         state["latestQa"] = None
         write(root / "studio-state.json", state)
-        # Fixed authored coordinates and full-frame crops; no visual coordinate guessing.
-        shots = [{"name": "neutral", "params": {}}]
-        for parameter in ("ParamAngleX", "ParamAngleY", "ParamAngleZ", "ParamBodyAngleX"):
-            limit = 10 if parameter == "ParamBodyAngleX" else 30
-            for value in (-limit, limit):
-                shots.append({"name": parameter + ("_minus" if value < 0 else "_plus"), "params": {parameter: value}})
-        for value in (0, 0.5, 1):
-            shots.append({"name": "mouth_" + str(value).replace(".", "_"), "params": {"ParamMouthOpenY": value}})
-        shots.extend([{"name": "eyes_closed", "params": {"ParamEyeLOpen": 0, "ParamEyeROpen": 0}},
-                      {"name": "eyes_closed_mouth_open", "params": {"ParamEyeLOpen": 0, "ParamEyeROpen": 0, "ParamMouthOpenY": 1}}])
-        cdi = next((root / state["latestBuild"] / "native").glob("*.cdi3.json"))
-        available = {parameter["Id"] for parameter in read(cdi)["Parameters"]}
-        hair = [parameter for parameter in ("ParamHairFront", "ParamHairBack", "ParamHairSide") if parameter in available]
-        if not hair:
-            raise ValueError("Pose QA requires at least one generated hair parameter")
-        shots.extend({"name": "hair_minus" if value < 0 else "hair_plus", "params": {parameter: value for parameter in hair}} for value in (-1, 1))
-        spec = {"model": view["build"]["modelUrl"], "vendor": "/public/vendor/cubism/",
-                "canvas": [640, 640], "canvaspx": [data["canvas"]["width"], data["canvas"]["height"]], "shots": shots}
+        parameters = view["build"].get("parameters")
+        if parameters is None:
+            raise ValueError("Build report has no parameter ranges; rebuild before running Pose QA")
+        spec = build_pose_spec(view["build"]["modelUrl"], data["canvas"], parameters)
         directory = root / "reviews" / uuid.uuid4().hex
         directory.mkdir(parents=True)
         write(directory / "spec.json", spec)
